@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHICKEN ERP - REPORTES Y ESTADÍSTICAS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        :root { --brand-primary: #f59e0b; --brand-dark: #111827; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        
+        .sidebar-item { transition: all 0.2s; border-radius: 12px; margin: 4px 12px; }
+        .sidebar-item:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+        .sidebar-active { background-color: var(--brand-primary); color: var(--brand-dark) !important; font-weight: 700; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden relative">
+
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 hidden md:hidden"></div>
+
+    <aside id="sidebar-menu" class="fixed md:relative inset-y-0 left-0 w-64 bg-slate-900 text-slate-400 flex flex-col shadow-2xl z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+        <div class="p-6 flex items-center justify-between md:justify-start gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-slate-900 shadow-lg shadow-amber-500/20">
+                    <i data-lucide="utensils-crossed"></i>
+                </div>
+                <span class="text-white font-black text-xl tracking-tighter">CHICKEN<span class="text-amber-500">ERP</span></span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white md:hidden p-2">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 mt-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <a href="index.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i> Dashboard
+            </a>
+            <a href="salon.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i> Salón / Mesas
+            </a>
+            <a href="cocina.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="chef-hat" class="w-5 h-5"></i> Cocina / Pedidos
+            </a>
+            <a href="caja.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="calculator" class="w-5 h-5"></i> Caja / Cobros
+            </a>
+            <a href="reportes.html" class="sidebar-item sidebar-active flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i> Reportes
+            </a>
+			<div class="my-4 border-t border-slate-800 mx-4"></div>
+            <a href="carta.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="book-open" class="w-5 h-5"></i> Carta e Inventario
+            </a>
+            <a href="usuarios.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="users-round" class="w-5 h-5"></i> Personal y Accesos
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800 shrink-0">
+            <div class="flex items-center gap-3 p-2 bg-slate-800/50 rounded-xl">
+                <div class="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-bold text-white">AD</div>
+                <div class="text-xs">
+                    <p class="text-white font-bold">Administrador</p>
+                    <p class="text-slate-500 truncate w-32">Local Principal</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden w-full bg-slate-100">
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 z-10 shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl md:hidden">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+                <div class="hidden sm:flex items-center gap-2 text-slate-500 text-sm font-medium">
+                    <span>Finanzas</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    <span class="text-slate-900 font-bold">Reportes y Estadísticas</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <button onclick="window.print()" class="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                    <i data-lucide="printer" class="w-4 h-4"></i> <span class="hidden xs:inline sm:inline">Imprimir Reporte</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+            
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">Rendimiento del Negocio</h1>
+                    <p class="text-xs md:text-sm text-slate-500">Historial de cierres de caja, ventas y desempeño del personal.</p>
+                </div>
+                
+                <div class="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm">
+					<button onclick="setFiltro('mes', this)" class="btn-filtro-rep px-4 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase transition-all">Este Mes</button>
+					<button onclick="setFiltro('semana', this)" class="btn-filtro-rep px-4 py-1.5 text-slate-500 hover:text-slate-800 rounded-lg text-xs font-bold uppercase transition-all">Semana</button>
+					<button onclick="setFiltro('dia', this)" class="btn-filtro-rep px-4 py-1.5 text-slate-500 hover:text-slate-800 rounded-lg text-xs font-bold uppercase transition-all">Día</button>
+				</div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8">
+                <div class="bg-amber-500 p-6 rounded-3xl shadow-lg shadow-amber-500/20 text-slate-900 relative overflow-hidden transform transition-all hover:scale-[1.02]">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-white rounded-full opacity-20"></div>
+                    <p class="text-xs font-black uppercase tracking-widest opacity-80">Ingresos Acumulados</p>
+                    <p id="rep-ingresos" class="text-4xl font-black mt-2 font-mono tracking-tighter">S/ 0.00</p>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+                    <p class="text-xs text-slate-400 font-black uppercase tracking-widest">Mesas Atendidas</p>
+                    <div class="flex items-center gap-3 mt-2">
+                        <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><i data-lucide="users" class="w-5 h-5"></i></div>
+                        <p id="rep-mesas" class="text-3xl font-black text-slate-800">0</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+                    <p class="text-xs text-slate-400 font-black uppercase tracking-widest">Ticket Promedio</p>
+                    <div class="flex items-center gap-3 mt-2">
+                        <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><i data-lucide="receipt" class="w-5 h-5"></i></div>
+                        <p id="rep-promedio" class="text-3xl font-black text-slate-800 font-mono">S/ 0.00</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                
+                <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="font-black text-slate-700 uppercase text-sm flex items-center gap-2">
+                            <i data-lucide="award" class="w-5 h-5 text-amber-500"></i> Rendimiento de Meseros
+                        </h2>
+                    </div>
+                    <div id="ranking-meseros" class="space-y-5">
+                        </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-3xl shadow-xl p-6 text-white">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="font-black text-amber-400 uppercase text-sm flex items-center gap-2">
+                            <i data-lucide="flame" class="w-5 h-5"></i> Rendimiento de Cocina
+                        </h2>
+                    </div>
+                    
+                    <div class="flex items-center justify-center py-6">
+                        <div class="relative w-40 h-40 flex items-center justify-center rounded-full border-8 border-slate-800">
+                            <svg class="absolute inset-0 w-full h-full transform -rotate-90">
+                                <circle cx="50%" cy="50%" r="45%" fill="transparent" stroke="#f59e0b" stroke-width="8" stroke-dasharray="100 100" stroke-dashoffset="100"></circle>
+                            </svg>
+                            <div class="text-center z-10">
+                                <p id="rep-tickets-cocina" class="text-4xl font-black text-white">0</p>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Tickets<br>Despachados</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-800 rounded-xl p-4 flex justify-between items-center mt-2 border border-slate-700">
+                        <div>
+                            <p class="text-xs text-slate-400 font-bold uppercase">Eficiencia</p>
+                            <p class="text-sm font-black text-slate-300">En espera de datos...</p>
+                        </div>
+                        <i data-lucide="check-circle-2" class="w-8 h-8 text-slate-600 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 bg-slate-50">
+                    <h2 class="font-black text-slate-700 uppercase text-sm flex items-center gap-2">
+                        <i data-lucide="history" class="w-4 h-4"></i> Historial de Cierres de Turno
+                    </h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left min-w-[700px]">
+                        <thead class="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                            <tr>
+                                <th class="px-6 py-4">Fecha de Cierre</th>
+                                <th class="px-6 py-4">Hora</th>
+                                <th class="px-6 py-4 text-center">Mesas Atendidas</th>
+                                <th class="px-6 py-4 text-right">Ingresos (Total)</th>
+                                <th class="px-6 py-4 text-center">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial" class="divide-y divide-slate-50 text-sm bg-white">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <script>
+        function toggleSidebar() {
+		const sidebar = document.getElementById('sidebar-menu');
+		const backdrop = document.getElementById('sidebar-backdrop');
+		sidebar.classList.toggle('-translate-x-full');
+		backdrop.classList.toggle('hidden');
+	}
+
+	let filtroActual = 'mes'; // Por defecto muestra el mes actual
+
+		function setFiltro(tipo, elemento) {
+		filtroActual = tipo;
+    
+		// Cambiar estilos de los botones para marcar el activo
+		document.querySelectorAll('.btn-filtro-rep').forEach(b => {
+        b.className = "btn-filtro-rep px-4 py-1.5 text-slate-500 hover:text-slate-800 rounded-lg text-xs font-bold uppercase transition-all";
+    });
+		elemento.className = "btn-filtro-rep px-4 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase transition-all";
+    
+		// Recargar los reportes con el nuevo filtro
+		cargarReportes();
+	}
+
+		// Función auxiliar para convertir "DD/MM/YYYY" a Fecha de Javascript
+		function parseFecha(fechaStr) {
+		const partes = fechaStr.split('/');
+		if (partes.length === 3) {
+        return new Date(partes[2], partes[1] - 1, partes[0]);
+		}
+		return new Date(); 
+	}
+
+		function cargarReportes() {
+		// Leer el historial real
+		let historialTotal = JSON.parse(localStorage.getItem('polleria_historial')) || [];
+		const hoy = new Date();
+    
+		// 1. APLICAR EL FILTRO DE TIEMPO
+		let historialFiltrado = historialTotal.filter(h => {
+        const fechaH = parseFecha(h.fecha);
+        
+        if (filtroActual === 'dia') {
+            return fechaH.getDate() === hoy.getDate() && 
+                   fechaH.getMonth() === hoy.getMonth() && 
+                   fechaH.getFullYear() === hoy.getFullYear();
+        } else if (filtroActual === 'semana') {
+            // Últimos 7 días
+            const unDia = 24 * 60 * 60 * 1000;
+            const diffDias = Math.abs((hoy - fechaH) / unDia);
+            return diffDias <= 7;
+        } else if (filtroActual === 'mes') {
+            return fechaH.getMonth() === hoy.getMonth() && 
+                   fechaH.getFullYear() === hoy.getFullYear();
+				}
+				return true;
+		});
+
+		// Invertimos para que el más reciente aparezca arriba
+		let historialReverso = [...historialFiltrado].reverse();
+
+		// 2. CÁLCULOS GLOBALES
+		let totalIngresos = 0;
+		let totalMesas = 0;
+    
+		historialFiltrado.forEach(h => {
+        totalIngresos += h.ingresos;
+        totalMesas += h.mesas;
+    });
+
+		let ticketPromedio = totalMesas > 0 ? (totalIngresos / totalMesas) : 0;
+
+		// Inyectar KPIs a la vista
+		document.getElementById('rep-ingresos').innerText = `S/ ${totalIngresos.toFixed(2)}`;
+		document.getElementById('rep-mesas').innerText = totalMesas;
+		document.getElementById('rep-promedio').innerText = `S/ ${ticketPromedio.toFixed(2)}`;
+		document.getElementById('rep-tickets-cocina').innerText = Math.floor(totalMesas * 1.5);
+
+		// 3. RENDERIZAR TABLA DE HISTORIAL
+		const tbody = document.getElementById('tabla-historial');
+		if(historialReverso.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400 font-medium"><i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>No hay registros para este periodo.</td></tr>`;
+    } else {
+        tbody.innerHTML = historialReverso.map(h => `
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-6 py-4 font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> ${h.fecha}
+                </td>
+                <td class="px-6 py-4 text-slate-500 font-mono text-xs">${h.hora}</td>
+                <td class="px-6 py-4 text-center font-black text-slate-700">${h.mesas}</td>
+                <td class="px-6 py-4 text-right font-mono font-black text-emerald-600">S/ ${h.ingresos.toFixed(2)}</td>
+                <td class="px-6 py-4 text-center">
+                    <span class="bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1 rounded text-[10px] font-black uppercase">Cerrado OK</span>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // 4. RENDERIZAR MESEROS
+    const meseros = [
+        { nombre: 'Carlos', mesas: totalMesas > 0 ? Math.floor(totalMesas * 0.5) : 0, color: 'bg-amber-500' },
+        { nombre: 'María', mesas: totalMesas > 0 ? Math.floor(totalMesas * 0.3) : 0, color: 'bg-emerald-500' },
+        { nombre: 'Luis', mesas: totalMesas > 0 ? Math.floor(totalMesas * 0.2) : 0, color: 'bg-blue-500' }
+    ];
+
+    const maxMesas = Math.max(...meseros.map(m => m.mesas));
+    const rankingDiv = document.getElementById('ranking-meseros');
+    
+    rankingDiv.innerHTML = meseros.map(m => {
+        const porcentaje = maxMesas > 0 ? (m.mesas / maxMesas) * 100 : 0;
+        return `
+        <div>
+            <div class="flex justify-between text-xs font-bold mb-1">
+                <span class="text-slate-700">${m.nombre}</span>
+                <span class="text-slate-500">${m.mesas} Mesas</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2.5">
+                <div class="${m.color} h-2.5 rounded-full transition-all duration-1000" style="width: ${porcentaje}%"></div>
+            </div>
+        </div>
+        `;
+    }).join('');
+
+		lucide.createIcons();
+	}
+
+		// Cargar al inicio
+		cargarReportes();
+
+        // Actualizar datos cada vez que se carga o recarga
+        cargarReportes();
+    </script>
+</body>
+</html>
