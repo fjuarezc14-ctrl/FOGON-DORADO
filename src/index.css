@@ -20,7 +20,7 @@
   
   .sidebar-item { @apply transition-all duration-200 rounded-xl mx-3 my-1; }
   .sidebar-item:hover { @apply bg-white/10 text-white; }
-  .sidebar-active { @apply bg-amber-500 text-slate-900 font-bold !important; }
+  .sidebar-active { @apply !bg-amber-500 !text-slate-900 !font-bold; }
 }
 
 @layer utilities {
