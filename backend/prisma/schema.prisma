@@ -1,0 +1,112 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// USUARIOS Y ROLES
+// ============================================================
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  rol       String   // "Administrador", "Cajero", "Mozo", "Cocinero"
+  pin       String
+  permisos  String[] // ["Dashboard", "Salon", "Caja", ...]
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+}
+
+// ============================================================
+// CARTA / PRODUCTOS
+// ============================================================
+model Producto {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  categoria String   // "Pollos", "Bebidas", "Guarniciones"
+  precio    Float
+  tipoStock String   @default("ilimitado") // "ilimitado" | "limitado"
+  stock     Int      @default(0)
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now())
+  
+  ItemPedido ItemPedido[]
+}
+
+// ============================================================
+// MESAS Y PEDIDOS
+// ============================================================
+model Mesa {
+  id      Int      @id @default(autoincrement())
+  numero  Int      @unique
+  estado  String   @default("Libre") // "Libre", "Cocina", "Servido"
+  
+  Pedidos Pedido[]
+}
+
+model Pedido {
+  id        Int          @id @default(autoincrement())
+  mesa      Mesa         @relation(fields: [mesaId], references: [id])
+  mesaId    Int
+  mesero    String
+  estado    String       @default("Cocina") // "Cocina", "Servido", "Cobrado"
+  total     Float
+  adicional Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  
+  items     ItemPedido[]
+  Venta     Venta?
+}
+
+model ItemPedido {
+  id         Int      @id @default(autoincrement())
+  pedido     Pedido   @relation(fields: [pedidoId], references: [id])
+  pedidoId   Int
+  producto   Producto @relation(fields: [productoId], references: [id])
+  productoId Int
+  nombre     String   // Guardamos el nombre al momento de la venta
+  precio     Float
+  cantidad   Int
+  historial  Boolean  @default(false)
+}
+
+// ============================================================
+// VENTAS / CAJA
+// ============================================================
+model Venta {
+  id              Int      @id @default(autoincrement())
+  pedido          Pedido   @relation(fields: [pedidoId], references: [id])
+  pedidoId        Int      @unique
+  tipoComprobante String   // "Boleta", "Factura", "Ticket"
+  numDocumento    String?  // DNI o RUC del cliente
+  nombreCliente   String?
+  total           Float
+  igv             Float
+  subtotal        Float
+  metodoPago      String   @default("Efectivo") // "Efectivo", "Tarjeta", "Yape"
+  estadoNubefact  String   @default("PENDIENTE") // "PENDIENTE", "ACEPTADA", "ERROR"
+  createdAt       DateTime @default(now())
+}
+
+// ============================================================
+// COMPRAS / GASTOS (RCE - SUNAT)
+// ============================================================
+model Compra {
+  id             Int      @id @default(autoincrement())
+  fecha          DateTime @default(now())
+  proveedor      String
+  ruc            String?
+  tipoDocumento  String   @default("Factura") // "Factura", "Boleta"
+  serieNumero    String?  // Ej: "F001-001"
+  baseImponible  Float
+  igv            Float
+  total          Float
+  xmlData        String?  // Guardamos el XML crudo del proveedor
+  origenCarga    String   @default("manual") // "xml", "manual"
+  creadoEn       DateTime @default(now())
+}

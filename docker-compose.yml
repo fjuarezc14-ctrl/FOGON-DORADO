@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # --- Frontend: React/Vite ---
   web:
     build:
       context: .
@@ -12,3 +13,43 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+    depends_on:
+      - db
+
+  # --- Backend: Node.js/Express ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - DATABASE_URL=postgresql://fogon_user:fogon_password@db:5432/fogon_dorado
+      - PORT=3000
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  # --- Base de Datos: PostgreSQL ---
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=fogon_user
+      - POSTGRES_PASSWORD=fogon_password
+      - POSTGRES_DB=fogon_dorado
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fogon_user -d fogon_dorado"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
