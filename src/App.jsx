@@ -1,7 +1,11 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, Receipt, Users, Banknote, Lock, CheckCircle, Coins, CreditCard, Smartphone, Search, UploadCloud, Download, TrendingUp, TrendingDown, DollarSign, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
-
+import DashboardPage from './pages/DashboardPage';
+import SalonPage from './pages/SalonPage';
+import CocinaPage from './pages/CocinaPage';
+import CartaPage from './pages/CartaPage';
+import UsuariosPage from './pages/UsuariosPage';
 // === COMPONENTS ===
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
@@ -481,10 +485,14 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Layout title="Resumen de Ventas"><DashboardPage /></Layout>} />
+        <Route path="/salon" element={<Layout title="Gestión de Salón"><SalonPage /></Layout>} />
+        <Route path="/cocina" element={<Layout title="Monitor de Preparación"><CocinaPage /></Layout>} />
         <Route path="/caja" element={<Layout title="Punto de Cobro"><CajaPage /></Layout>} />
         <Route path="/compras" element={<Layout title="Registro de Compras"><ComprasPage /></Layout>} />
         <Route path="/reportes" element={<Layout title="Panel Contable"><ReportesPage /></Layout>} />
-        <Route path="/" element={<Layout title="Punto de Cobro"><CajaPage /></Layout>} />
+        <Route path="/carta" element={<Layout title="Carta e Inventario"><CartaPage /></Layout>} />
+        <Route path="/usuarios" element={<Layout title="Personal y Accesos"><UsuariosPage /></Layout>} />
       </Routes>
     </BrowserRouter>
   );

@@ -11,5 +11,8 @@ export default defineConfig({
   server: {
     host: true, // Listen on all local IPs (needed for Docker)
     port: 5173,
+    watch: {
+      usePolling: true
+    }
   }
 })
