@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHICKEN ERP - USUARIOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        :root { --brand-primary: #f59e0b; --brand-dark: #111827; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        
+        .sidebar-item { transition: all 0.2s; border-radius: 12px; margin: 4px 12px; }
+        .sidebar-item:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+        .sidebar-active { background-color: var(--brand-primary); color: var(--brand-dark) !important; font-weight: 700; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        /* Estilos para los checkboxes tipo switch */
+        .toggle-checkbox:checked { right: 0; border-color: #10b981; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden relative">
+
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 hidden md:hidden"></div>
+
+    <aside id="sidebar-menu" class="fixed md:relative inset-y-0 left-0 w-64 bg-slate-900 text-slate-400 flex flex-col shadow-2xl z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+        <div class="p-6 flex items-center justify-between md:justify-start gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-slate-900 shadow-lg shadow-amber-500/20">
+                    <i data-lucide="utensils-crossed"></i>
+                </div>
+                <span class="text-white font-black text-xl tracking-tighter">CHICKEN<span class="text-amber-500">ERP</span></span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white md:hidden p-2">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 mt-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <a href="index.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i> Dashboard
+            </a>
+            <a href="salon.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i> Salón / Mesas
+            </a>
+            <a href="cocina.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="chef-hat" class="w-5 h-5"></i> Cocina / Pedidos
+            </a>
+            <a href="caja.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="calculator" class="w-5 h-5"></i> Caja / Cobros
+            </a>
+            <a href="reportes.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i> Reportes
+            </a>
+			<div class="my-4 border-t border-slate-800 mx-4"></div>
+            <a href="carta.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="book-open" class="w-5 h-5"></i> Carta e Inventario
+            </a>
+            <a href="usuarios.html" class="sidebar-item sidebar-active flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="users-round" class="w-5 h-5"></i> Personal y Accesos
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800 shrink-0">
+            <div class="flex items-center gap-3 p-2 bg-slate-800/50 rounded-xl">
+                <div class="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-bold text-white">AD</div>
+                <div class="text-xs">
+                    <p class="text-white font-bold">Administrador</p>
+                    <p class="text-slate-500 truncate w-32">Local Principal</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden w-full bg-slate-100">
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 z-10 shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl md:hidden">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+                <div class="hidden sm:flex items-center gap-2 text-slate-500 text-sm font-medium">
+                    <span>Configuración</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    <span class="text-slate-900 font-bold">Personal y Accesos</span>
+                </div>
+            </div>
+        </header>
+
+        <section class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+            
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">Gestión de Usuarios</h1>
+                    <p class="text-xs md:text-sm text-slate-500">Crea cuentas, asigna roles y controla qué puede ver cada empleado.</p>
+                </div>
+                
+                <button onclick="abrirModalUsuario()" class="bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl font-black text-sm uppercase tracking-wide hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i> Nuevo Usuario
+                </button>
+            </div>
+
+            <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left min-w-[800px]">
+                        <thead class="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                            <tr>
+                                <th class="px-6 py-4">Empleado</th>
+                                <th class="px-6 py-4 text-center">Rol</th>
+                                <th class="px-6 py-4">Módulos Permitidos</th>
+                                <th class="px-6 py-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-usuarios" class="divide-y divide-slate-50 text-sm">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <div id="modal-usuario" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div class="bg-slate-900 p-5 flex justify-between items-center text-white">
+                <h3 class="font-black flex items-center gap-2"><i data-lucide="user-plus" class="w-5 h-5 text-amber-500"></i> Registrar Empleado</h3>
+                <button onclick="cerrarModalUsuario()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2 sm:col-span-1">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Nombre completo</label>
+                        <input type="text" id="user-nombre" placeholder="Ej. Juan Pérez" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
+                    </div>
+                    <div class="col-span-2 sm:col-span-1">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Rol Asignado</label>
+                        <select id="user-rol" onchange="autoSeleccionarPermisos()" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 bg-white">
+                            <option value="">Selecciona un rol...</option>
+                            <option value="Administrador">Administrador</option>
+                            <option value="Cajero">Cajero / Recepción</option>
+                            <option value="Mozo">Mozo / Mesero</option>
+                            <option value="Cocinero">Jefe de Cocina</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">PIN de Acceso (4 dígitos)</label>
+                    <input type="number" id="user-pin" placeholder="****" class="w-full sm:w-1/2 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 font-mono" maxlength="4">
+                </div>
+
+                <div class="border-t border-slate-100 pt-4">
+                    <label class="block text-xs font-black text-slate-800 uppercase tracking-wide mb-4">Permisos de Acceso al Menú</label>
+                    <div class="grid grid-cols-2 gap-3" id="contenedor-permisos">
+                        <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
+                            <input type="checkbox" value="Dashboard" class="permiso-cb w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer">
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4 text-slate-400"></i> Dashboard</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
+                            <input type="checkbox" value="Salon" class="permiso-cb w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer">
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="layout-grid" class="w-4 h-4 text-slate-400"></i> Salón/Mesas</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
+                            <input type="checkbox" value="Cocina" class="permiso-cb w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer">
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="chef-hat" class="w-4 h-4 text-slate-400"></i> Cocina</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
+                            <input type="checkbox" value="Caja" class="permiso-cb w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer">
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="calculator" class="w-4 h-4 text-slate-400"></i> Caja/Cobros</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
+                            <input type="checkbox" value="Reportes" class="permiso-cb w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer">
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="pie-chart" class="w-4 h-4 text-slate-400"></i> Reportes</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
+                            <input type="checkbox" value="Usuarios" class="permiso-cb w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer">
+                            <span class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="users-round" class="w-4 h-4 text-slate-400"></i> Usuarios</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-slate-50 p-5 border-t border-slate-100 flex justify-end gap-3">
+                <button onclick="cerrarModalUsuario()" class="px-5 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+                <button onclick="guardarUsuario()" class="px-5 py-2 text-sm font-black text-slate-900 bg-amber-500 hover:bg-amber-400 rounded-xl shadow-md transition-colors flex items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i> Guardar Usuario
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar-menu');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+
+        // Datos iniciales si la memoria está vacía
+        const usuarioAdminDefault = [{
+            id: 1,
+            nombre: 'Admin Principal',
+            rol: 'Administrador',
+            pin: '1234',
+            permisos: ['Dashboard', 'Salon', 'Cocina', 'Caja', 'Reportes', 'Usuarios']
+        }];
+
+        function cargarUsuarios() {
+            let usuarios = JSON.parse(localStorage.getItem('polleria_usuarios'));
+            if (!usuarios) {
+                usuarios = usuarioAdminDefault;
+                localStorage.setItem('polleria_usuarios', JSON.stringify(usuarios));
+            }
+
+            const tbody = document.getElementById('tabla-usuarios');
+            
+            tbody.innerHTML = usuarios.map(u => {
+                // Generar etiquetas (badges) de colores para los permisos
+                const badgesPermisos = u.permisos.map(p => 
+                    `<span class="inline-block bg-slate-100 text-slate-600 border border-slate-200 text-[10px] px-2 py-0.5 rounded-md font-bold uppercase mr-1 mb-1">${p}</span>`
+                ).join('');
+
+                // Estilo del rol
+                let colorRol = 'bg-slate-100 text-slate-600';
+                if (u.rol === 'Administrador') colorRol = 'bg-amber-100 text-amber-800 border-amber-200';
+                if (u.rol === 'Mozo') colorRol = 'bg-blue-100 text-blue-800 border-blue-200';
+                if (u.rol === 'Cocinero') colorRol = 'bg-red-100 text-red-800 border-red-200';
+                if (u.rol === 'Cajero') colorRol = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+                return `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs">
+                                ${u.nombre.substring(0,2).toUpperCase()}
+                            </div>
+                            <div>
+                                <p class="font-bold text-slate-800">${u.nombre}</p>
+                                <p class="text-xs text-slate-400 font-mono">PIN: ****</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="border px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wide ${colorRol}">
+                            ${u.rol}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 max-w-xs flex-wrap">
+                        ${badgesPermisos}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <button onclick="eliminarUsuario(${u.id})" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function abrirModalUsuario() {
+            // Limpiar formulario
+            document.getElementById('user-nombre').value = '';
+            document.getElementById('user-rol').value = '';
+            document.getElementById('user-pin').value = '';
+            document.querySelectorAll('.permiso-cb').forEach(cb => cb.checked = false);
+            
+            document.getElementById('modal-usuario').classList.remove('hidden');
+        }
+
+        function cerrarModalUsuario() {
+            document.getElementById('modal-usuario').classList.add('hidden');
+        }
+
+        // Lógica genial: Selecciona el Rol y se auto-marcan los permisos lógicos
+        function autoSeleccionarPermisos() {
+            const rol = document.getElementById('user-rol').value;
+            const checkboxes = document.querySelectorAll('.permiso-cb');
+            
+            // Primero desmarcamos todos
+            checkboxes.forEach(cb => cb.checked = false);
+
+            if (rol === 'Administrador') {
+                checkboxes.forEach(cb => cb.checked = true);
+            } else if (rol === 'Mozo') {
+                document.querySelector('input[value="Salon"]').checked = true;
+            } else if (rol === 'Cocinero') {
+                document.querySelector('input[value="Cocina"]').checked = true;
+            } else if (rol === 'Cajero') {
+                document.querySelector('input[value="Dashboard"]').checked = true;
+                document.querySelector('input[value="Salon"]').checked = true;
+                document.querySelector('input[value="Caja"]').checked = true;
+            }
+        }
+
+        function guardarUsuario() {
+            const nombre = document.getElementById('user-nombre').value.trim();
+            const rol = document.getElementById('user-rol').value;
+            const pin = document.getElementById('user-pin').value.trim();
+            
+            // Recoger checkboxes marcados
+            const permisosMarcados = [];
+            document.querySelectorAll('.permiso-cb:checked').forEach(cb => {
+                permisosMarcados.push(cb.value);
+            });
+
+            if (!nombre || !rol || !pin || permisosMarcados.length === 0) {
+                alert('Por favor completa todos los campos y asigna al menos un permiso.');
+                return;
+            }
+
+            let usuarios = JSON.parse(localStorage.getItem('polleria_usuarios')) || [];
+            
+            const nuevoId = usuarios.length > 0 ? Math.max(...usuarios.map(u => u.id)) + 1 : 1;
+
+            usuarios.push({
+                id: nuevoId,
+                nombre: nombre,
+                rol: rol,
+                pin: pin,
+                permisos: permisosMarcados
+            });
+
+            localStorage.setItem('polleria_usuarios', JSON.stringify(usuarios));
+            cerrarModalUsuario();
+            cargarUsuarios();
+        }
+
+        function eliminarUsuario(id) {
+            let usuarios = JSON.parse(localStorage.getItem('polleria_usuarios')) || [];
+            
+            if(usuarios.find(u => u.id === id).rol === 'Administrador' && usuarios.filter(u => u.rol === 'Administrador').length === 1){
+                alert("¡No puedes eliminar al único Administrador del sistema!");
+                return;
+            }
+
+            if (confirm('¿Estás seguro de eliminar este usuario?')) {
+                usuarios = usuarios.filter(u => u.id !== id);
+                localStorage.setItem('polleria_usuarios', JSON.stringify(usuarios));
+                cargarUsuarios();
+            }
+        }
+
+        // Cargar al iniciar
+        cargarUsuarios();
+    </script>
+</body>
+</html>
