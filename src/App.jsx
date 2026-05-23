@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, Receipt, Users, Banknote, Lock, CheckCircle, Coins, CreditCard, Smartphone } from 'lucide-react';
+import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, Receipt, Users, Banknote, Lock, CheckCircle, Coins, CreditCard, Smartphone, Search, User } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 // === COMPONENTS ===
@@ -104,8 +104,18 @@ const Layout = ({ children }) => {
 const CajaPage = () => {
   const [mesas, setMesas] = useState([]);
   const [stats, setStats] = useState({ atendidas: 0, ingresos: 0 });
+  
+  // Estados para el Modal y Facturación
   const [modalOpen, setModalOpen] = useState(false);
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
+  const [tipoComprobante, setTipoComprobante] = useState('Boleta');
+  const [metodoPago, setMetodoPago] = useState('Efectivo');
+  
+  // Datos del Cliente (Consulta RUC/DNI)
+  const [numDocumento, setNumDocumento] = useState('');
+  const [clienteNombre, setClienteNombre] = useState('');
+  const [clienteDireccion, setClienteDireccion] = useState('');
+  const [isBuscando, setIsBuscando] = useState(false);
 
   useEffect(() => {
     // Mock Data
@@ -113,8 +123,8 @@ const CajaPage = () => {
       num: i + 1,
       estado: i % 4 === 0 ? 'Servido' : (i % 5 === 0 ? 'Cocina' : 'Libre'),
       pedidoData: (i % 4 === 0 || i % 5 === 0) ? {
-        mesero: 'Carlos P.', hora: '14:30', total: Math.random() * 100 + 50,
-        items: [{ cant: 1, nombre: '1/4 Pollo a la Brasa', precio: 25 }, { cant: 2, nombre: 'Inka Kola 500ml', precio: 5 }]
+        mesero: 'Carlos P.', hora: '14:30', total: 60.00,
+        items: [{ cant: 1, nombre: '1 Pollo a la Brasa', precio: 50 }, { cant: 1, nombre: 'Gaseosa 1.5L', precio: 10 }]
       } : null
     }));
     setMesas(mockMesas);
@@ -122,15 +132,90 @@ const CajaPage = () => {
 
   const mesasPendientes = mesas.filter(m => m.estado !== 'Libre');
 
-  const procesarCobro = () => {
+  // Simulación de búsqueda en API de SUNAT/Reniec
+  const buscarCliente = () => {
+    if (!numDocumento) return;
+    setIsBuscando(true);
+    
+    // Simulamos la demora de red
+    setTimeout(() => {
+      if (tipoComprobante === 'Factura') {
+        setClienteNombre('EMPRESA DE PRUEBA S.A.C.');
+        setClienteDireccion('AV. LAS PALMERAS 123, LIMA');
+      } else {
+        setClienteNombre('JUAN PEREZ GONZALES');
+        setClienteDireccion('CALLE LOS PINOS 456');
+      }
+      setIsBuscando(false);
+    }, 1000);
+  };
+
+  // Función principal: Genera el JSON y "cobra"
+  const procesarCobroYFacturar = () => {
     if(!mesaSeleccionada) return;
+
+    const total = mesaSeleccionada.pedidoData.total;
+    const subtotal = total / 1.18;
+    const igv = total - subtotal;
+
+    // 1. ESTRUCTURA JSON PARA NUBEFACT
+    // Esta es la plantilla exacta que usa Nubefact
+    const dataNubefact = {
+      "operacion": "generar_comprobante",
+      "tipo_de_comprobante": tipoComprobante === 'Factura' ? "1" : (tipoComprobante === 'Boleta' ? "2" : "3"), // 1:Factura, 2:Boleta
+      "serie": tipoComprobante === 'Factura' ? "F001" : "B001",
+      "numero": "1", // Este número debe ser autoincremental en la BD
+      "sunat_transaction": "1", // 1 = Venta Interna
+      "cliente_tipo_de_documento": tipoComprobante === 'Factura' ? "6" : "1", // 6: RUC, 1: DNI
+      "cliente_numero_de_documento": numDocumento || (tipoComprobante === 'Factura' ? "20000000000" : "00000000"),
+      "cliente_denominacion": clienteNombre || "CLIENTE VARIOS",
+      "cliente_direccion": clienteDireccion || "-",
+      "cliente_email": "",
+      "fecha_de_emision": new Date().toLocaleDateString('es-PE'),
+      "moneda": "1", // 1 = Soles
+      "porcentaje_de_igv": "18.00",
+      "descuento_global": "",
+      "total_descuento": "",
+      "total_anticipo": "",
+      "total_gravada": subtotal.toFixed(2),
+      "total_igv": igv.toFixed(2),
+      "total": total.toFixed(2),
+      "items": mesaSeleccionada.pedidoData.items.map(item => {
+        const valorUnitario = item.precio / 1.18;
+        return {
+          "unidad_de_medida": "NIU",
+          "codigo": "P001",
+          "descripcion": item.nombre,
+          "cantidad": item.cant,
+          "valor_unitario": valorUnitario.toFixed(2),
+          "precio_unitario": item.precio.toFixed(2),
+          "subtotal": (valorUnitario * item.cant).toFixed(2),
+          "tipo_de_igv": "1", // 1 = Gravado - Operación Onerosa
+          "igv": ((item.precio - valorUnitario) * item.cant).toFixed(2),
+          "total": (item.precio * item.cant).toFixed(2),
+          "anticipo_regularizacion": "false"
+        };
+      })
+    };
+
+    // Imprimimos el JSON en consola para validar
+    console.log("=== JSON GENERADO PARA NUBEFACT ===");
+    console.log(JSON.stringify(dataNubefact, null, 2));
+
+    // 2. ACTUALIZAR ESTADO LOCAL (Liberar Mesa)
     setStats({
       atendidas: stats.atendidas + 1,
-      ingresos: stats.ingresos + mesaSeleccionada.pedidoData.total
+      ingresos: stats.ingresos + total
     });
     setMesas(mesas.map(m => m.num === mesaSeleccionada.num ? { ...m, estado: 'Libre', pedidoData: null } : m));
+    
+    // Limpiar formulario y cerrar modal
+    setNumDocumento('');
+    setClienteNombre('');
+    setClienteDireccion('');
     setModalOpen(false);
-    alert('✅ ¡Cobro procesado exitosamente!');
+
+    alert(`✅ ¡Cobro procesado!\n\nSe ha generado el JSON para la ${tipoComprobante} (Revisa la consola F12).\nLa mesa ha sido liberada.`);
   };
 
   return (
@@ -143,6 +228,7 @@ const CajaPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* LISTADO DE MESAS PENDIENTES */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
@@ -201,6 +287,7 @@ const CajaPage = () => {
           </div>
         </div>
 
+        {/* RESUMEN DEL TURNO */}
         <div className="bg-slate-900 rounded-3xl shadow-xl p-6 text-white flex flex-col sticky top-4">
           <h2 className="font-black uppercase text-sm mb-6 text-amber-400 flex items-center gap-2">
             <PieChart className="w-5 h-5" /> Resumen del Turno
@@ -232,17 +319,20 @@ const CajaPage = () => {
         </div>
       </div>
 
+      {/* MODAL DE COBRO Y FACTURACIÓN */}
       {modalOpen && mesaSeleccionada && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[110] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full h-[90vh] md:h-auto md:max-h-[95vh] max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up md:animate-fade-in">
+          <div className="bg-white w-full h-[95vh] md:h-auto md:max-h-[95vh] max-w-3xl rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up md:animate-fade-in">
+            
+            {/* Header Modal */}
             <div className="p-4 md:p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-900">
                   <Banknote className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="font-black text-lg uppercase tracking-tight leading-none">Mesa <span className="text-emerald-400">{mesaSeleccionada.num}</span></h2>
-                  <p className="text-xs text-slate-400">Verificación y Pago</p>
+                  <h2 className="font-black text-lg uppercase tracking-tight leading-none">Cobro Mesa <span className="text-emerald-400">{mesaSeleccionada.num}</span></h2>
+                  <p className="text-xs text-slate-400">Facturación Electrónica</p>
                 </div>
               </div>
               <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors">
@@ -250,33 +340,152 @@ const CajaPage = () => {
               </button>
             </div>
             
-            <div className="p-6 space-y-5 flex-1 overflow-y-auto custom-scrollbar">
-              <div>
-                <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Detalle del Consumo:</label>
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-40 overflow-y-auto custom-scrollbar">
-                  <ul className="space-y-2">
-                    {mesaSeleccionada.pedidoData?.items.map((item, idx) => (
-                      <li key={idx} className="flex justify-between items-center text-sm border-b border-slate-200 pb-2 last:border-0 last:pb-0">
-                        <div className="flex-1">
-                          <span className="font-black text-slate-800 inline-block w-6">{item.cant}x</span>
-                          <span className="font-medium text-slate-600">{item.nombre}</span>
-                        </div>
-                        <span className="font-mono font-bold text-slate-900 shrink-0">S/ {(item.cant * item.precio).toFixed(2)}</span>
-                      </li>
-                    ))}
-                  </ul>
+            <div className="p-6 overflow-y-auto custom-scrollbar bg-slate-50 flex-1 grid md:grid-cols-2 gap-6">
+              
+              {/* Columna Izquierda: Datos del Comprobante */}
+              <div className="space-y-5">
+                
+                {/* Tipo de Comprobante */}
+                <div>
+                  <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Tipo de Comprobante:</label>
+                  <select 
+                    value={tipoComprobante}
+                    onChange={(e) => setTipoComprobante(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-bold text-slate-800 transition-all"
+                  >
+                    <option value="Boleta">Boleta Electrónica (DNI)</option>
+                    <option value="Factura">Factura Electrónica (RUC)</option>
+                    <option value="Ticket">Ticket Interno (Sin valor fiscal)</option>
+                  </select>
+                </div>
+
+                {/* Búsqueda Cliente */}
+                {(tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') && (
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div>
+                      <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">
+                        {tipoComprobante === 'Factura' ? 'RUC del Cliente' : 'DNI del Cliente (Opcional)'}:
+                      </label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={numDocumento}
+                          onChange={(e) => setNumDocumento(e.target.value)}
+                          placeholder={tipoComprobante === 'Factura' ? 'Ej. 20000000000' : 'Ej. 70000000'}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                        />
+                        <button 
+                          onClick={buscarCliente}
+                          disabled={!numDocumento || isBuscando}
+                          className="bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {isBuscando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : <Search className="w-4 h-4"/>}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-500 font-bold mb-1 text-[10px] tracking-widest uppercase">Nombre / Razón Social:</label>
+                      <input 
+                        type="text" 
+                        readOnly
+                        value={clienteNombre}
+                        placeholder="Autocompletado..."
+                        className="w-full bg-slate-100 border border-slate-200 text-slate-600 font-medium rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                    
+                    {tipoComprobante === 'Factura' && (
+                      <div>
+                        <label className="block text-slate-500 font-bold mb-1 text-[10px] tracking-widest uppercase">Dirección Fiscal:</label>
+                        <input 
+                          type="text" 
+                          readOnly
+                          value={clienteDireccion}
+                          placeholder="Autocompletado..."
+                          className="w-full bg-slate-100 border border-slate-200 text-slate-600 font-medium rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Metodo de pago */}
+                <div>
+                  <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Método de Pago:</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                      onClick={() => setMetodoPago('Efectivo')}
+                      className={`text-center p-3 rounded-xl border-2 transition-all ${metodoPago === 'Efectivo' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-200'}`}
+                    >
+                      <Coins className={`w-6 h-6 mx-auto mb-1 ${metodoPago === 'Efectivo' ? 'text-emerald-600' : 'text-slate-400'}`} />
+                      <span className={`text-xs font-bold block ${metodoPago === 'Efectivo' ? 'text-emerald-700' : 'text-slate-500'}`}>Efectivo</span>
+                    </button>
+                    <button 
+                      onClick={() => setMetodoPago('Tarjeta')}
+                      className={`text-center p-3 rounded-xl border-2 transition-all ${metodoPago === 'Tarjeta' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-200'}`}
+                    >
+                      <CreditCard className={`w-6 h-6 mx-auto mb-1 ${metodoPago === 'Tarjeta' ? 'text-blue-600' : 'text-slate-400'}`} />
+                      <span className={`text-xs font-bold block ${metodoPago === 'Tarjeta' ? 'text-blue-700' : 'text-slate-500'}`}>Tarjeta</span>
+                    </button>
+                    <button 
+                      onClick={() => setMetodoPago('Yape/Plin')}
+                      className={`text-center p-3 rounded-xl border-2 transition-all ${metodoPago === 'Yape/Plin' ? 'border-purple-500 bg-purple-50' : 'border-slate-200 bg-white hover:border-purple-200'}`}
+                    >
+                      <Smartphone className={`w-6 h-6 mx-auto mb-1 ${metodoPago === 'Yape/Plin' ? 'text-purple-600' : 'text-slate-400'}`} />
+                      <span className={`text-xs font-bold block ${metodoPago === 'Yape/Plin' ? 'text-purple-700' : 'text-slate-500'}`}>Yape/Plin</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Columna Derecha: Detalle y Totales */}
+              <div className="space-y-5 flex flex-col">
+                <div>
+                  <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Detalle del Consumo:</label>
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm h-48 overflow-y-auto custom-scrollbar">
+                    <ul className="space-y-3">
+                      {mesaSeleccionada.pedidoData?.items.map((item, idx) => (
+                        <li key={idx} className="flex justify-between items-center text-sm border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                          <div className="flex-1">
+                            <span className="font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs mr-2">{item.cant}x</span>
+                            <span className="font-medium text-slate-600">{item.nombre}</span>
+                          </div>
+                          <span className="font-mono font-bold text-slate-900 shrink-0">S/ {(item.cant * item.precio).toFixed(2)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-auto bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl text-white">
+                  <div className="space-y-2 mb-4 border-b border-slate-700 pb-4">
+                    <div className="flex justify-between text-sm text-slate-400">
+                      <span>Base Imponible (Subtotal)</span>
+                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData?.total / 1.18).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-slate-400">
+                      <span>IGV (18%)</span>
+                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData?.total - (mesaSeleccionada.pedidoData?.total / 1.18)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-end">
+                    <p className="text-xs text-amber-400 font-bold uppercase tracking-widest mb-1">Total a Pagar</p>
+                    <p className="text-4xl font-black text-white font-mono tracking-tighter">
+                      <span className="text-xl text-slate-500 mr-1">S/</span>
+                      {mesaSeleccionada.pedidoData?.total.toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="text-center bg-emerald-50 p-6 rounded-2xl border border-emerald-100 shadow-inner">
-                <p className="text-xs text-emerald-700 font-bold uppercase tracking-widest mb-1">Total a Pagar</p>
-                <p className="text-5xl font-black text-emerald-900 font-mono tracking-tighter">S/ {mesaSeleccionada.pedidoData?.total.toFixed(2)}</p>
-              </div>
             </div>
 
-            <div className="p-4 bg-white border-t border-slate-100 shrink-0 pb-6 md:pb-4">
-              <button onClick={procesarCobro} className="w-full py-4 bg-slate-900 hover:bg-emerald-600 text-white font-black uppercase tracking-widest rounded-xl text-sm transition-all shadow-xl shadow-slate-900/20 flex justify-center items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-emerald-400" /> Confirmar y Liberar Mesa
+            {/* Footer Modal */}
+            <div className="p-4 bg-white border-t border-slate-200 shrink-0">
+              <button onClick={procesarCobroYFacturar} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-black uppercase tracking-widest rounded-xl text-sm transition-all shadow-lg shadow-emerald-500/20 flex justify-center items-center gap-2">
+                <CheckCircle className="w-5 h-5" /> Emitir Comprobante y Cobrar
               </button>
             </div>
           </div>
