@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHICKEN ERP - SALÓN Y MESAS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        :root { --brand-primary: #f59e0b; --brand-dark: #111827; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .sidebar-item { transition: all 0.2s; border-radius: 12px; margin: 4px 12px; }
+        .sidebar-item:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+        .sidebar-active { background-color: var(--brand-primary); color: var(--brand-dark) !important; font-weight: 700; }
+        .modal-active { display: flex !important; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden relative">
+
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 hidden md:hidden"></div>
+
+    <aside id="sidebar-menu" class="fixed md:relative inset-y-0 left-0 w-64 bg-slate-900 text-slate-400 flex flex-col shadow-2xl z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+        <div class="p-6 flex items-center justify-between md:justify-start gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-slate-900 shadow-lg shadow-amber-500/20">
+                    <i data-lucide="utensils-crossed"></i>
+                </div>
+                <span class="text-white font-black text-xl tracking-tighter">CHICKEN<span class="text-amber-500">ERP</span></span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white md:hidden p-2">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 mt-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <a href="index.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i> Dashboard
+            </a>
+            <a href="salon.html" class="sidebar-item sidebar-active flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i> Salón / Mesas
+            </a>
+            <a href="cocina.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="chef-hat" class="w-5 h-5"></i> Cocina / Pedidos
+            </a>
+            <a href="caja.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="calculator" class="w-5 h-5"></i> Caja / Cobros
+            </a>
+			<a href="reportes.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i> Reportes
+            </a>
+			<div class="my-4 border-t border-slate-800 mx-4"></div>
+            <a href="carta.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="book-open" class="w-5 h-5"></i> Carta e Inventario
+            </a>
+            <a href="usuarios.html" class="sidebar-item flex items-center gap-3 p-3 text-sm">
+                <i data-lucide="users-round" class="w-5 h-5"></i> Personal y Accesos
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800 shrink-0">
+            <div class="flex items-center gap-3 p-2 bg-slate-800/50 rounded-xl">
+                <div class="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-bold text-white">AD</div>
+                <div class="text-xs">
+                    <p class="text-white font-bold">Administrador</p>
+                    <p class="text-slate-500 truncate w-32">Local Principal</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden w-full bg-slate-100">
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 z-10 shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl md:hidden">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+                <div class="hidden sm:flex items-center gap-2 text-slate-500 text-sm font-medium">
+                    <span>Operaciones</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    <span class="text-slate-900 font-bold">Gestión de Salón</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 md:gap-4">
+                <div class="hidden md:flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                    <i data-lucide="user" class="w-4 h-4 text-slate-400"></i>
+                    <select id="mesero-global" class="bg-transparent text-sm font-bold text-slate-700 focus:outline-none">
+                        <option>Mesero: Carlos</option>
+                        <option>Mesero: María</option>
+                        <option>Mesero: Luis</option>
+                    </select>
+                </div>
+                <div class="h-8 w-px bg-slate-200 mx-1 md:mx-2 hidden md:block"></div>
+                <div class="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 hidden sm:flex">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    Sync Activo
+                </div>
+            </div>
+        </header>
+
+        <section class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">Atención en Salón</h1>
+                    <p class="text-xs md:text-sm text-slate-500">Toca una mesa para tomar, editar o agregar un pedido adicional.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <div class="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600 uppercase bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"><div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Libre</div>
+                    <div class="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600 uppercase bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"><div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Cocina</div>
+                    <div class="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600 uppercase bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"><div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Servido</div>
+                </div>
+            </div>
+
+            <div id="grid-mesas" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-5 pb-20 md:pb-0">
+                </div>
+        </section>
+    </main>
+
+    <div id="modal-pos" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] hidden items-end md:items-center justify-center p-0 md:p-4">
+        <div class="bg-white w-full h-[95vh] md:h-auto md:max-h-[90vh] max-w-6xl rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up md:animate-fade-in">
+            <div class="p-3 md:p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 md:w-10 md:h-10 bg-amber-500 rounded-lg md:rounded-xl flex items-center justify-center text-slate-900"><i data-lucide="edit-3" class="w-4 h-4 md:w-5 md:h-5"></i></div>
+                    <div>
+                        <h2 class="font-black text-sm md:text-lg uppercase tracking-tight leading-none">Mesa <span id="pos-mesa-num" class="text-amber-400 text-lg md:text-xl"></span></h2>
+                        <p class="text-[10px] md:text-xs text-slate-400">Punto de Venta</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <select id="pos-mesero" class="md:hidden bg-slate-800 border border-slate-700 text-white text-[10px] font-bold rounded-lg px-2 py-1.5 focus:outline-none max-w-[100px] truncate">
+                        <option>Carlos</option>
+                        <option>María</option>
+                        <option>Luis</option>
+                    </select>
+                    <button onclick="cerrarModalPOS()" class="bg-slate-800 hover:bg-red-500 hover:text-white text-slate-300 p-2 md:p-2.5 rounded-xl transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex flex-col md:flex-row flex-1 min-h-0 bg-slate-50">
+                <div class="w-full md:w-3/5 flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-slate-200">
+                    <div class="flex gap-2 overflow-x-auto custom-scrollbar p-3 shrink-0 bg-white shadow-sm z-10">
+                        <button onclick="filtrarMenu('Todos', this)" class="btn-filtro px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-md">Todos</button>
+                        <button onclick="filtrarMenu('Pollos', this)" class="btn-filtro px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-amber-50 rounded-xl text-xs font-black uppercase whitespace-nowrap transition-colors">Pollos</button>
+                        <button onclick="filtrarMenu('Guarniciones', this)" class="btn-filtro px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-amber-50 rounded-xl text-xs font-black uppercase whitespace-nowrap transition-colors">Guarniciones</button>
+                        <button onclick="filtrarMenu('Bebidas', this)" class="btn-filtro px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-amber-50 rounded-xl text-xs font-black uppercase whitespace-nowrap transition-colors">Bebidas</button>
+                    </div>
+                    <div id="pos-grid-menu" class="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
+                    </div>
+                </div>
+
+                <div class="w-full md:w-2/5 bg-white flex flex-col min-h-[40vh] md:min-h-0">
+                    <div class="p-3 md:p-4 border-b border-slate-100 bg-amber-50 shrink-0 flex justify-between items-center">
+                        <h3 class="font-black text-amber-800 uppercase text-xs flex items-center gap-2">
+                            <i data-lucide="receipt" class="w-4 h-4"></i> Pedido Actual
+                        </h3>
+                        <span id="pos-badge-estado" class="text-[10px] font-bold px-2 py-1 rounded bg-white text-slate-500 shadow-sm border border-slate-200 uppercase">Nueva Orden</span>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-2 md:p-4 custom-scrollbar bg-slate-50/50">
+                        <ul id="pos-ticket-lista" class="space-y-2 md:space-y-3">
+                        </ul>
+                    </div>
+
+                    <div class="p-4 bg-white border-t border-slate-200 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                        <div class="flex justify-between items-end mb-3 md:mb-4 px-2">
+                            <span class="font-bold text-slate-400 uppercase text-[10px] md:text-xs tracking-widest">Total Mesa</span>
+                            <span id="pos-total-monto" class="font-black font-mono text-2xl md:text-3xl text-slate-900 leading-none">S/ 0.00</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 md:gap-3">
+                            <button onclick="cerrarModalPOS()" class="py-3.5 md:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs md:text-sm uppercase tracking-wide transition-colors">Guardar / Salir</button>
+                            <button onclick="enviarPedidoACocina()" class="py-3.5 md:py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-black uppercase tracking-tight rounded-xl text-xs md:text-sm transition-colors shadow-lg shadow-amber-500/30 flex justify-center items-center gap-2">
+                                <i data-lucide="chef-hat" class="w-4 h-4 md:w-5 md:h-5"></i> A Cocina
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    </style>
+
+    <script>
+        const menuDB = [
+            { id: 'M01', nombre: '1 Pollo a la Brasa + Papas', precio: 65.00, cat: 'Pollos' },
+            { id: 'M02', nombre: '1/2 Pollo a la Brasa + Papas', precio: 35.00, cat: 'Pollos' },
+            { id: 'M03', nombre: '1/4 de Pollo a la Brasa', precio: 19.00, cat: 'Pollos' },
+            { id: 'M04', nombre: 'Porción de Papas Fritas', precio: 12.00, cat: 'Guarniciones' },
+            { id: 'M05', nombre: 'Porción de Arroz Chaufa', precio: 10.00, cat: 'Guarniciones' },
+            { id: 'M06', nombre: 'Ensalada Clásica Grande', precio: 14.00, cat: 'Guarniciones' },
+            { id: 'M07', nombre: 'Chicha Morada (Jarra)', precio: 12.00, cat: 'Bebidas' },
+            { id: 'M08', nombre: 'Inca Kola 1.5L', precio: 12.00, cat: 'Bebidas' },
+            { id: 'M09', nombre: 'Limonada (Jarra)', precio: 10.00, cat: 'Bebidas' }
+        ];
+
+        let mesasDB = JSON.parse(localStorage.getItem('polleria_mesas'));
+        
+        if (!mesasDB || mesasDB.length === 0) {
+            mesasDB = [];
+            for(let i=1; i<=15; i++) mesasDB.push({ num: i, estado: 'Libre', pedidoData: null });
+            localStorage.setItem('polleria_mesas', JSON.stringify(mesasDB));
+        }
+
+        function guardarBD() {
+            localStorage.setItem('polleria_mesas', JSON.stringify(mesasDB));
+        }
+
+        setInterval(() => {
+            let datosGuardados = localStorage.getItem('polleria_mesas');
+            if (datosGuardados) {
+                mesasDB = JSON.parse(datosGuardados);
+                if (!document.getElementById('modal-pos').classList.contains('modal-active')) {
+                    renderizarMesas();
+                }
+            }
+        }, 2000);
+
+        let mesaActualPOS = null;
+        let ticketActual = []; 
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar-menu');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+
+        function renderizarMesas() {
+            const grid = document.getElementById('grid-mesas');
+            let html = '';
+
+            mesasDB.forEach((m, index) => {
+                let colorBg, colorText, colorBorder, icon;
+
+                switch(m.estado) {
+                    case 'Libre': 
+                        colorBg = 'bg-white hover:bg-emerald-50'; colorText = 'text-slate-300'; colorBorder = 'border-slate-200'; icon = 'utensils'; break;
+                    case 'Cocina': 
+                        colorBg = 'bg-amber-50'; colorText = 'text-amber-500'; colorBorder = 'border-amber-300 shadow-md'; icon = 'chef-hat'; break;
+                    case 'Servido': 
+                        colorBg = 'bg-blue-50'; colorText = 'text-blue-500'; colorBorder = 'border-blue-300 shadow-md'; icon = 'check-circle'; break;
+                }
+
+                const totalStr = m.pedidoData 
+                    ? `<p class="font-mono font-black text-sm md:text-lg mt-1 text-slate-800">S/ ${m.pedidoData.total.toFixed(2)}</p>` 
+                    : `<p class="text-[10px] md:text-xs mt-1 text-slate-400 font-medium">Disponible</p>`;
+                
+                html += `
+                    <div onclick="clickMesa(${index})" class="relative rounded-2xl md:rounded-3xl border-2 ${colorBorder} ${colorBg} p-3 md:p-5 flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95 hover:-translate-y-1 aspect-square md:aspect-auto md:h-40 group">
+                        <div class="w-8 h-8 md:w-12 md:h-12 rounded-full flex items-center justify-center ${colorText} mb-1 md:mb-2 bg-white shadow-sm border border-slate-100">
+                            <i data-lucide="${icon}" class="w-4 h-4 md:w-6 md:h-6"></i>
+                        </div>
+                        <h3 class="font-black text-slate-900 text-sm md:text-lg uppercase tracking-tight">Mesa ${m.num}</h3>
+                        ${totalStr}
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function clickMesa(index) {
+            abrirModalPOS(index);
+        }
+
+        function abrirModalPOS(indexMesa) {
+            mesaActualPOS = indexMesa;
+            const m = mesasDB[indexMesa];
+            
+            document.getElementById('pos-mesa-num').innerText = m.num;
+            const meseroGlobal = document.getElementById('mesero-global') ? document.getElementById('mesero-global').value.replace('Mesero: ', '') : 'Carlos';
+            
+            if(m.pedidoData && m.pedidoData.items && m.pedidoData.items.length > 0) {
+                ticketActual = JSON.parse(JSON.stringify(m.pedidoData.items)); 
+                document.getElementById('pos-mesero').value = m.pedidoData.mesero;
+                
+                if(m.estado === 'Servido') {
+                    // CRUCIAL: Bloqueamos los items anteriores marcándolos como "historial"
+                    ticketActual.forEach(item => item.historial = true);
+                    
+                    document.getElementById('pos-badge-estado').innerText = "+ ADICIONAL";
+                    document.getElementById('pos-badge-estado').className = "text-[10px] font-black px-2 py-1 rounded bg-blue-100 text-blue-700 uppercase animate-pulse";
+                } else {
+                    document.getElementById('pos-badge-estado').innerText = "Editando Pedido";
+                    document.getElementById('pos-badge-estado').className = "text-[10px] font-bold px-2 py-1 rounded bg-amber-100 text-amber-700 uppercase";
+                }
+            } else {
+                ticketActual = [];
+                document.getElementById('pos-mesero').value = meseroGlobal;
+                document.getElementById('pos-badge-estado').innerText = "Nueva Orden";
+                document.getElementById('pos-badge-estado').className = "text-[10px] font-bold px-2 py-1 rounded bg-emerald-100 text-emerald-700 uppercase";
+            }
+
+            const botonesFiltro = document.querySelectorAll('.btn-filtro');
+            if(botonesFiltro.length > 0) filtrarMenu('Todos', botonesFiltro[0]);
+            else renderizarMenuGrid('Todos');
+
+            actualizarTicketPOS();
+            document.getElementById('modal-pos').classList.add('modal-active');
+        }
+
+        function cerrarModalPOS() {
+            document.getElementById('modal-pos').classList.remove('modal-active');
+            mesaActualPOS = null;
+        }
+
+        function renderizarMenuGrid(categoria) {
+            const grid = document.getElementById('pos-grid-menu');
+            let items = menuDB;
+            if(categoria !== 'Todos') items = items.filter(i => i.cat === categoria);
+
+            grid.innerHTML = items.map(i => `
+                <div onclick="agregarAlTicket('${i.id}')" class="bg-white border border-slate-200 rounded-xl p-3 md:p-4 flex flex-col justify-between cursor-pointer active:bg-slate-50 transition-colors shadow-sm relative overflow-hidden h-24 md:h-28">
+                    <p class="font-bold text-slate-800 text-[10px] md:text-xs uppercase leading-tight pr-4 z-10">${i.nombre}</p>
+                    <p class="font-black font-mono text-emerald-600 text-sm md:text-base z-10">S/ ${i.precio.toFixed(2)}</p>
+                    <i data-lucide="plus-circle" class="absolute bottom-[-10px] right-[-10px] w-12 h-12 text-slate-100 opacity-50"></i>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function filtrarMenu(cat, botonElemento) {
+            if(botonElemento) {
+                document.querySelectorAll('.btn-filtro').forEach(b => {
+                    b.className = "btn-filtro px-4 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-amber-50 rounded-xl text-xs font-black uppercase whitespace-nowrap transition-colors";
+                });
+                botonElemento.className = "btn-filtro px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-md";
+            }
+            renderizarMenuGrid(cat);
+        }
+
+        function agregarAlTicket(idProducto) {
+            const prod = menuDB.find(m => m.id === idProducto);
+            // Solo agrupar si el producto NO ES del historial antiguo
+            const index = ticketActual.findIndex(t => t.id === idProducto && !t.historial);
+            
+            if(index >= 0) ticketActual[index].cant++;
+            else ticketActual.push({ id: prod.id, nombre: prod.nombre, precio: prod.precio, cant: 1, historial: false });
+            
+            actualizarTicketPOS();
+        }
+
+        function alterarCantidad(index, operacion) {
+            if(ticketActual[index].historial) return; // Protección extra
+            
+            if(operacion === '+') ticketActual[index].cant++;
+            else {
+                ticketActual[index].cant--;
+                if(ticketActual[index].cant <= 0) ticketActual.splice(index, 1);
+            }
+            actualizarTicketPOS();
+        }
+
+        function actualizarTicketPOS() {
+            const ul = document.getElementById('pos-ticket-lista');
+            let total = 0;
+            
+            ul.innerHTML = ticketActual.map((item, index) => {
+                const sub = item.cant * item.precio;
+                total += sub;
+                
+                // Si el item ya fue servido (historial), se dibuja bloqueado y en gris
+                if(item.historial) {
+                    return `
+                        <li class="bg-slate-50 border border-slate-200 p-2.5 md:p-3 rounded-xl flex items-center justify-between opacity-60 grayscale">
+                            <div class="flex-1 pr-2">
+                                <p class="font-bold text-slate-500 text-[10px] md:text-xs leading-tight line-through decoration-slate-300">${item.nombre}</p>
+                                <p class="font-mono text-slate-400 font-bold text-xs md:text-sm mt-1">S/ ${sub.toFixed(2)}</p>
+                            </div>
+                            <div class="font-black text-slate-400 text-sm md:text-base px-3">${item.cant} <span class="text-[10px]">✔</span></div>
+                        </li>
+                    `;
+                }
+                
+                // Si es un item nuevo o en edición normal
+                return `
+                    <li class="bg-white border border-slate-200 p-2.5 md:p-3 rounded-xl flex items-center justify-between shadow-sm">
+                        <div class="flex-1 pr-2">
+                            <p class="font-bold text-slate-800 text-[10px] md:text-xs leading-tight">${item.nombre}</p>
+                            <p class="font-mono text-emerald-600 font-bold text-xs md:text-sm mt-1">S/ ${sub.toFixed(2)}</p>
+                        </div>
+                        <div class="flex items-center gap-1 md:gap-2 bg-slate-100 rounded-lg p-1 shrink-0 border border-slate-200">
+                            <button onclick="alterarCantidad(${index}, '-')" class="w-8 h-8 md:w-7 md:h-7 bg-white rounded-md shadow-sm text-slate-600 font-black active:bg-slate-200 text-lg md:text-base leading-none">-</button>
+                            <span class="font-bold text-slate-900 w-5 md:w-6 text-center text-sm">${item.cant}</span>
+                            <button onclick="alterarCantidad(${index}, '+')" class="w-8 h-8 md:w-7 md:h-7 bg-white rounded-md shadow-sm text-slate-600 font-black active:bg-slate-200 text-lg md:text-base leading-none">+</button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+
+            if(ticketActual.length === 0) {
+                ul.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-32 opacity-50">
+                        <i data-lucide="shopping-bag" class="w-8 h-8 mb-2"></i>
+                        <p class="text-center text-slate-500 font-bold text-xs">Aún no hay productos en la mesa.</p>
+                    </div>`;
+            }
+
+            document.getElementById('pos-total-monto').innerText = `S/ ${total.toFixed(2)}`;
+            lucide.createIcons();
+        }
+
+        function enviarPedidoACocina() {
+            // Revisar si hay ALGO nuevo que mandar a cocina
+            const hayNuevos = ticketActual.some(i => !i.historial);
+
+            if(!hayNuevos) {
+                alert("No has agregado ningún producto nuevo para enviar a cocina."); 
+                return;
+            }
+
+            const total = ticketActual.reduce((acc, val) => acc + (val.cant * val.precio), 0);
+            const mesero = document.getElementById('pos-mesero').value;
+            const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+
+            let esAdicional = mesasDB[mesaActualPOS].estado === 'Servido';
+
+            // Al darle "A Cocina", marcamos todos los actuales como historial falso (para que se guarde)
+            // porque la lógica del historial lo manejará la cocina luego.
+            mesasDB[mesaActualPOS].estado = 'Cocina';
+            mesasDB[mesaActualPOS].pedidoData = { mesero, items: ticketActual, total, hora, adicional: esAdicional };
+            
+            guardarBD();
+            cerrarModalPOS();
+            renderizarMesas();
+        }
+
+        renderizarMesas();
+        lucide.createIcons();
+    </script>
+</body>
+</html>
