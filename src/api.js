@@ -50,16 +50,16 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
   getResumenVentas: () => fetch(`${API_BASE}/api/ventas/resumen`).then(r => r.json()),
-  getHistorialVentas: () => fetch(`${API_BASE}/api/ventas`).then(r => r.json()),
+  getHistorialVentas: (desde, hasta) => fetch(`${API_BASE}/api/ventas${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
 
   // Compras
-  getCompras: () => fetch(`${API_BASE}/api/compras`).then(r => r.json()),
+  getCompras: (desde, hasta) => fetch(`${API_BASE}/api/compras${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
   crearCompra: (body) => fetch(`${API_BASE}/api/compras`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
 
   // Reportes
-  getReporteContable: () => fetch(`${API_BASE}/api/reportes/contable`).then(r => r.json()),
-  getCancelaciones: () => fetch(`${API_BASE}/api/reportes/cancelaciones`).then(r => r.json()),
-  getReporteMozos: () => fetch(`${API_BASE}/api/reportes/mozos`).then(r => r.json()),
+  getReporteContable: (desde, hasta) => fetch(`${API_BASE}/api/reportes/contable${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
+  getCancelaciones: (desde, hasta) => fetch(`${API_BASE}/api/reportes/cancelaciones${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
+  getReporteMozos: (desde, hasta) => fetch(`${API_BASE}/api/reportes/mozos${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
 };

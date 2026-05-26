@@ -613,16 +613,23 @@ app.post('/api/ventas', async (req, res) => {
   }
 });
 
-// GET /api/ventas → Historial detallado de las ventas del día (hora Perú)
+// GET /api/ventas → Historial detallado de las ventas del día o rango de fechas (hora Perú)
 app.get('/api/ventas', async (req, res) => {
+  const { desde, hasta } = req.query;
   try {
-    const ahora = new Date();
-    const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
-    hoyPeru.setHours(0, 0, 0, 0);
-    const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+    let filtroFecha = {};
+    if (desde && hasta) {
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+    } else {
+      const ahora = new Date();
+      const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+      hoyPeru.setHours(0, 0, 0, 0);
+      const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+      filtroFecha = { gte: inicioUTC };
+    }
 
     const ventas = await prisma.venta.findMany({
-      where: { createdAt: { gte: inicioUTC } },
+      where: { createdAt: filtroFecha },
       include: {
         pedido: {
           include: {
@@ -688,11 +695,18 @@ app.get('/api/ventas/resumen', async (req, res) => {
 // ============================================================
 
 app.get('/api/compras', async (req, res) => {
+  const { desde, hasta } = req.query;
   try {
-    const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    let filtroFecha = {};
+    if (desde && hasta) {
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+    } else {
+      const ahora = new Date();
+      const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+      filtroFecha = { gte: inicioMes };
+    }
     const compras = await prisma.compra.findMany({
-      where: { creadoEn: { gte: inicioMes } },
+      where: { creadoEn: filtroFecha },
       orderBy: { creadoEn: 'desc' },
     });
     res.json(compras);
@@ -714,16 +728,23 @@ app.post('/api/compras', async (req, res) => {
 // REPORTES
 // ============================================================
 
-// GET /api/reportes/cancelaciones → Pedidos cancelados del día
+// GET /api/reportes/cancelaciones → Pedidos cancelados del día o rango de fechas
 app.get('/api/reportes/cancelaciones', async (req, res) => {
+  const { desde, hasta } = req.query;
   try {
-    const ahora = new Date();
-    const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
-    hoyPeru.setHours(0, 0, 0, 0);
-    const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+    let filtroFecha = {};
+    if (desde && hasta) {
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+    } else {
+      const ahora = new Date();
+      const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+      hoyPeru.setHours(0, 0, 0, 0);
+      const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+      filtroFecha = { gte: inicioUTC };
+    }
 
     const pedidos = await prisma.pedido.findMany({
-      where: { estado: 'Cancelado', canceladoEn: { gte: inicioUTC } },
+      where: { estado: 'Cancelado', canceladoEn: filtroFecha },
       include: { items: true, mesa: true },
       orderBy: { canceladoEn: 'desc' },
     });
@@ -733,6 +754,7 @@ app.get('/api/reportes/cancelaciones', async (req, res) => {
       hora: p.canceladoEn?.toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),
+      fecha: p.canceladoEn?.toLocaleDateString('es-PE'),
       mesa: p.mesa?.numero || null,
       codigoPedidosYa: p.codigoPedidosYa,
       canceladoPor: p.canceladoPor,
@@ -747,17 +769,24 @@ app.get('/api/reportes/cancelaciones', async (req, res) => {
   }
 });
 
-// GET /api/reportes/mozos → Estadísticas por mozo del día
+// GET /api/reportes/mozos → Estadísticas por mozo por rango de fechas
 app.get('/api/reportes/mozos', async (req, res) => {
+  const { desde, hasta } = req.query;
   try {
-    const ahora = new Date();
-    const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
-    hoyPeru.setHours(0, 0, 0, 0);
-    const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+    let filtroFecha = {};
+    if (desde && hasta) {
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+    } else {
+      const ahora = new Date();
+      const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+      hoyPeru.setHours(0, 0, 0, 0);
+      const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+      filtroFecha = { gte: inicioUTC };
+    }
 
     const pedidos = await prisma.pedido.findMany({
       where: {
-        createdAt: { gte: inicioUTC },
+        createdAt: filtroFecha,
         tipoEntrega: 'salon',
         estado: { not: 'Cancelado' },
       },
@@ -783,15 +812,22 @@ app.get('/api/reportes/mozos', async (req, res) => {
   }
 });
 
-// GET /api/reportes/contable
+// GET /api/reportes/contable → Ventas y compras por rango de fechas
 app.get('/api/reportes/contable', async (req, res) => {
+  const { desde, hasta } = req.query;
   try {
-    const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    let filtroFecha = {};
+    if (desde && hasta) {
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+    } else {
+      const ahora = new Date();
+      const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+      filtroFecha = { gte: inicioMes };
+    }
 
     const [ventas, compras] = await Promise.all([
-      prisma.venta.findMany({ where: { createdAt: { gte: inicioMes } } }),
-      prisma.compra.findMany({ where: { creadoEn: { gte: inicioMes } } }),
+      prisma.venta.findMany({ where: { createdAt: filtroFecha } }),
+      prisma.compra.findMany({ where: { creadoEn: filtroFecha } }),
     ]);
 
     const ventasTotal = ventas.reduce((s, v) => s + v.total, 0);
