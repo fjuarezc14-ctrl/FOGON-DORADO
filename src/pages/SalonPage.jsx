@@ -11,6 +11,29 @@ function formatCuentaRegresiva(ms) {
   return `${min}:${s.toString().padStart(2, '0')}`;
 }
 
+// Sintetizador Web Audio API de Campana de Restaurante Premium (G5 -> C6)
+function playChimeNotification() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const playTone = (freq, startTime, duration) => {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+      gainNode.gain.setValueAtTime(0.15, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+    playTone(784, audioCtx.currentTime, 0.6);
+    playTone(1046.5, audioCtx.currentTime + 0.12, 0.8);
+  } catch (e) {
+    console.error('AudioContext bloqueado/no soportado:', e);
+  }
+}
+
 export default function SalonPage() {
   const [mesas, setMesas] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -26,6 +49,10 @@ export default function SalonPage() {
   const [cancelMotivo, setCancelMotivo] = useState('');
   const [cancelandoPedido, setCancelandoPedido] = useState(false);
   const [tiempoRestante, setTiempoRestante] = useState(LIMITE_CANCELACION_MS);
+
+  // Estados de Notificación en Tiempo Real
+  const [prevMesas, setPrevMesas] = useState([]);
+  const [toasts, setToasts] = useState([]);
 
   // Cargar mesas desde el API real
   const fetchMesas = useCallback(async () => {
@@ -63,7 +90,9 @@ export default function SalonPage() {
     setMesaActual(m);
     if (m.pedidoData?.items?.length > 0) {
       let items = JSON.parse(JSON.stringify(m.pedidoData.items));
-      if (m.estado === 'Servido') items.forEach(i => i.historial = true);
+      // Cualquier producto ya existente en la mesa se considera comanda histórica
+      // para evitar que al agregar items nuevos se reenvíen los antiguos.
+      items.forEach(i => i.historial = true);
       setTicketActual(items);
     } else {
       setTicketActual([]);
@@ -93,6 +122,36 @@ export default function SalonPage() {
     }
     setTicketActual(nuevos);
   };
+
+  // Detector de mesas listas para el mesero activo (Sonido + Toast)
+  useEffect(() => {
+    if (mesas.length === 0) {
+      if (prevMesas.length === 0) setPrevMesas(mesas);
+      return;
+    }
+    if (prevMesas.length > 0) {
+      const listasNuevas = [];
+      mesas.forEach(m => {
+        const ant = prevMesas.find(p => p.num === m.num);
+        if (ant && ant.estado === 'Cocina' && m.estado === 'Servido') {
+          if (m.pedidoData?.mesero === meseroGlobal) {
+            listasNuevas.push(m.num);
+          }
+        }
+      });
+      if (listasNuevas.length > 0) {
+        playChimeNotification();
+        listasNuevas.forEach(num => {
+          const toastId = Date.now() + Math.random();
+          setToasts(prev => [...prev, { id: toastId, mesa: num, mensaje: `🛎️ ¡Mesa ${num} lista para servir!` }]);
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== toastId));
+          }, 6000);
+        });
+      }
+    }
+    setPrevMesas(mesas);
+  }, [mesas, meseroGlobal, prevMesas]);
 
   // Countdown timer para cancelación
   useEffect(() => {
@@ -129,18 +188,18 @@ export default function SalonPage() {
   };
 
   const enviarACocina = async () => {
-    const hayNuevos = ticketActual.some(i => !i.historial);
-    if (!hayNuevos) { alert('No has agregado ningún producto nuevo.'); return; }
+    const nuevosItems = ticketActual.filter(i => !i.historial);
+    if (nuevosItems.length === 0) { alert('No has agregado ningún producto nuevo.'); return; }
 
     setEnviando(true);
     try {
-      const total = ticketActual.reduce((acc, val) => acc + (val.cant * val.precio), 0);
-      const esAdicional = mesaActual.estado === 'Servido';
+      const totalNuevos = nuevosItems.reduce((acc, val) => acc + (val.cant * val.precio), 0);
+      const esAdicional = mesaActual.pedidoData?.items?.length > 0;
 
       await api.enviarACocina(mesaActual.num, {
         mesero: meseroGlobal,
-        items: ticketActual,
-        total,
+        items: nuevosItems, // Enviamos UNICAMENTE los nuevos items añadidos
+        total: totalNuevos, // Enviamos el total del pedido adicional específico
         adicional: esAdicional,
       });
 
@@ -377,9 +436,27 @@ export default function SalonPage() {
                   : <><AlertTriangle className="w-4 h-4" /> Confirmar</>}
               </button>
             </div>
+      {/* FLOATING TOASTS NOTIFICATIONS SYSTEM */}
+      <div className="fixed bottom-6 right-6 z-[250] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+        {toasts.map(t => (
+          <div key={t.id} className="pointer-events-auto bg-slate-900 border border-emerald-500/20 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent"></div>
+            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-lg animate-bounce shrink-0 shadow-lg shadow-emerald-500/20">
+              🛎️
+            </div>
+            <div className="flex-1 pr-2 relative z-10">
+              <h4 className="font-black text-xs text-emerald-400 uppercase tracking-widest leading-none mb-1">¡Pedido Listo!</h4>
+              <p className="font-bold text-sm text-slate-100">{t.mensaje}</p>
+            </div>
+            <button 
+              onClick={() => setToasts(prev => prev.filter(item => item.id !== t.id))}
+              className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-colors relative z-10 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </section>
   );
 }

@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight } from 'lucide-react';
+import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import DashboardPage from './pages/DashboardPage';
 import SalonPage from './pages/SalonPage';
 import CocinaPage from './pages/CocinaPage';
+import BarraPage from './pages/BarraPage';
 import CajaPage from './pages/CajaPage';
 import ComprasPage from './pages/ComprasPage';
 import ReportesPage from './pages/ReportesPage';
@@ -17,6 +18,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/salon', icon: LayoutGrid, label: 'Salón / Mesas' },
     { path: '/cocina', icon: ChefHat, label: 'Cocina / Pedidos' },
+    { path: '/barra', icon: GlassWater, label: 'Barra / Bebidas' },
     { path: '/caja', icon: Calculator, label: 'Caja / Cobros' },
     { path: '/compras', icon: BookOpen, label: 'Compras / Gastos' },
     { path: '/reportes', icon: PieChart, label: 'Reportes (Contador)' },
@@ -120,6 +122,7 @@ function App() {
         <Route path="/" element={<Layout title="Resumen de Ventas"><DashboardPage /></Layout>} />
         <Route path="/salon" element={<Layout title="Gestión de Salón"><SalonPage /></Layout>} />
         <Route path="/cocina" element={<Layout title="Monitor de Preparación"><CocinaPage /></Layout>} />
+        <Route path="/barra" element={<Layout title="Monitor de Barra"><BarraPage /></Layout>} />
         <Route path="/caja" element={<Layout title="Punto de Cobro"><CajaPage /></Layout>} />
         <Route path="/compras" element={<Layout title="Registro de Compras"><ComprasPage /></Layout>} />
         <Route path="/reportes" element={<Layout title="Panel Contable"><ReportesPage /></Layout>} />

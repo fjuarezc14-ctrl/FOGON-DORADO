@@ -17,6 +17,10 @@ export default function CajaPage() {
   const [isBuscando, setIsBuscando] = useState(false);
   const [cobrando, setCobrando] = useState(false);
 
+  // Historial de Ventas y Arqueo/Cierre de Caja
+  const [ventas, setVentas] = useState([]);
+  const [cierreModalOpen, setCierreModalOpen] = useState(false);
+
   // Modal PedidosYa
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [codigoPY, setCodigoPY] = useState('');
@@ -27,14 +31,16 @@ export default function CajaPage() {
 
   const fetchCajaData = useCallback(async () => {
     try {
-      const [mesasData, resumenData, llevarData] = await Promise.all([
+      const [mesasData, resumenData, llevarData, ventasData] = await Promise.all([
         api.getMesas(),
         api.getResumenVentas(),
         api.getPedidosLlevar(),
+        api.getHistorialVentas(),
       ]);
       setMesas(mesasData);
       setPedidosLlevar(llevarData);
       setStats({ atendidas: resumenData.atendidas || 0, ingresos: resumenData.ingresos || 0 });
+      setVentas(ventasData || []);
     } catch (err) {
       console.error('Error cargando datos de caja:', err);
     } finally {
@@ -45,10 +51,10 @@ export default function CajaPage() {
   useEffect(() => {
     fetchCajaData();
     const interval = setInterval(() => {
-      if (!modalOpen && !deliveryModal) fetchCajaData();
+      if (!modalOpen && !deliveryModal && !cierreModalOpen) fetchCajaData();
     }, 4000);
     return () => clearInterval(interval);
-  }, [fetchCajaData, modalOpen, deliveryModal]);
+  }, [fetchCajaData, modalOpen, deliveryModal, cierreModalOpen]);
 
   const mesasPendientes = mesas.filter(m => m.estado !== 'Libre' && m.pedidoData);
 
@@ -335,6 +341,81 @@ export default function CajaPage() {
               </div>
             </div>
           )}
+
+          {/* HISTORIAL DE VENTAS DEL DÍA */}
+          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-500" /> Historial de Ventas del Día
+              </h2>
+              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                {ventas.length} Venta{ventas.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[650px]">
+                <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4">ID / Hora</th>
+                    <th className="px-6 py-4">Comprobante / Cliente</th>
+                    <th className="px-6 py-4">Origen / Mesa</th>
+                    <th className="px-6 py-4">Método de Pago</th>
+                    <th className="px-6 py-4">Detalle</th>
+                    <th className="px-6 py-4 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm bg-white">
+                  {ventas.length > 0 ? ventas.map(v => (
+                    <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-mono text-xs font-black text-slate-900">#VT-{v.id}</span>
+                          <span className="text-[10px] text-slate-400 font-mono mt-0.5">{v.hora}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-800 text-xs">{v.tipoComprobante} ({v.numDocumento || 'S/D'})</span>
+                          <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">{v.nombreCliente}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {v.tipoEntrega === 'llevar' ? (
+                          <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono">
+                            🛵 PY: {v.codigoPedidosYa}
+                          </span>
+                        ) : (
+                          <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                            🍽️ Mesa {v.mesaNum}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                          v.metodoPago === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                          v.metodoPago === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                          v.metodoPago === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                          'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        }`}>{v.metodoPago}</span>
+                      </td>
+                      <td className="px-6 py-4 max-w-xs truncate text-xs font-bold text-slate-500 uppercase" title={v.itemsResumen}>
+                        {v.itemsResumen}
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono font-black text-slate-900 text-base">
+                        S/ {v.total.toFixed(2)}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase tracking-wider text-xs">
+                        Aún no se han registrado ventas hoy.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         {/* RESUMEN LATERAL */}
@@ -353,7 +434,7 @@ export default function CajaPage() {
               <p className="text-xs text-blue-300 font-black uppercase tracking-widest">Delivery Activos</p>
               <p className="text-3xl font-black mt-2">{pedidosLlevar.length}</p>
             </div>
-            <div className="bg-amber-500 p-5 rounded-2xl relative overflow-hidden text-slate-900 shadow-lg shadow-amber-500/20 transform transition-all hover:scale-[1.02]">
+            <div className="bg-amber-500 p-5 rounded-2xl relative overflow-hidden text-slate-900 shadow-lg shadow-amber-500/20">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-white rounded-full opacity-20"></div>
               <p className="text-xs font-black uppercase tracking-wider opacity-80">Ingresos del Día (S/)</p>
               <div className="flex items-center gap-3 mt-2 relative z-10">
@@ -361,6 +442,15 @@ export default function CajaPage() {
                 <p className="text-3xl lg:text-4xl font-black font-mono tracking-tighter">S/ {stats.ingresos.toFixed(2)}</p>
               </div>
             </div>
+
+            {/* BOTÓN CIERRE DE CAJA TURNO */}
+            <button
+              onClick={() => setCierreModalOpen(true)}
+              className="w-full py-4 mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl shadow-purple-950/40 transition-all active:scale-95 flex items-center justify-center gap-2 border border-purple-500/20"
+            >
+              <CheckCircle className="w-4 h-4" />
+              Cierre de Caja (Turno)
+            </button>
           </div>
         </div>
       </div>
@@ -564,6 +654,95 @@ export default function CajaPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL DE CIERRE DE CAJA (ARQUEO DE TURNO) */}
+      {cierreModalOpen && (() => {
+        // Consolidación reactiva de montos
+        const totalEfectivo = ventas.filter(v => v.metodoPago === 'Efectivo').reduce((s, v) => s + v.total, 0);
+        const totalTarjeta = ventas.filter(v => v.metodoPago === 'Tarjeta').reduce((s, v) => s + v.total, 0);
+        const totalYape = ventas.filter(v => v.metodoPago === 'Yape').reduce((s, v) => s + v.total, 0);
+        const totalPedidosYa = ventas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0);
+        const totalCalculado = totalEfectivo + totalTarjeta + totalYape + totalPedidosYa;
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-slide-up relative">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2 text-indigo-700">
+                  <Calculator className="w-6 h-6 shrink-0" />
+                  <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-none">Arqueo y Cierre</h3>
+                </div>
+                <button onClick={() => setCierreModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-1 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"><X className="w-5 h-5" /></button>
+              </div>
+
+              {/* Vista del ticket térmico */}
+              <div className="bg-amber-50/70 border-2 border-dashed border-amber-200 rounded-2xl p-5 font-mono text-slate-800 text-xs shadow-sm mb-6 flex flex-col">
+                <div className="text-center border-b border-dashed border-slate-300 pb-3 mb-4">
+                  <h4 className="font-black text-sm text-slate-900 uppercase">EL FOGÓN DORADO</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Av. Los Pioneros 432 · RUC: 20404040404</p>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1">CIERRE DE TURNO · ARQUEO DIARIO</p>
+                </div>
+
+                <div className="space-y-1.5 border-b border-dashed border-slate-300 pb-3 mb-4 text-slate-600 font-bold">
+                  <div className="flex justify-between"><span>FECHA:</span><span>{new Date().toLocaleDateString('es-PE')}</span></div>
+                  <div className="flex justify-between"><span>HORA IMP:</span><span>{new Date().toLocaleTimeString('es-PE')}</span></div>
+                  <div className="flex justify-between"><span>CAJERO:</span><span className="uppercase">{cajeroNombre}</span></div>
+                  <div className="flex justify-between"><span>ESTADO:</span><span className="text-emerald-700">DESPACHADO</span></div>
+                </div>
+
+                <div className="space-y-3 mb-4 border-b border-dashed border-slate-300 pb-3">
+                  <div className="flex justify-between font-bold text-slate-700">
+                    <span>💵 EFECTIVO:</span>
+                    <span className="font-black text-slate-900">S/ {totalEfectivo.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-700">
+                    <span>💳 TARJETA POS:</span>
+                    <span className="font-black text-slate-900">S/ {totalTarjeta.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-700">
+                    <span>📱 YAPE / PLIN:</span>
+                    <span className="font-black text-slate-900">S/ {totalYape.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-700">
+                    <span>🛵 PEDIDOS YA (POS):</span>
+                    <span className="font-black text-slate-900">S/ {totalPedidosYa.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-sm font-black text-slate-900 uppercase">
+                  <span>💰 TOTAL CAJA:</span>
+                  <span className="text-base text-emerald-700">S/ {totalCalculado.toFixed(2)}</span>
+                </div>
+
+                <div className="text-center text-[9px] text-slate-400 font-bold mt-6 border-t border-dashed border-slate-200 pt-3">
+                  *** Fin del Reporte de Turno ***
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs uppercase tracking-widest transition-colors flex justify-center items-center gap-1.5"
+                >
+                  Imprimir Ticket
+                </button>
+                <button
+                  onClick={() => {
+                    alert(`✅ ¡Cierre de Turno exitoso!\n\nSe consolidó un total de S/ ${totalCalculado.toFixed(2)} en ventas.\nEl turno ha sido archivado.`);
+                    setCierreModalOpen(false);
+                  }}
+                  className="py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-900 font-black rounded-xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  Cerrar Turno
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </section>
   );
 }

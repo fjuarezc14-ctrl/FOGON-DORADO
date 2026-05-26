@@ -10,6 +10,10 @@ export const api = {
 
   // Cocina (unificado: salón + delivery)
   getPedidosCocina: () => fetch(`${API_BASE}/api/pedidos/cocina`).then(r => r.json()),
+  getPedidosBarra: () => fetch(`${API_BASE}/api/pedidos/barra`).then(r => r.json()),
+  prepararPedido: (id, seccion) => fetch(`${API_BASE}/api/pedidos/${id}/preparar`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seccion }),
+  }).then(r => r.json()),
   servirPedido: (id) => fetch(`${API_BASE}/api/pedidos/${id}/servir`, { method: 'PATCH' }).then(r => r.json()),
 
   // Cancelación de pedidos (mozo)
@@ -46,6 +50,7 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
   getResumenVentas: () => fetch(`${API_BASE}/api/ventas/resumen`).then(r => r.json()),
+  getHistorialVentas: () => fetch(`${API_BASE}/api/ventas`).then(r => r.json()),
 
   // Compras
   getCompras: () => fetch(`${API_BASE}/api/compras`).then(r => r.json()),

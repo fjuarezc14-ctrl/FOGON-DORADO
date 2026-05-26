@@ -178,6 +178,107 @@ app.get('/api/pedidos/cocina', async (req, res) => {
   }
 });
 
+// GET /api/pedidos/barra → Todos los pedidos con bebidas pendientes en Cocina
+app.get('/api/pedidos/barra', async (req, res) => {
+  try {
+    const pedidos = await prisma.pedido.findMany({
+      where: { estado: 'Cocina' },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        items: {
+          include: { producto: { select: { categoria: true } } },
+        },
+        mesa: true,
+      },
+    });
+
+    const formateados = pedidos.map(p => ({
+      pedidoId: p.id,
+      mesaNum: p.mesa?.numero || null,
+      tipoEntrega: p.tipoEntrega,
+      codigoPedidosYa: p.codigoPedidosYa,
+      mesero: p.mesero,
+      adicional: p.adicional,
+      hora: p.createdAt.toLocaleTimeString('es-PE', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
+      }),
+      // Barra solo ve bebidas que no se han despachado (historial === false)
+      items: p.items
+        .filter(i => !i.historial && i.producto?.categoria === 'Bebidas')
+        .map(i => ({
+          nombre: i.nombre,
+          cant: i.cantidad,
+          categoria: i.producto?.categoria || '',
+        })),
+    })).filter(p => p.items.length > 0);
+
+    res.json(formateados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/pedidos/:id/preparar → Cocinero o Barman marca listo su sección
+app.patch('/api/pedidos/:id/preparar', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { seccion } = req.body; // "cocina" o "barra"
+
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      include: { items: { include: { producto: true } } },
+    });
+
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+    // Filtrar los items que corresponden a la sección
+    const itemsAActualizar = pedido.items.filter(i => {
+      const esBebida = i.producto?.categoria === 'Bebidas';
+      if (seccion === 'barra') return esBebida;
+      if (seccion === 'cocina') return !esBebida;
+      return false;
+    });
+
+    // Marcar items como historial
+    await prisma.itemPedido.updateMany({
+      where: { id: { in: itemsAActualizar.map(item => item.id) } },
+      data: { historial: true },
+    });
+
+    // Volver a consultar para validar si todos los items del pedido ya están listos
+    const pedidoActualizado = await prisma.pedido.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    const todosListos = pedidoActualizado.items.every(i => i.historial === true);
+    if (todosListos) {
+      const ped = await prisma.pedido.update({
+        where: { id },
+        data: { estado: 'Servido' },
+        include: { mesa: true },
+      });
+
+      // Si es pedido de salón, verificar si la mesa puede pasar a Servido
+      if (ped.mesaId && ped.tipoEntrega === 'salon') {
+        const enCocina = await prisma.pedido.count({
+          where: { mesaId: ped.mesaId, estado: 'Cocina' },
+        });
+        if (enCocina === 0) {
+          await prisma.mesa.update({
+            where: { id: ped.mesaId },
+            data: { estado: 'Servido' },
+          });
+        }
+      }
+    }
+
+    res.json({ ok: true, todosListos });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/pedidos/:id/servir → Cocinero marca como Listo
 app.patch('/api/pedidos/:id/servir', async (req, res) => {
   const id = parseInt(req.params.id);
@@ -507,6 +608,52 @@ app.post('/api/ventas', async (req, res) => {
     }
 
     res.json({ ok: true, ventaId: venta.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/ventas → Historial detallado de las ventas del día (hora Perú)
+app.get('/api/ventas', async (req, res) => {
+  try {
+    const ahora = new Date();
+    const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+    hoyPeru.setHours(0, 0, 0, 0);
+    const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+
+    const ventas = await prisma.venta.findMany({
+      where: { createdAt: { gte: inicioUTC } },
+      include: {
+        pedido: {
+          include: {
+            items: true,
+            mesa: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formateadas = ventas.map(v => ({
+      id: v.id,
+      pedidoId: v.pedidoId,
+      tipoComprobante: v.tipoComprobante,
+      numDocumento: v.numDocumento,
+      nombreCliente: v.nombreCliente,
+      total: v.total,
+      igv: v.igv,
+      subtotal: v.subtotal,
+      metodoPago: v.metodoPago,
+      hora: v.createdAt.toLocaleTimeString('es-PE', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
+      }),
+      mesaNum: v.pedido?.mesa?.numero || null,
+      codigoPedidosYa: v.pedido?.codigoPedidosYa || null,
+      tipoEntrega: v.pedido?.tipoEntrega || 'salon',
+      itemsResumen: v.pedido?.items?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
+    }));
+
+    res.json(formateadas);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
