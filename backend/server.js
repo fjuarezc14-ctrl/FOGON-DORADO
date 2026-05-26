@@ -650,6 +650,7 @@ app.get('/api/ventas', async (req, res) => {
       mesaNum: v.pedido?.mesa?.numero || null,
       codigoPedidosYa: v.pedido?.codigoPedidosYa || null,
       tipoEntrega: v.pedido?.tipoEntrega || 'salon',
+      createdAt: v.createdAt.toISOString(),
       itemsResumen: v.pedido?.items?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
     }));
 

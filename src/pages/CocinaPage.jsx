@@ -29,7 +29,7 @@ export default function CocinaPage() {
 
   const marcarListo = async (pedidoId) => {
     try {
-      await api.servirPedido(pedidoId);
+      await api.prepararPedido(pedidoId, 'cocina');
       await fetchPedidos();
     } catch (err) {
       alert('Error al marcar listo: ' + err.message);
