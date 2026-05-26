@@ -436,6 +436,9 @@ export default function SalonPage() {
                   : <><AlertTriangle className="w-4 h-4" /> Confirmar</>}
               </button>
             </div>
+          </div>
+        </div>
+      )}
       {/* FLOATING TOASTS NOTIFICATIONS SYSTEM */}
       <div className="fixed bottom-6 right-6 z-[250] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
