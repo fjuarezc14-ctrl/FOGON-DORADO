@@ -51,16 +51,25 @@ model Mesa {
 
 model Pedido {
   id        Int          @id @default(autoincrement())
-  mesa      Mesa         @relation(fields: [mesaId], references: [id])
-  mesaId    Int
+  mesa      Mesa?        @relation(fields: [mesaId], references: [id])
+  mesaId    Int?         // Opcional: null para pedidos de delivery
   mesero    String
-  estado    String       @default("Cocina") // "Cocina", "Servido", "Cobrado"
+  estado    String       @default("Cocina") // "Cocina", "Servido", "Cobrado", "Cancelado"
   total     Float
   adicional Boolean      @default(false)
   createdAt DateTime     @default(now())
-  
-  items     ItemPedido[]
-  Venta     Venta?
+
+  // --- Delivery / PedidosYa ---
+  tipoEntrega      String    @default("salon")  // "salon" | "llevar"
+  codigoPedidosYa  String?                      // "FG-4821"
+
+  // --- Auditoría de cancelación ---
+  canceladoPor   String?
+  motivoCancela  String?
+  canceladoEn    DateTime?
+
+  items  ItemPedido[]
+  Venta  Venta?
 }
 
 model ItemPedido {
@@ -88,8 +97,8 @@ model Venta {
   total           Float
   igv             Float
   subtotal        Float
-  metodoPago      String   @default("Efectivo") // "Efectivo", "Tarjeta", "Yape"
-  estadoNubefact  String   @default("PENDIENTE") // "PENDIENTE", "ACEPTADA", "ERROR"
+  metodoPago      String   @default("Efectivo") // "Efectivo", "Tarjeta", "Yape", "PedidosYa"
+  estadoNubefact  String   @default("PENDIENTE")
   createdAt       DateTime @default(now())
 }
 
@@ -102,11 +111,11 @@ model Compra {
   proveedor      String
   ruc            String?
   tipoDocumento  String   @default("Factura") // "Factura", "Boleta"
-  serieNumero    String?  // Ej: "F001-001"
+  serieNumero    String?
   baseImponible  Float
   igv            Float
   total          Float
-  xmlData        String?  // Guardamos el XML crudo del proveedor
+  xmlData        String?
   origenCarga    String   @default("manual") // "xml", "manual"
   creadoEn       DateTime @default(now())
 }

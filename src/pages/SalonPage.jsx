@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User } from 'lucide-react';
+import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock } from 'lucide-react';
 import { api } from '../api';
+
+const LIMITE_CANCELACION_MS = 5 * 60 * 1000;
+
+function formatCuentaRegresiva(ms) {
+  const seg = Math.max(0, Math.floor(ms / 1000));
+  const min = Math.floor(seg / 60);
+  const s = seg % 60;
+  return `${min}:${s.toString().padStart(2, '0')}`;
+}
 
 export default function SalonPage() {
   const [mesas, setMesas] = useState([]);
@@ -12,6 +21,11 @@ export default function SalonPage() {
   const [categoriaActiva, setCategoriaActiva] = useState('Todos');
   const [meseroGlobal, setMeseroGlobal] = useState('Carlos');
   const [enviando, setEnviando] = useState(false);
+  // Cancelación
+  const [cancelModal, setCancelModal] = useState(false);
+  const [cancelMotivo, setCancelMotivo] = useState('');
+  const [cancelandoPedido, setCancelandoPedido] = useState(false);
+  const [tiempoRestante, setTiempoRestante] = useState(LIMITE_CANCELACION_MS);
 
   // Cargar mesas desde el API real
   const fetchMesas = useCallback(async () => {
@@ -78,6 +92,40 @@ export default function SalonPage() {
       if (nuevos[index].cant <= 0) nuevos.splice(index, 1);
     }
     setTicketActual(nuevos);
+  };
+
+  // Countdown timer para cancelación
+  useEffect(() => {
+    if (!modalOpen || !mesaActual?.pedidoData?.pedidoCreadoEn) return;
+    const calcular = () => {
+      const elapsed = Date.now() - new Date(mesaActual.pedidoData.pedidoCreadoEn).getTime();
+      setTiempoRestante(Math.max(0, LIMITE_CANCELACION_MS - elapsed));
+    };
+    calcular();
+    const interval = setInterval(calcular, 1000);
+    return () => clearInterval(interval);
+  }, [modalOpen, mesaActual?.pedidoData?.pedidoCreadoEn]);
+
+  const handleCancelarPedido = async () => {
+    if (!cancelMotivo.trim()) { alert('Por favor escribe un motivo para la cancelación.'); return; }
+    setCancelandoPedido(true);
+    try {
+      const pedidoId = mesaActual.pedidoData.pedidoId;
+      const result = await api.cancelarPedido(pedidoId, {
+        canceladoPor: meseroGlobal,
+        motivo: cancelMotivo.trim(),
+      });
+      if (result.error) throw new Error(result.error);
+      setCancelModal(false);
+      setModalOpen(false);
+      setCancelMotivo('');
+      await fetchMesas();
+      alert(`✅ Pedido cancelado correctamente. Mesa ${mesaActual.num} liberada.`);
+    } catch (err) {
+      alert('Error al cancelar: ' + err.message);
+    } finally {
+      setCancelandoPedido(false);
+    }
   };
 
   const enviarACocina = async () => {
@@ -244,6 +292,29 @@ export default function SalonPage() {
                     <span className="font-bold text-slate-400 uppercase text-[10px] md:text-xs tracking-widest">Total Mesa</span>
                     <span className="font-black font-mono text-2xl md:text-3xl text-slate-900 leading-none">S/ {totalTicket.toFixed(2)}</span>
                   </div>
+
+                  {/* Botón cancelar pedido (solo si hay pedido en Cocina) */}
+                  {mesaActual?.pedidoData && mesaActual.estado === 'Cocina' && (
+                    <div className="mb-3">
+                      {tiempoRestante > 0 ? (
+                        <button
+                          onClick={() => setCancelModal(true)}
+                          className="w-full py-2.5 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 font-black uppercase text-[10px] tracking-widest rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                          Cancelar Pedido
+                          <span className="ml-1 font-mono bg-red-100 border border-red-200 px-2 py-0.5 rounded-md text-red-600">
+                            <Clock className="w-3 h-3 inline mr-1" />{formatCuentaRegresiva(tiempoRestante)}
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="w-full py-2.5 bg-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
+                          <Clock className="w-4 h-4" /> Cancelación · Tiempo agotado
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-2 md:gap-3">
                     <button onClick={() => setModalOpen(false)} className="py-3.5 md:py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs md:text-sm uppercase tracking-wide transition-colors">Guardar / Salir</button>
                     <button onClick={enviarACocina} disabled={enviando} className="py-3.5 md:py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-black uppercase tracking-tight rounded-xl text-xs md:text-sm transition-colors shadow-lg shadow-amber-500/30 flex justify-center items-center gap-2 disabled:opacity-50">
@@ -253,6 +324,58 @@ export default function SalonPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMACIÓN DE CANCELACIÓN */}
+      {cancelModal && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-slide-up">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-none">Cancelar Pedido</h3>
+                <p className="text-xs text-slate-500 mt-1">Mesa {mesaActual?.num} · Mozo: {meseroGlobal}</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-5">
+              <p className="text-xs text-red-700 font-bold">
+                ⚠️ Esta acción eliminará el pedido. Si algún insumo ya fue usado, se habrá generado un desperdicio.
+              </p>
+            </div>
+
+            <div className="mb-5">
+              <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Motivo de cancelación (obligatorio):</label>
+              <textarea
+                rows={3}
+                value={cancelMotivo}
+                onChange={(e) => setCancelMotivo(e.target.value)}
+                placeholder="Ej: Cliente cambió de opinión, se equivocó de mesa..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 resize-none font-medium text-slate-800"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => { setCancelModal(false); setCancelMotivo(''); }}
+                className="py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm uppercase tracking-wide transition-colors"
+              >
+                No cancelar
+              </button>
+              <button
+                onClick={handleCancelarPedido}
+                disabled={cancelandoPedido || !cancelMotivo.trim()}
+                className="py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-sm uppercase tracking-wide transition-colors flex justify-center items-center gap-2 disabled:opacity-50 shadow-lg shadow-red-500/20"
+              >
+                {cancelandoPedido
+                  ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  : <><AlertTriangle className="w-4 h-4" /> Confirmar</>}
+              </button>
             </div>
           </div>
         </div>
