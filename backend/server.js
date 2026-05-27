@@ -810,7 +810,9 @@ app.get('/api/ventas', async (req, res) => {
       codigoPedidosYa: v.pedido?.codigoPedidosYa || null,
       tipoEntrega: v.pedido?.tipoEntrega || 'salon',
       createdAt: v.createdAt.toISOString(),
+      estadoNubefact: v.estadoNubefact,
       itemsResumen: v.pedido?.items?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
+
       items: v.pedido?.items?.map(i => ({
         nombre: i.nombre,
         cant: i.cantidad,
