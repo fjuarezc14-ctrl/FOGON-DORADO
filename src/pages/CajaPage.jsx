@@ -167,7 +167,7 @@ export default function CajaPage() {
 
   const reimprimirComprobante = (v) => {
     if (!v) return;
-    const rucEmpresa = "R.U.C. N° 33333399999";
+    const rucEmpresa = "R.U.C. N° 20496009259";
     
     let serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
     let correlativoStr = String(v.id % 10000).padStart(4, '0');
@@ -175,6 +175,7 @@ export default function CajaPage() {
     let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
     let enlacePdf = null;
     let contingencia = v.estadoNubefact === 'PENDIENTE_REINTENTO';
+
 
     if (v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:')) {
       try {
@@ -231,14 +232,12 @@ export default function CajaPage() {
       qrImageUrl,
       enlacePdf,
       contingencia,
+      shouldAutoPrint: true,
     });
 
     setSunatModalOpen(true);
-    
-    setTimeout(() => {
-      window.print();
-    }, 400);
   };
+
 
 
   const enviarPorWhatsApp = (v) => {
@@ -320,9 +319,10 @@ export default function CajaPage() {
       let igv = total - subtotal;
       let totalLetras = numeroALetras(total);
       let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
-      const rucEmpresa = "R.U.C. N° 33333399999";
+      const rucEmpresa = "R.U.C. N° 20496009259";
       let qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${igv.toFixed(2)}|${total.toFixed(2)}|${fecha}|${tipoComprobante === 'Factura'?'6':'1'}|${numDocumento || '00000000'}`;
       let enlacePdf = null;
+
       let contingencia = response.contingencia || false;
 
       // Extraer datos oficiales devueltos por la API de Nubefact
@@ -365,6 +365,7 @@ export default function CajaPage() {
         qrImageUrl,
         enlacePdf,
         contingencia,
+        shouldAutoPrint: true,
       });
 
       setModalOpen(false);
@@ -374,18 +375,13 @@ export default function CajaPage() {
       setSunatModalOpen(true);
 
       await fetchCajaData();
-
-      // Auto-trigger window.print() after a short delay
-      setTimeout(() => {
-        window.print();
-      }, 400);
-
     } catch (err) {
       alert('Error al procesar cobro: ' + err.message);
     } finally {
       setCobrando(false);
     }
   };
+
 
 
 
@@ -1098,11 +1094,12 @@ export default function CajaPage() {
                 </div>
               )}
               
-              <div className="text-center font-bold" style={{ fontSize: '14px', marginBottom: '2px' }}>Pollería El Fogón Dorado</div>
+              <div className="text-center font-bold" style={{ fontSize: '14px', marginBottom: '2px' }}>Nuevo Fogón Dorado E.I.R.L.</div>
               <div className="text-center text-[10px] leading-tight mb-2">
-                Av. Los Pioneros 432, Los Olivos, Lima<br />
-                R.U.C. N° 10722791326
+                Av. Hoyos Rubio Nro. 338, Pueblo Nuevo, Cajamarca<br />
+                R.U.C. N° 20496009259
               </div>
+
 
               
               <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}</div>
@@ -1166,8 +1163,22 @@ export default function CajaPage() {
               </div>
               
               <div className="flex justify-center my-5">
-                <img src={activeComprobante.qrImageUrl} alt="QR Comprobante" style={{ width: '120px', height: '120px' }} className="border p-1 bg-white" />
+                <img 
+                  src={activeComprobante.qrImageUrl} 
+                  alt="QR Comprobante" 
+                  style={{ width: '120px', height: '120px' }} 
+                  className="border p-1 bg-white"
+                  onLoad={() => {
+                    if (activeComprobante.shouldAutoPrint) {
+                      setTimeout(() => {
+                        window.print();
+                      }, 200);
+                      activeComprobante.shouldAutoPrint = false; // Evitar disparar de nuevo al recargar
+                    }
+                  }}
+                />
               </div>
+
               
               <div className="text-center font-bold" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
               <div className="text-center text-[9px] leading-tight text-slate-500 mt-1">
