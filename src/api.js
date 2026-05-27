@@ -62,4 +62,8 @@ export const api = {
   getReporteContable: (desde, hasta) => fetch(`${API_BASE}/api/reportes/contable${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
   getCancelaciones: (desde, hasta) => fetch(`${API_BASE}/api/reportes/cancelaciones${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
   getReporteMozos: (desde, hasta) => fetch(`${API_BASE}/api/reportes/mozos${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
+
+  // Consulta DNI/RUC segura
+  consultarCliente: (doc) => fetch(`${API_BASE}/api/clientes/consulta/${doc}`).then(r => r.json()),
 };
+

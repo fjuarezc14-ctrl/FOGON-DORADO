@@ -18,6 +18,98 @@ app.get('/api/status', (req, res) => {
 });
 
 // ============================================================
+// CONSULTA RUC/DNI SEGURA (APIsNetPe / Decolecta)
+// ============================================================
+app.get('/api/clientes/consulta/:doc', async (req, res) => {
+  const { doc } = req.params;
+  const cleaned = doc.trim();
+  
+  // Fallbacks rápidos locales para pruebas rápidas en desarrollo
+  if (cleaned === '20613857321') {
+    return res.json({
+      razonSocial: 'FIRST FISH S.A.C.',
+      direccion: 'LT. 05 DPTO. LIMA MZ. J COOP. CAJABAMBA - LIMA LIMA LOS OLIVOS',
+      tipo: 'Factura'
+    });
+  } else if (cleaned === '10404040404') {
+    return res.json({
+      nombre: 'JUAN PEREZ SOTO',
+      direccion: 'CALLE SAN MARTÍN 109',
+      tipo: 'Boleta'
+    });
+  }
+
+  const token = process.env.APIS_NET_PE_TOKEN;
+
+  // Si no hay token configurado, proveemos fallbacks dinámicos inteligentes para simulación
+  if (!token || token.includes('tu_token') || token === '') {
+    const esRuc = cleaned.length === 11;
+    if (esRuc) {
+      return res.json({
+        razonSocial: `DISTRIBUIDORA Y RESTAURANTE ${cleaned} S.A.C. (MOCK)`,
+        direccion: `AV. LOS PIONEROS N° ${cleaned.substring(4,7)}, LIMA LIMA LOS OLIVOS`,
+        tipo: 'Factura'
+      });
+    } else {
+      return res.json({
+        nombre: `CLIENTE DE PRUEBA ${cleaned} (MOCK)`,
+        direccion: `CALLE PRINCIPAL N° ${cleaned.substring(3,6)}`,
+        tipo: 'Boleta'
+      });
+    }
+  }
+
+  try {
+    const isRUC = cleaned.length === 11;
+    const apiURL = isRUC 
+      ? `https://api.decolecta.com/v1/sunat/ruc?numero=${cleaned}` 
+      : `https://api.decolecta.com/v1/reniec/dni?numero=${cleaned}`;
+    
+    const response = await fetch(apiURL, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Referer': 'https://apis.net.pe/',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      
+      // Mapear al formato consistente que espera el frontend
+      if (isRUC) {
+        return res.json({
+          razonSocial: data.razon_social || 'Desconocido',
+          direccion: data.direccion || 'Av. Los Pioneros 432, Lima',
+          tipo: 'Factura'
+        });
+      } else {
+        return res.json({
+          nombre: data.full_name || `${data.first_name || ''} ${data.first_last_name || ''} ${data.second_last_name || ''}`.trim() || 'Desconocido',
+          direccion: 'Calle San Martín 109', // DNI de RENIEC no devuelve dirección de forma pública
+          tipo: 'Boleta'
+        });
+      }
+    } else {
+      const errorText = await response.text();
+      console.warn(`[Proxy Decolecta] Error de respuesta de API (${response.status}): ${errorText}`);
+      throw new Error(`API responded with status ${response.status}`);
+    }
+  } catch (err) {
+    console.error("Error en proxy de consulta RUC/DNI:", err);
+    const esRuc = cleaned.length === 11;
+    res.json({
+      razonSocial: esRuc ? `ERROR CONEXIÓN RUC ${cleaned}` : undefined,
+      nombre: !esRuc ? `ERROR CONEXIÓN DNI ${cleaned}` : undefined,
+      direccion: 'AV. PRINCIPAL 123, LIMA',
+      tipo: esRuc ? 'Factura' : 'Boleta'
+    });
+  }
+});
+
+
+
+// ============================================================
 // MESAS — Consolidado con todos los pedidos activos
 // ============================================================
 
@@ -579,7 +671,7 @@ app.delete('/api/usuarios/:id', async (req, res) => {
 
 // POST /api/ventas → Cobrar mesa (acepta pedidoIds array o pedidoId simple)
 app.post('/api/ventas', async (req, res) => {
-  const { pedidoId, pedidoIds, tipoComprobante, numDocumento, nombreCliente, total, metodoPago } = req.body;
+  const { pedidoId, pedidoIds, tipoComprobante, numDocumento, nombreCliente, total, metodoPago, clienteDireccion } = req.body;
   const idsAPagar = pedidoIds || [pedidoId];
   const idPrincipal = idsAPagar[idsAPagar.length - 1]; // El más reciente como venta principal
 
@@ -596,9 +688,21 @@ app.post('/api/ventas', async (req, res) => {
       });
     }
 
-    // Crear Venta principal
+    // Crear Venta principal (inicialmente PENDIENTE si es factura/boleta)
+    const initEstadoNubefact = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
+
     const venta = await prisma.venta.create({
-      data: { pedidoId: idPrincipal, tipoComprobante, numDocumento, nombreCliente, total, igv, subtotal, metodoPago },
+      data: { 
+        pedidoId: idPrincipal, 
+        tipoComprobante, 
+        numDocumento, 
+        nombreCliente, 
+        total, 
+        igv, 
+        subtotal, 
+        metodoPago,
+        estadoNubefact: initEstadoNubefact
+      },
     });
 
     // Marcar TODOS los pedidos de la mesa como Cobrado
@@ -616,11 +720,50 @@ app.post('/api/ventas', async (req, res) => {
       });
     }
 
-    res.json({ ok: true, ventaId: venta.id });
+    // Si es Boleta o Factura, intentamos enviar a Nubefact
+    if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
+      try {
+        const pedidoConItems = await prisma.pedido.findUnique({
+          where: { id: idPrincipal },
+          include: { items: true }
+        });
+
+        // Llamar a Nubefact
+        const response = await enviarANubefact({ ...venta, clienteDireccion }, pedidoConItems.items);
+        
+        // Si tiene éxito, actualizamos a ACEPTADO y guardamos la respuesta
+        const ventaActualizada = await prisma.venta.update({
+          where: { id: venta.id },
+          data: { estadoNubefact: `ACEPTADO:${JSON.stringify(response)}` }
+        });
+
+        return res.json({ ok: true, ventaId: venta.id, estadoNubefact: ventaActualizada.estadoNubefact });
+      } catch (nubefactErr) {
+        console.error("⚠️ Error al facturar con Nubefact. Entrando en modo contingencia (Offline-First):", nubefactErr.message);
+
+        // Guardar estado de contingencia
+        const ventaActualizada = await prisma.venta.update({
+          where: { id: venta.id },
+          data: { estadoNubefact: 'PENDIENTE_REINTENTO' }
+        });
+
+        // Retornamos éxito al POS para liberar la mesa sin trabas e indicando contingencia
+        return res.json({ 
+          ok: true, 
+          ventaId: venta.id, 
+          estadoNubefact: ventaActualizada.estadoNubefact,
+          contingencia: true,
+          mensaje: "Comprobante emitido en contingencia. El envío a la SUNAT se completará automáticamente en segundo plano."
+        });
+      }
+    }
+
+    res.json({ ok: true, ventaId: venta.id, estadoNubefact: initEstadoNubefact });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // GET /api/ventas → Historial detallado de las ventas del día o rango de fechas (hora Perú)
 app.get('/api/ventas', async (req, res) => {
@@ -868,3 +1011,146 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend Fogón Dorado v3 corriendo en http://localhost:${PORT}`);
 });
+
+
+// ============================================================
+// HELPERS E INTEGRACIÓN NUBEFACT (SUNAT PSE)
+// ============================================================
+
+async function enviarANubefact(venta, items) {
+  // Simular caída de red si está activa la variable de entorno
+  if (process.env.NUBEFACT_SIMULATE_OUTAGE === 'true') {
+    throw new Error('Outage Simulator Active: Nubefact server is simulated down.');
+  }
+
+  const token = process.env.NUBEFACT_TOKEN;
+  const url = process.env.NUBEFACT_API_URL;
+
+  if (!token || !url || token.includes('tu_token') || url.includes('tu_token') || token === '') {
+    throw new Error('Nubefact credentials not configured in .env');
+  }
+
+  // Mapear tipo de comprobante para Nubefact (1 = Factura, 2 = Boleta)
+  const tipoComprobanteNum = venta.tipoComprobante === 'Factura' ? 1 : 2;
+  const serie = venta.tipoComprobante === 'Factura' ? 'FFF1' : 'BBB1'; // Series oficiales de homologación Nubefact
+  
+  // Identificación del cliente (1 = DNI, 6 = RUC, 0 = Sin Documento)
+  let clienteTipoDoc = 1;
+  let clienteNumDoc = venta.numDocumento || '00000000';
+  if (venta.numDocumento && venta.numDocumento.length === 11) {
+    clienteTipoDoc = 6;
+  } else if (!venta.numDocumento || venta.numDocumento === '00000000' || venta.numDocumento === '0') {
+    clienteTipoDoc = 0; // Sin documento para boletas menores a 700 soles
+    clienteNumDoc = '00000000';
+  }
+
+  // Formatear items para el JSON de Nubefact
+  const formattedItems = items.map((item) => {
+    const totalItem = item.precio * item.cantidad;
+    const subtotalItem = totalItem / 1.18;
+    const igvItem = totalItem - subtotalItem;
+    
+    return {
+      unidad_de_medida: "NIU",
+      codigo: `P${String(item.productoId).padStart(3, '0')}`,
+      descripcion: item.nombre,
+      cantidad: parseFloat(item.cantidad),
+      valor_unitario: parseFloat((subtotalItem / item.cantidad).toFixed(4)),
+      precio_unitario: parseFloat(item.precio.toFixed(4)),
+      subtotal: parseFloat(subtotalItem.toFixed(2)),
+      tipo_de_igv: 1, // Gravado - Operación Onerosa
+      igv: parseFloat(igvItem.toFixed(2)),
+      total: parseFloat(totalItem.toFixed(2))
+    };
+  });
+
+  const payload = {
+    operacion: "generar_comprobante",
+    tipo_de_comprobante: tipoComprobanteNum,
+    serie: serie,
+    numero: null, // Autoincrementar en Nubefact
+    sunat_transaction: 1, // Venta interna
+    cliente_tipo_de_documento: clienteTipoDoc,
+    cliente_numero_de_documento: clienteNumDoc,
+    cliente_denominacion: venta.nombreCliente || 'PÚBLICO GENERAL',
+    cliente_direccion: venta.clienteDireccion || 'LIMA',
+    cliente_email: null,
+    fecha_de_emision: new Date(venta.createdAt).toISOString().split('T')[0],
+    moneda: 1, // Soles
+    porcentaje_de_igv: 18.00,
+    total_gravada: parseFloat(venta.subtotal.toFixed(2)),
+    total_igv: parseFloat(venta.igv.toFixed(2)),
+    total: parseFloat(venta.total.toFixed(2)),
+    enviar_a_la_sunat: true,
+    items: formattedItems
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 segundos de timeout estricto
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(payload),
+    signal: controller.signal
+  });
+
+  clearTimeout(timeoutId);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Nubefact Error (${response.status}): ${errorText}`);
+  }
+
+  return await response.json();
+}
+
+
+// ============================================================
+// WORKER DE REINTENTO AUTOMÁTICO (OFFLINE CONTINGENCY)
+// ============================================================
+
+async function procesarVentasPendientes() {
+  try {
+    const pendientes = await prisma.venta.findMany({
+      where: {
+        estadoNubefact: 'PENDIENTE_REINTENTO',
+        tipoComprobante: { in: ['Boleta', 'Factura'] }
+      },
+      include: {
+        pedido: {
+          include: { items: true }
+        }
+      }
+    });
+
+    if (pendientes.length === 0) return;
+
+    console.log(`[Worker Nubefact] 🔍 Se encontraron ${pendientes.length} ventas en contingencia por reintentar.`);
+
+    for (const venta of pendientes) {
+      try {
+        console.log(`[Worker Nubefact] 🔄 Reintentando envío de Venta #${venta.id}...`);
+        const response = await enviarANubefact(venta, venta.pedido.items);
+        
+        await prisma.venta.update({
+          where: { id: venta.id },
+          data: { estadoNubefact: `ACEPTADO:${JSON.stringify(response)}` }
+        });
+        
+        console.log(`[Worker Nubefact] ✅ Venta #${venta.id} enviada y ACEPTADA por Nubefact.`);
+      } catch (err) {
+        console.error(`[Worker Nubefact] ❌ Intento fallido para Venta #${venta.id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("[Worker Nubefact] ❌ Error crítico en el worker:", err.message);
+  }
+}
+
+// Iniciar worker de reintentos cada 1 minuto (60000ms)
+setInterval(procesarVentasPendientes, 60000);
+

@@ -38,7 +38,8 @@ services:
   db:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"
+      - "5435:5432"
+
     environment:
       - POSTGRES_USER=fogon_user
       - POSTGRES_PASSWORD=fogon_password

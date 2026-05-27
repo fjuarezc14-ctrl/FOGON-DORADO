@@ -121,7 +121,7 @@ export default function CajaPage() {
     setIsBuscando(true);
     const doc = numDocumento.trim();
     
-    // Fallbacks locales rápidos de prueba
+    // Fallbacks locales rápidos de prueba en desarrollo
     if (doc === '20613857321') {
       setClienteNombre('FIRST FISH S.A.C.');
       setClienteDireccion('LT. 05 DPTO. LIMA MZ. J COOP. CAJABAMBA - LIMA LIMA LOS OLIVOS');
@@ -137,35 +137,21 @@ export default function CajaPage() {
     }
 
     try {
+      const data = await api.consultarCliente(doc);
       const isRUC = doc.length === 11;
-      const apiURL = isRUC 
-        ? `https://api.apisperu.org.pe/v1/ruc/${doc}?token=tu_token_de_apisperu` 
-        : `https://api.apisperu.org.pe/v1/dni/${doc}?token=tu_token_de_apisperu`;
-      
-      const response = await fetch(apiURL);
-      if (response.ok) {
-        const data = await response.json();
-        if (isRUC) {
-          setClienteNombre(data.razonSocial || data.nombre || 'Desconocido');
-          setClienteDireccion(data.direccion || 'Av. Los Pioneros 432, Lima');
-          setTipoComprobante('Factura');
-        } else {
-          setClienteNombre(`${data.nombres || ''} ${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim() || 'Desconocido');
-          setClienteDireccion(data.direccion || 'Calle San Martín 109');
-          setTipoComprobante('Boleta');
-        }
+      if (isRUC) {
+        setClienteNombre(data.razonSocial || data.nombre || 'Desconocido');
+        setClienteDireccion(data.direccion || 'Av. Los Pioneros 432, Lima');
+        setTipoComprobante('Factura');
       } else {
-        // Fallback local en caso de error de red o de token de la API de APIS PERU
-        if (tipoComprobante === 'Factura') {
-          setClienteNombre('DISTRIBUIDORA Y RESTAURANTE FOGÓN S.A.C.');
-          setClienteDireccion('AV. LOS PIONEROS 432, LIMA');
-        } else {
-          setClienteNombre('JUAN ALBERTO MENDOZA PÉREZ');
-          setClienteDireccion('CALLE SAN MARTÍN 109');
-        }
+        const fullNombre = data.nombre || `${data.nombres || ''} ${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim();
+        setClienteNombre(fullNombre || 'Desconocido');
+        setClienteDireccion(data.direccion || 'Calle San Martín 109');
+        setTipoComprobante('Boleta');
       }
     } catch (err) {
       console.error("Error consultando API de DNI/RUC:", err);
+      // Fallback local en caso de error del API
       if (tipoComprobante === 'Factura') {
         setClienteNombre('DISTRIBUIDORA Y RESTAURANTE FOGÓN S.A.C.');
         setClienteDireccion('AV. LOS PIONEROS 432, LIMA');
@@ -178,15 +164,37 @@ export default function CajaPage() {
     }
   };
 
+
   const reimprimirComprobante = (v) => {
     if (!v) return;
-    const serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
-    const correlativoStr = String(v.id % 10000).padStart(4, '0');
-    const totalLetras = numeroALetras(v.total);
-    const hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
     const rucEmpresa = "R.U.C. N° 33333399999";
-    const qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${v.igv.toFixed(2)}|${v.total.toFixed(2)}|${v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}|${v.tipoComprobante === 'Factura'?'6':'1'}|${v.numDocumento || '00000000'}`;
+    
+    let serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+    let correlativoStr = String(v.id % 10000).padStart(4, '0');
+    let qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${v.igv.toFixed(2)}|${v.total.toFixed(2)}|${v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}|${v.tipoComprobante === 'Factura'?'6':'1'}|${v.numDocumento || '00000000'}`;
+    let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
+    let enlacePdf = null;
+    let contingencia = v.estadoNubefact === 'PENDIENTE_REINTENTO';
+
+    if (v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:')) {
+      try {
+        const responseData = JSON.parse(v.estadoNubefact.substring(9));
+        serie = responseData.serie || serie;
+        correlativoStr = String(responseData.numero || correlativoStr).padStart(4, '0');
+        if (responseData.cadena_para_codigo_qr) {
+          qrData = responseData.cadena_para_codigo_qr;
+        }
+        if (responseData.key) {
+          hashResumen = responseData.key;
+        }
+        enlacePdf = responseData.enlace_del_pdf || null;
+      } catch (err) {
+        console.error("Error parsing Nubefact response:", err);
+      }
+    }
+
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(qrData)}`;
+    const totalLetras = numeroALetras(v.total);
 
     // Reconstruir items si vienen del backend o parsear de itemsResumen
     let items = v.items || [];
@@ -221,6 +229,8 @@ export default function CajaPage() {
       hashResumen,
       metodoPago: v.metodoPago,
       qrImageUrl,
+      enlacePdf,
+      contingencia,
     });
 
     setSunatModalOpen(true);
@@ -229,6 +239,7 @@ export default function CajaPage() {
       window.print();
     }, 400);
   };
+
 
   const enviarPorWhatsApp = (v) => {
     if (!v) return;
@@ -271,13 +282,14 @@ export default function CajaPage() {
     setCobrando(true);
     try {
       const total = mesaSeleccionada.pedidoData.total;
-      await api.cobrar({
+      const response = await api.cobrar({
         pedidoIds: mesaSeleccionada.pedidoData.pedidoIds,
         tipoComprobante,
         numDocumento: numDocumento || null,
         nombreCliente: clienteNombre || 'PÚBLICO GENERAL',
         total,
         metodoPago,
+        clienteDireccion: clienteDireccion || '',
       });
 
       // Incrementar correlativo SUNAT
@@ -288,15 +300,36 @@ export default function CajaPage() {
       // Guardar en activeComprobante
       const fecha = new Date().toLocaleDateString('es-PE');
       const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-      const serie = tipoComprobante === 'Factura' ? 'F001' : 'B001';
-      const correlativoStr = String(correlativoActual).padStart(4, '0');
-      const subtotal = total / 1.18;
-      const igv = total - subtotal;
-      const totalLetras = numeroALetras(total);
-      const hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
+      
+      let serie = tipoComprobante === 'Factura' ? 'F001' : 'B001';
+      let correlativoStr = String(correlativoActual).padStart(4, '0');
+      let subtotal = total / 1.18;
+      let igv = total - subtotal;
+      let totalLetras = numeroALetras(total);
+      let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
       const rucEmpresa = "R.U.C. N° 33333399999";
+      let qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${igv.toFixed(2)}|${total.toFixed(2)}|${fecha}|${tipoComprobante === 'Factura'?'6':'1'}|${numDocumento || '00000000'}`;
+      let enlacePdf = null;
+      let contingencia = response.contingencia || false;
 
-      const qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${igv.toFixed(2)}|${total.toFixed(2)}|${fecha}|${tipoComprobante === 'Factura'?'6':'1'}|${numDocumento || '00000000'}`;
+      // Extraer datos oficiales devueltos por la API de Nubefact
+      if (response.estadoNubefact && response.estadoNubefact.startsWith('ACEPTADO:')) {
+        try {
+          const responseData = JSON.parse(response.estadoNubefact.substring(9));
+          serie = responseData.serie || serie;
+          correlativoStr = String(responseData.numero || correlativoStr).padStart(4, '0');
+          if (responseData.cadena_para_codigo_qr) {
+            qrData = responseData.cadena_para_codigo_qr;
+          }
+          if (responseData.key) {
+            hashResumen = responseData.key;
+          }
+          enlacePdf = responseData.enlace_del_pdf || null;
+        } catch (err) {
+          console.error("Error parsing Nubefact response:", err);
+        }
+      }
+
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(qrData)}`;
 
       setActiveComprobante({
@@ -317,6 +350,8 @@ export default function CajaPage() {
         hashResumen,
         metodoPago,
         qrImageUrl,
+        enlacePdf,
+        contingencia,
       });
 
       setModalOpen(false);
@@ -338,6 +373,7 @@ export default function CajaPage() {
       setCobrando(false);
     }
   };
+
 
 
   const confirmarEntregaDelivery = async (pedidoId, codigo) => {
@@ -1042,6 +1078,13 @@ export default function CajaPage() {
             </div>
             
             <div id="comprobante-sunat-ticket-print" className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white text-slate-900 font-mono text-xs leading-relaxed">
+              {activeComprobante.contingencia && (
+                <div className="bg-amber-100 text-amber-900 border-2 border-dashed border-amber-400 p-2 rounded-lg text-center mb-3 font-bold text-[9px] uppercase tracking-tight no-print">
+                  ⚠️ TICKET DE CONTROL INTERNO<br />
+                  Emisión electrónica pendiente por contingencia
+                </div>
+              )}
+              
               <div className="text-center font-bold" style={{ fontSize: '14px', marginBottom: '2px' }}>Restaurant Prueba</div>
               <div className="text-center text-[10px] leading-tight mb-2">
                 Urbanización Prueba Tres Patitos N123<br />
@@ -1116,7 +1159,16 @@ export default function CajaPage() {
               <div className="text-center text-[9px] leading-tight text-slate-500 mt-1">
                 Representación impresa de la Factura electrónica. consulte su documento en https://consulta.susii.com
               </div>
+
+              {activeComprobante.enlacePdf && (
+                <div className="text-center text-[10px] mt-4 font-bold no-print pt-2 border-t border-slate-100">
+                  <a href={activeComprobante.enlacePdf} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800 flex items-center justify-center gap-1.5">
+                    📄 Descargar Comprobante SUNAT (PDF)
+                  </a>
+                </div>
+              )}
             </div>
+
             
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2 shrink-0">
               <button onClick={() => window.print()} className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black uppercase tracking-widest rounded-xl text-xs flex justify-center items-center gap-2 shadow-lg shadow-emerald-500/20">
