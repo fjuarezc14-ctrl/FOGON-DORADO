@@ -253,14 +253,27 @@ export default function CajaPage() {
       return;
     }
     
-    const serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
-    const correlativoStr = String(v.id % 10000).padStart(4, '0');
+    let serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+    let correlativoStr = String(v.id % 10000).padStart(4, '0');
+    let enlace = 'https://www.nubefact.com/buscar';
+
+    if (v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:')) {
+      try {
+        const responseData = JSON.parse(v.estadoNubefact.substring(9));
+        serie = responseData.serie || serie;
+        correlativoStr = String(responseData.numero || correlativoStr).padStart(4, '0');
+        enlace = responseData.enlace_del_pdf || responseData.enlace || enlace;
+      } catch (err) {
+        console.error("Error parsing Nubefact response for WhatsApp:", err);
+      }
+    }
     
-    const mensaje = `Estimado cliente *${v.nombreCliente || 'Consumidor Final'}*, le hacemos entrega de su comprobante electrónico *${v.tipoComprobante === 'Factura' ? 'FACTURA' : 'BOLETA'} ${serie}-${correlativoStr}* por un monto total de *S/ ${v.total.toFixed(2)}*.\n\nPuede consultar y descargar su documento ingresando con sus datos en: https://consulta.susii.com\n\n¡Gracias por su preferencia en *El Fogón Dorado*!`;
+    const mensaje = `Estimado cliente *${v.nombreCliente || 'Consumidor Final'}*, le hacemos entrega de su comprobante electrónico *${v.tipoComprobante === 'Factura' ? 'FACTURA' : 'BOLETA'} ${serie}-${correlativoStr}* por un monto total de *S/ ${v.total.toFixed(2)}*.\n\nPuede consultar y descargar su documento oficial desde aquí:\n${enlace}\n\n¡Gracias por su preferencia en *Pollería El Fogón Dorado*!`;
     
     const waURL = `https://api.whatsapp.com/send?phone=51${cleanedPhone}&text=${encodeURIComponent(mensaje)}`;
     window.open(waURL, '_blank');
   };
+
 
 
 
@@ -1085,11 +1098,12 @@ export default function CajaPage() {
                 </div>
               )}
               
-              <div className="text-center font-bold" style={{ fontSize: '14px', marginBottom: '2px' }}>Restaurant Prueba</div>
+              <div className="text-center font-bold" style={{ fontSize: '14px', marginBottom: '2px' }}>Pollería El Fogón Dorado</div>
               <div className="text-center text-[10px] leading-tight mb-2">
-                Urbanización Prueba Tres Patitos N123<br />
-                R.U.C. N° 33333399999
+                Av. Los Pioneros 432, Los Olivos, Lima<br />
+                R.U.C. N° 10722791326
               </div>
+
               
               <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}</div>
               <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{activeComprobante.serie}-{activeComprobante.correlativo}</div>
@@ -1157,8 +1171,9 @@ export default function CajaPage() {
               
               <div className="text-center font-bold" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
               <div className="text-center text-[9px] leading-tight text-slate-500 mt-1">
-                Representación impresa de la Factura electrónica. consulte su documento en https://consulta.susii.com
+                Representación impresa de la Factura electrónica. Consulte su documento en: https://www.nubefact.com/buscar
               </div>
+
 
               {activeComprobante.enlacePdf && (
                 <div className="text-center text-[10px] mt-4 font-bold no-print pt-2 border-t border-slate-100">

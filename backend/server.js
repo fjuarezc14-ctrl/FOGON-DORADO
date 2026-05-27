@@ -1066,9 +1066,11 @@ async function enviarANubefact(venta, items) {
 
   const payload = {
     operacion: "generar_comprobante",
+    codigo_unico: `fogon_venta_${venta.id}`,
     tipo_de_comprobante: tipoComprobanteNum,
     serie: serie,
     numero: null, // Autoincrementar en Nubefact
+
     sunat_transaction: 1, // Venta interna
     cliente_tipo_de_documento: clienteTipoDoc,
     cliente_numero_de_documento: clienteNumDoc,
