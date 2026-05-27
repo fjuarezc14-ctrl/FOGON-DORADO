@@ -587,6 +587,15 @@ app.post('/api/ventas', async (req, res) => {
     const subtotal = parseFloat((total / 1.18).toFixed(2));
     const igv = parseFloat((total - subtotal).toFixed(2));
 
+    // Mover todos los items de los otros pedidos adicionales al pedido principal para que se consoliden en el detalle de la venta
+    if (idsAPagar.length > 1) {
+      const otrosIds = idsAPagar.filter(id => id !== idPrincipal);
+      await prisma.itemPedido.updateMany({
+        where: { pedidoId: { in: otrosIds } },
+        data: { pedidoId: idPrincipal },
+      });
+    }
+
     // Crear Venta principal
     const venta = await prisma.venta.create({
       data: { pedidoId: idPrincipal, tipoComprobante, numDocumento, nombreCliente, total, igv, subtotal, metodoPago },
@@ -659,6 +668,11 @@ app.get('/api/ventas', async (req, res) => {
       tipoEntrega: v.pedido?.tipoEntrega || 'salon',
       createdAt: v.createdAt.toISOString(),
       itemsResumen: v.pedido?.items?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
+      items: v.pedido?.items?.map(i => ({
+        nombre: i.nombre,
+        cant: i.cantidad,
+        precio: i.precio
+      })) || [],
     }));
 
     res.json(formateadas);

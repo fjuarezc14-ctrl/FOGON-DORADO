@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, TrendingUp, TrendingDown, DollarSign, XCircle, Users, Truck, Calendar, Search } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, DollarSign, XCircle, Users, Truck, Calendar, Search, Receipt, Printer, X } from 'lucide-react';
 import { api } from '../api';
+
 
 export default function ReportesPage() {
   const getPrimerDiaMes = () => {
@@ -33,18 +34,136 @@ export default function ReportesPage() {
   const [mozos, setMozos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtrando, setFiltrando] = useState(false);
+  const [ventas, setVentas] = useState([]);
+  const [activeComprobante, setActiveComprobante] = useState(null);
+  const [sunatModalOpen, setSunatModalOpen] = useState(false);
+
+  const numeroALetras = (num) => {
+    const unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
+    const decenas = ["", "DIEZ", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
+    const especiales = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISEIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
+    const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+
+    let entero = Math.floor(num);
+    let decimales = Math.round((num - entero) * 100);
+    let decimalStr = decimales < 10 ? "0" + decimales : decimales;
+
+    if (entero === 0) return "CERO CON " + decimalStr + "/100 SOLES";
+    if (entero === 100) return "CIEN CON " + decimalStr + "/100 SOLES";
+
+    let letras = "";
+
+    if (entero >= 100) {
+      let c = Math.floor(entero / 100);
+      letras += centenas[c] + " ";
+      entero %= 100;
+    }
+
+    if (entero >= 10 && entero <= 19) {
+      letras += especiales[entero - 10] + " ";
+    } else if (entero >= 20 || entero > 0) {
+      let d = Math.floor(entero / 10);
+      let u = entero % 10;
+      if (d > 0) {
+        letras += decenas[d];
+        if (u > 0) letras += " Y ";
+      }
+      if (u > 0) {
+        letras += unidades[u];
+      }
+      letras += " ";
+    }
+
+    return letras.trim() + " CON " + decimalStr + "/100 SOLES";
+  };
+
+  const reimprimirComprobante = (v) => {
+    if (!v) return;
+    const serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+    const correlativoStr = String(v.id % 10000).padStart(4, '0');
+    const totalLetras = numeroALetras(v.total);
+    const hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
+    const rucEmpresa = "R.U.C. N° 33333399999";
+    const qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${v.igv.toFixed(2)}|${v.total.toFixed(2)}|${v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}|${v.tipoComprobante === 'Factura'?'6':'1'}|${v.numDocumento || '00000000'}`;
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(qrData)}`;
+
+    // Reconstruir items si vienen del backend o parsear de itemsResumen
+    let items = v.items || [];
+    if (items.length === 0 && v.itemsResumen) {
+      items = v.itemsResumen.split(', ').map(str => {
+        const match = str.match(/^(\d+)x\s+(.+)$/);
+        if (match) {
+          const cant = parseInt(match[1]);
+          const nombre = match[2];
+          const precio = v.total / cant; // fallback estimate
+          return { cant, nombre, precio };
+        }
+        return { cant: 1, nombre: str, precio: v.total };
+      });
+    }
+
+    setActiveComprobante({
+      tipo: v.tipoComprobante,
+      serie,
+      correlativo: correlativoStr,
+      fecha: v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE'),
+      hora: v.hora,
+      mesaNum: v.mesaNum || 'Delivery',
+      clienteNombre: v.nombreCliente || 'Consumidor Final',
+      clienteDoc: v.numDocumento || 'S/D',
+      clienteDireccion: v.clienteDireccion || 'Av. Principal 123, Lima',
+      items,
+      subtotal: v.subtotal,
+      igv: v.igv,
+      total: v.total,
+      totalLetras,
+      hashResumen,
+      metodoPago: v.metodoPago,
+      qrImageUrl,
+    });
+
+    setSunatModalOpen(true);
+    
+    setTimeout(() => {
+      window.print();
+    }, 400);
+  };
+
+  const enviarPorWhatsApp = (v) => {
+    if (!v) return;
+    const telefono = prompt("Ingresa el número de WhatsApp del cliente (Ej. 999888777):");
+    if (!telefono) return;
+    
+    // Validar celular peruano de 9 dígitos
+    const cleanedPhone = telefono.replace(/\D/g, '');
+    if (cleanedPhone.length !== 9) {
+      alert("Por favor, ingresa un número de celular válido de 9 dígitos.");
+      return;
+    }
+    
+    const serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+    const correlativoStr = String(v.id % 10000).padStart(4, '0');
+    
+    const mensaje = `Estimado cliente *${v.nombreCliente || 'Consumidor Final'}*, le hacemos entrega de su comprobante electrónico *${v.tipoComprobante === 'Factura' ? 'FACTURA' : 'BOLETA'} ${serie}-${correlativoStr}* por un monto total de *S/ ${v.total.toFixed(2)}*.\n\nPuede consultar y descargar su documento ingresando con sus datos en: https://consulta.susii.com\n\n¡Gracias por su preferencia en *El Fogón Dorado*!`;
+    
+    const waURL = `https://api.whatsapp.com/send?phone=51${cleanedPhone}&text=${encodeURIComponent(mensaje)}`;
+    window.open(waURL, '_blank');
+  };
+
 
   const fetchReportes = useCallback(async (desde, hasta) => {
     setFiltrando(true);
     try {
-      const [data, cancs, mzs] = await Promise.all([
+      const [data, cancs, mzs, vts] = await Promise.all([
         api.getReporteContable(desde, hasta),
         api.getCancelaciones(desde, hasta),
         api.getReporteMozos(desde, hasta),
+        api.getHistorialVentas(desde, hasta),
       ]);
       setResumen(data);
       setCancelaciones(cancs || []);
       setMozos(mzs || []);
+      setVentas(vts || []);
     } catch(err) {
       console.error('Error cargando reportes:', err);
     } finally {
@@ -52,6 +171,7 @@ export default function ReportesPage() {
       setFiltrando(false);
     }
   }, []);
+
 
   useEffect(() => {
     fetchReportes(fechaDesde, fechaHasta);
@@ -340,6 +460,262 @@ export default function ReportesPage() {
           </div>
         )}
       </div>
+
+
+      {/* HISTORIAL Y AUDITORÍA DE COMPROBANTES EMITIDOS */}
+      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mt-8 mb-12">
+        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+          <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-indigo-500" /> Registro de Comprobantes Emitidos (RCE)
+          </h2>
+          <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+            {ventas.length} Comprobante{ventas.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[750px]">
+            <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4">ID / Hora</th>
+                <th className="px-6 py-4">Comprobante / Cliente</th>
+                <th className="px-6 py-4">Mesa / Delivery</th>
+                <th className="px-6 py-4">Método de Pago</th>
+                <th className="px-6 py-4">Detalle Items</th>
+                <th className="px-6 py-4 text-right">Total</th>
+                <th className="px-6 py-4 text-center">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+              {ventas.length > 0 ? ventas.map(v => (
+                <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-mono text-xs font-black text-slate-900">#VT-{v.id}</span>
+                      <span className="text-[10px] text-slate-400 font-mono mt-0.5">{v.hora}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-slate-800 text-xs">{v.tipoComprobante} ({v.numDocumento || 'S/D'})</span>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">{v.nombreCliente}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {v.tipoEntrega === 'llevar' ? (
+                      <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono">
+                        🛵 PY: {v.codigoPedidosYa}
+                      </span>
+                    ) : (
+                      <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                        🍽️ Mesa {v.mesaNum}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                      v.metodoPago === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                      v.metodoPago === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                      v.metodoPago === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                      'bg-indigo-50 border-indigo-200 text-indigo-700'
+                    }`}>{v.metodoPago}</span>
+                  </td>
+                  <td className="px-6 py-4 max-w-xs truncate text-xs font-bold text-slate-500 uppercase" title={v.itemsResumen}>
+                    {v.itemsResumen}
+                  </td>
+                  <td className="px-6 py-4 text-right font-mono font-black text-slate-900 text-base">
+                    S/ {v.total.toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => reimprimirComprobante(v)}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                        title="Reimprimir Comprobante Susii 80mm"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Reimprimir
+                      </button>
+                      <button
+                        onClick={() => enviarPorWhatsApp(v)}
+                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                        title="Enviar Comprobante por WhatsApp"
+                      >
+                        <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.161.001 6.136 1.23 8.375 3.466 2.238 2.237 3.467 5.21 3.466 8.373-.003 6.535-5.328 11.86-11.859 11.86-2.007-.001-3.98-.51-5.753-1.48L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.269 0 9.557-4.287 9.559-9.556.001-2.553-.99-4.955-2.792-6.758-1.802-1.802-4.199-2.793-6.753-2.794-5.27 0-9.559 4.287-9.56 9.559-.001 1.625.434 3.208 1.262 4.622L1.51 21.054l4.137-1.9zm12.135-6.843c-.268-.134-1.583-.78-1.828-.87-.247-.09-.427-.134-.607.134-.18.267-.697.87-.852 1.047-.156.178-.311.201-.579.067-.268-.134-1.132-.418-2.156-1.332-.796-.71-1.335-1.586-1.492-1.853-.156-.268-.017-.413.117-.547.12-.12.268-.312.401-.468.134-.156.179-.268.268-.446.09-.178.045-.335-.022-.469-.067-.134-.607-1.462-.832-2.002-.22-.53-.442-.457-.607-.466-.156-.008-.337-.008-.518-.008-.18 0-.473.067-.72.337-.247.268-.943.922-.943 2.248s.965 2.604 1.1 2.784c.134.18 1.9 2.901 4.6 4.068.643.277 1.143.443 1.534.568.646.205 1.233.176 1.697.107.518-.077 1.583-.647 1.807-1.272.223-.624.223-1.159.156-1.272-.069-.112-.249-.18-.517-.313z" />
+                        </svg> WhatsApp
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="7" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
+                    No se encontraron comprobantes emitidos en este rango de fechas.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* SUNAT Comprobante Susii Style Modal */}
+      {sunatModalOpen && activeComprobante && (
+        <div id="modal-comprobante-sunat-print-container" className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
+            <div className="bg-slate-950 p-4 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-black text-xs uppercase tracking-wider flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}
+              </h3>
+              <button onClick={() => setSunatModalOpen(false)} className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div id="comprobante-sunat-ticket-print" className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white text-slate-900 font-mono text-xs leading-relaxed">
+              <div className="text-center font-bold" style={{ fontSize: '14px', marginBottom: '2px' }}>Restaurant Prueba</div>
+              <div className="text-center text-[10px] leading-tight mb-2">
+                Urbanización Prueba Tres Patitos N123<br />
+                R.U.C. N° 33333399999
+              </div>
+              
+              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}</div>
+              <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{activeComprobante.serie}-{activeComprobante.correlativo}</div>
+              
+              <div className="flex justify-between border-t border-b border-dashed border-slate-300 py-1.5 mb-2 font-bold">
+                <span>{activeComprobante.fecha} {activeComprobante.hora}</span>
+                <span>Mesa {activeComprobante.mesaNum}</span>
+              </div>
+              
+              <div className="space-y-1 mb-3">
+                <div><strong>Cliente:</strong> <span className="uppercase">{activeComprobante.clienteNombre}</span></div>
+                <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
+                <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
+                <div><strong>Items:</strong> <span>{activeComprobante.items.length}</span></div>
+              </div>
+              
+              <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
+              
+              {/* Items Table Header */}
+              <div className="flex font-bold border-b border-dashed border-slate-350 pb-1 mb-1">
+                <span className="w-16 shrink-0">Cant.</span>
+                <span className="flex-1">DESCRIPCIÓN</span>
+                <span className="w-16 text-right shrink-0">P.Unit</span>
+                <span className="w-20 text-right shrink-0">TOTAL</span>
+              </div>
+              
+              {activeComprobante.items.map((item, idx) => {
+                const subTotalItem = item.cant * item.precio;
+                return (
+                  <div key={idx} className="flex items-start mb-1">
+                    <span className="w-16 shrink-0">{item.cant.toFixed(2)} NIU</span>
+                    <span className="flex-1 uppercase">{item.nombre}</span>
+                    <span className="w-16 text-right shrink-0">{item.precio.toFixed(2)}</span>
+                    <span className="w-20 text-right shrink-0">{subTotalItem.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+              
+              <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
+              
+              <div className="space-y-1 text-right font-bold" style={{ fontSize: '11px' }}>
+                <div className="flex justify-between"><span>SUBTOTAL</span> <span>S/ {activeComprobante.subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>I.G.V (18%)</span> <span>S/ {activeComprobante.igv.toFixed(2)}</span></div>
+                <div className="flex justify-between" style={{ fontSize: '12px', fontWeight: '900' }}><span>TOTAL</span> <span>S/ {activeComprobante.total.toFixed(2)}</span></div>
+              </div>
+              
+              <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
+              
+              <div className="mb-4">
+                <strong className="block text-[10px]">IMPORTE EN LETRAS:</strong>
+                <span className="uppercase text-[10px] leading-tight block">{activeComprobante.totalLetras}</span>
+              </div>
+              
+              <div className="mb-3">
+                <strong>RESUMEN:</strong> <span className="font-mono text-[10px]">{activeComprobante.hashResumen}</span>
+              </div>
+              
+              <div>
+                <strong>FORMA DE PAGO:</strong> <span className="uppercase">{activeComprobante.metodoPago === 'Efectivo' ? 'CONTADO' : 'CONTADO (' + activeComprobante.metodoPago + ')'}</span>
+              </div>
+              
+              <div className="flex justify-center my-5">
+                <img src={activeComprobante.qrImageUrl} alt="QR Comprobante" style={{ width: '120px', height: '120px' }} className="border p-1 bg-white" />
+              </div>
+              
+              <div className="text-center font-bold" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
+              <div className="text-center text-[9px] leading-tight text-slate-500 mt-1">
+                Representación impresa de la Factura electrónica. consulte su documento en https://consulta.susii.com
+              </div>
+            </div>
+            
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2 shrink-0">
+              <button onClick={() => window.print()} className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black uppercase tracking-widest rounded-xl text-xs flex justify-center items-center gap-2 shadow-lg shadow-emerald-500/20">
+                <Receipt className="w-4 h-4" /> Imprimir 80mm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @media print {
+          /* Ocultar elementos de navegación y fondos */
+          aside, header, #sidebar-menu, #sidebar-backdrop, button, nav, .shrink-0 {
+            display: none !important;
+          }
+          /* Ocultar el resto del contenido de la página excepto el modal a imprimir */
+          main > *:not(section),
+          section > *:not(#modal-comprobante-sunat-print-container):not(#modal-cierre) {
+            display: none !important;
+          }
+          /* Garantizar que el body y contenedores no tengan alturas fijas o desbordamientos */
+          html, body, #root, main, section {
+            background: white !important;
+            color: black !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+            width: auto !important;
+          }
+          /* Formatear el contenedor del ticket en 80mm en la esquina superior izquierda */
+          #modal-comprobante-sunat-print-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 80mm !important;
+            height: auto !important;
+            display: block !important;
+            background: white !important;
+            z-index: 99999 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          #modal-comprobante-sunat-print-container > div {
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            max-width: 80mm !important;
+            width: 80mm !important;
+            height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          #modal-comprobante-sunat-print-container div.bg-slate-950, 
+          #modal-comprobante-sunat-print-container div.shrink-0 {
+            display: none !important;
+          }
+          #comprobante-sunat-ticket-print {
+            width: 80mm !important;
+            padding: 10px !important;
+            margin: 0 !important;
+            font-family: 'Courier New', Courier, monospace !important;
+            font-size: 11px !important;
+            line-height: 1.3 !important;
+            color: black !important;
+          }
+        }
+      `}</style>
     </section>
   );
 }
+
