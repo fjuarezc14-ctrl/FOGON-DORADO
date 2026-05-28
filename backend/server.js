@@ -79,14 +79,14 @@ app.get('/api/clientes/consulta/:doc', async (req, res) => {
       // Mapear al formato consistente que espera el frontend
       if (isRUC) {
         return res.json({
-          razonSocial: data.razon_social || 'Desconocido',
-          direccion: data.direccion || 'Av. Los Pioneros 432, Lima',
+          razonSocial: data.razon_social || '',
+          direccion: data.direccion || '',
           tipo: 'Factura'
         });
       } else {
         return res.json({
-          nombre: data.full_name || `${data.first_name || ''} ${data.first_last_name || ''} ${data.second_last_name || ''}`.trim() || 'Desconocido',
-          direccion: 'Calle San Martín 109', // DNI de RENIEC no devuelve dirección de forma pública
+          nombre: data.full_name || `${data.first_name || ''} ${data.first_last_name || ''} ${data.second_last_name || ''}`.trim() || '',
+          direccion: '', // DNI de RENIEC no devuelve dirección de forma pública
           tipo: 'Boleta'
         });
       }
@@ -99,9 +99,9 @@ app.get('/api/clientes/consulta/:doc', async (req, res) => {
     console.error("Error en proxy de consulta RUC/DNI:", err);
     const esRuc = cleaned.length === 11;
     res.json({
-      razonSocial: esRuc ? `ERROR CONEXIÓN RUC ${cleaned}` : undefined,
-      nombre: !esRuc ? `ERROR CONEXIÓN DNI ${cleaned}` : undefined,
-      direccion: 'AV. PRINCIPAL 123, LIMA',
+      razonSocial: '',
+      nombre: '',
+      direccion: '',
       tipo: esRuc ? 'Factura' : 'Boleta'
     });
   }

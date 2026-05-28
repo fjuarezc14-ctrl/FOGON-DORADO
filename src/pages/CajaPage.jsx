@@ -140,26 +140,21 @@ export default function CajaPage() {
       const data = await api.consultarCliente(doc);
       const isRUC = doc.length === 11;
       if (isRUC) {
-        setClienteNombre(data.razonSocial || data.nombre || 'Desconocido');
-        setClienteDireccion(data.direccion || 'Av. Los Pioneros 432, Lima');
+        setClienteNombre(data.razonSocial || '');
+        setClienteDireccion(data.direccion || '');
         setTipoComprobante('Factura');
       } else {
-        const fullNombre = data.nombre || `${data.nombres || ''} ${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim();
-        setClienteNombre(fullNombre || 'Desconocido');
-        setClienteDireccion(data.direccion || 'Calle San Martín 109');
+        setClienteNombre(data.nombre || '');
+        setClienteDireccion(data.direccion || '');
         setTipoComprobante('Boleta');
       }
     } catch (err) {
       console.error("Error consultando API de DNI/RUC:", err);
-      // Fallback local en caso de error del API
-      if (tipoComprobante === 'Factura') {
-        setClienteNombre('DISTRIBUIDORA Y RESTAURANTE FOGÓN S.A.C.');
-        setClienteDireccion('AV. LOS PIONEROS 432, LIMA');
-      } else {
-        setClienteNombre('JUAN ALBERTO MENDOZA PÉREZ');
-        setClienteDireccion('CALLE SAN MARTÍN 109');
-      }
-    } finally {
+      // Mantener campos vacíos en caso de error para permitir escritura manual limpia
+      setClienteNombre('');
+      setClienteDireccion('');
+    }
+ finally {
       setIsBuscando(false);
     }
   };
@@ -221,7 +216,7 @@ export default function CajaPage() {
       mesaNum: v.mesaNum || 'Delivery',
       clienteNombre: v.nombreCliente || 'Consumidor Final',
       clienteDoc: v.numDocumento || 'S/D',
-      clienteDireccion: v.clienteDireccion || 'Av. Principal 123, Lima',
+      clienteDireccion: v.clienteDireccion || '',
       items,
       subtotal: v.subtotal,
       igv: v.igv,
@@ -287,8 +282,8 @@ export default function CajaPage() {
 
   const procesarCobroYFacturar = async () => {
     if (!mesaSeleccionada || !mesaSeleccionada.pedidoData) return;
-    if ((tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') && !clienteNombre) {
-      alert('Por favor, busca y valida el documento del cliente antes de cobrar.');
+    if (tipoComprobante === 'Factura' && !clienteNombre) {
+      alert('Por favor, busca y valida el RUC del cliente antes de cobrar.');
       return;
     }
     setCobrando(true);
@@ -354,7 +349,7 @@ export default function CajaPage() {
         mesaNum: mesaSeleccionada.num,
         clienteNombre: clienteNombre || 'Consumidor Final',
         clienteDoc: numDocumento || 'S/D',
-        clienteDireccion: clienteDireccion || 'Av. Principal 123, Lima',
+        clienteDireccion: clienteDireccion || '',
         items: mesaSeleccionada.pedidoData.items,
         subtotal,
         igv,
@@ -802,7 +797,7 @@ export default function CajaPage() {
                     <div>
                       <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">{tipoComprobante === 'Factura' ? 'RUC del Cliente' : 'DNI del Cliente'}:</label>
                       <div className="flex gap-2">
-                        <input type="text" value={numDocumento} onChange={(e) => handleDocumentoChange(e.target.value)} placeholder={tipoComprobante === 'Factura' ? 'Ej. 20404040404' : 'Ej. 70443322'} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500 font-mono" />
+                        <input type="text" value={numDocumento} onChange={(e) => handleDocumentoChange(e.target.value)} placeholder={tipoComprobante === 'Factura' ? 'Ej. 20496009259' : 'Ej. 70443322'} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500 font-mono" />
 
                         <button onClick={buscarCliente} disabled={!numDocumento || isBuscando} className="bg-slate-900 text-white px-4 py-2 rounded-xl hover:bg-amber-500 hover:text-slate-900 transition-colors disabled:opacity-50 flex items-center justify-center shrink-0 shadow-md">
                           {isBuscando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : <Search className="w-4 h-4" />}
@@ -815,7 +810,7 @@ export default function CajaPage() {
                     </div>
                     <div>
                       <label className="block text-slate-500 font-bold mb-1 text-[10px] tracking-widest uppercase">Dirección del Cliente:</label>
-                      <input type="text" value={clienteDireccion} onChange={(e) => setClienteDireccion(e.target.value)} placeholder="Opcional (Ej. Av. Los Pioneros 432)" className="w-full bg-white border border-slate-200 text-slate-700 font-bold rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500" />
+                      <input type="text" value={clienteDireccion} onChange={(e) => setClienteDireccion(e.target.value)} placeholder="Opcional (Ej. Av. Hoyos Rubio Nro. 338)" className="w-full bg-white border border-slate-200 text-slate-700 font-bold rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-500" />
                     </div>
                   </div>
                 )}
@@ -991,7 +986,7 @@ export default function CajaPage() {
         const totalCalculado = totalEfectivo + totalTarjeta + totalYape + totalPedidosYa;
 
         return (
-          <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div id="modal-cierre" className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-slide-up relative">
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-2 text-indigo-700">
@@ -1000,12 +995,12 @@ export default function CajaPage() {
                 </div>
                 <button onClick={() => setCierreModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-1 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"><X className="w-5 h-5" /></button>
               </div>
-
+ 
               {/* Vista del ticket térmico */}
-              <div className="bg-amber-50/70 border-2 border-dashed border-amber-200 rounded-2xl p-5 font-mono text-slate-800 text-xs shadow-sm mb-6 flex flex-col">
+              <div id="cierre-imprimible" className="bg-amber-50/70 border-2 border-dashed border-amber-200 rounded-2xl p-5 font-mono text-slate-800 text-xs shadow-sm mb-6 flex flex-col">
                 <div className="text-center border-b border-dashed border-slate-300 pb-3 mb-4">
-                  <h4 className="font-black text-sm text-slate-900 uppercase">EL FOGÓN DORADO</h4>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Av. Los Pioneros 432 · RUC: 20404040404</p>
+                  <h4 className="font-black text-sm text-slate-900 uppercase">NUEVO FOGÓN DORADO E.I.R.L.</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Av. Hoyos Rubio Nro. 338 · RUC: 20496009259</p>
                   <p className="text-[10px] text-slate-400 font-bold mt-1">CIERRE DE TURNO · ARQUEO DIARIO</p>
                 </div>
 
@@ -1113,7 +1108,9 @@ export default function CajaPage() {
               <div className="space-y-1 mb-3">
                 <div><strong>Cliente:</strong> <span className="uppercase">{activeComprobante.clienteNombre}</span></div>
                 <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
-                <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
+                {activeComprobante.clienteDireccion && (
+                  <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
+                )}
                 <div><strong>Items:</strong> <span>{activeComprobante.items.length}</span></div>
               </div>
               
