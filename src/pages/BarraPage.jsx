@@ -87,7 +87,7 @@ export default function BarraPage() {
               return (
                 <div
                   key={p.pedidoId}
-                  className="bg-slate-900 border border-indigo-950/60 rounded-t-2xl rounded-b shadow-2xl flex flex-col overflow-hidden transform transition-all hover:scale-[1.02] relative"
+                  className="bg-slate-900 border border-indigo-950/60 rounded-t-2xl rounded-b shadow-2xl flex flex-col transform transition-all hover:scale-[1.02] relative"
                   style={{ minHeight: '280px' }}
                 >
                   {/* Header del Ticket */}
@@ -129,13 +129,20 @@ export default function BarraPage() {
                   {/* Detalle de Bebidas */}
                   <div className="p-4 flex-1 bg-slate-900/40 min-h-[120px]">
                     {p.items.map((item, i) => (
-                      <div key={i} className="flex items-start py-2.5 border-b border-indigo-950/30 last:border-0">
-                        <span className="font-mono font-black text-base mr-3 text-purple-400 w-5 text-center shrink-0">
-                          {item.cant}
-                        </span>
-                        <span className="flex-1 text-slate-100 font-bold text-sm leading-snug pt-0.5 uppercase tracking-wide">
-                          {item.nombre}
-                        </span>
+                      <div key={i} className="flex flex-col py-2.5 border-b border-indigo-950/30 last:border-0">
+                        <div className="flex items-start">
+                          <span className="font-mono font-black text-base mr-3 text-purple-400 w-5 text-center shrink-0">
+                            {item.cant}
+                          </span>
+                          <span className="flex-1 text-slate-100 font-bold text-sm leading-snug pt-0.5 uppercase tracking-wide">
+                            {item.nombre}
+                          </span>
+                        </div>
+                        {item.notas && (
+                          <div className="ml-8 mt-1">
+                            <span className="inline-block bg-slate-950 border border-indigo-950/50 text-purple-400 font-mono text-[9px] px-2 py-0.5 rounded font-black tracking-wide uppercase">📋 NOTA: {item.notas}</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

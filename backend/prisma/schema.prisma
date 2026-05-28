@@ -82,6 +82,7 @@ model ItemPedido {
   precio     Float
   cantidad   Int
   historial  Boolean  @default(false)
+  notas      String?
 }
 
 // ============================================================

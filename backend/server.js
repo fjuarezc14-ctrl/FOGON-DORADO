@@ -145,6 +145,8 @@ app.get('/api/mesas', async (req, res) => {
           cant: i.cantidad,
           historial: i.historial,
           categoria: i.producto?.categoria || '',
+          pedidoId: p.id,
+          notas: i.notas || null,
         }))
       );
 
@@ -186,6 +188,18 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
     const mesa = await prisma.mesa.findUnique({ where: { numero: parseInt(num) } });
     if (!mesa) return res.status(404).json({ error: 'Mesa no encontrada' });
 
+    // Control de concurrencia: Evitar comandas adicionales en mesas que ya fueron cobradas/liberadas
+    if (adicional) {
+      const activeCount = await prisma.pedido.count({
+        where: { mesaId: mesa.id, estado: { in: ['Cocina', 'Servido'] } }
+      });
+      if (activeCount === 0) {
+        return res.status(400).json({ 
+          error: 'Esta mesa ya ha sido cobrada y liberada por caja. Por favor, vuelve a abrir la mesa antes de comandar.' 
+        });
+      }
+    }
+
     const itemsNuevos = items.filter(i => !i.historial);
 
     const pedido = await prisma.pedido.create({
@@ -202,6 +216,7 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
             precio: i.precio,
             cantidad: i.cant,
             historial: false,
+            notas: i.notas || null,
           })),
         },
       },
@@ -261,6 +276,7 @@ app.get('/api/pedidos/cocina', async (req, res) => {
           nombre: i.nombre,
           cant: i.cantidad,
           categoria: i.producto?.categoria || '',
+          notas: i.notas || null,
         })),
     })).filter(p => p.items.length > 0); // Ocultar si solo tiene bebidas
 
@@ -301,6 +317,7 @@ app.get('/api/pedidos/barra', async (req, res) => {
           nombre: i.nombre,
           cant: i.cantidad,
           categoria: i.producto?.categoria || '',
+          notas: i.notas || null,
         })),
     })).filter(p => p.items.length > 0);
 
@@ -459,20 +476,149 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
       }
     }
 
-    // Liberar mesa si no quedan pedidos activos
+    let mesaLiberada = false;
+    let nuevoEstadoMesa = 'Libre';
+
+    // Liberar mesa si no quedan pedidos activos o actualizar su estado
     if (pedido.mesaId) {
-      const activos = await prisma.pedido.count({
+      const activos = await prisma.pedido.findMany({
         where: { mesaId: pedido.mesaId, estado: { in: ['Cocina', 'Servido'] } },
       });
-      if (activos === 0) {
+      
+      if (activos.length === 0) {
         await prisma.mesa.update({
           where: { id: pedido.mesaId },
           data: { estado: 'Libre' },
         });
+        mesaLiberada = true;
+      } else {
+        // Si hay al menos un pedido activo en Cocina, la mesa debe quedarse en Cocina.
+        // Si todos los activos están en Servido, pasa a Servido (Azul).
+        const hayEnCocina = activos.some(p => p.estado === 'Cocina');
+        nuevoEstadoMesa = hayEnCocina ? 'Cocina' : 'Servido';
+        
+        await prisma.mesa.update({
+          where: { id: pedido.mesaId },
+          data: { estado: nuevoEstadoMesa },
+        });
       }
     }
 
-    res.json({ ok: true });
+    res.json({ ok: true, mesaLiberada, nuevoEstadoMesa });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { productoId, cantidadACancelar, motivo, canceladoPor } = req.body;
+
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      include: {
+        items: { include: { producto: true } },
+        mesa: true,
+      },
+    });
+
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado.' });
+
+    if (pedido.estado !== 'Cocina') {
+      return res.status(400).json({
+        error: 'Este pedido ya no puede modificarse. Solo se cancelan ítems de pedidos en estado "Cocina".',
+      });
+    }
+
+    const elapsed = Date.now() - new Date(pedido.createdAt).getTime();
+    if (elapsed > LIMITE_CANCELACION_MS) {
+      return res.status(400).json({
+        error: 'El tiempo límite de 5 minutos para cancelar ha expirado. Consulta con el administrador.',
+      });
+    }
+
+    const item = pedido.items.find(i => String(i.productoId) === String(productoId) && !i.historial);
+    if (!item) return res.status(404).json({ error: 'El ítem seleccionado no se encuentra en la comanda activa.' });
+
+    if (cantidadACancelar > item.cantidad) {
+      return res.status(400).json({ error: 'La cantidad a cancelar supera la cantidad pedida.' });
+    }
+
+    // Calcular nueva cantidad
+    const nuevaCantidad = item.cantidad - cantidadACancelar;
+
+    // Restaurar stock
+    if (item.producto.tipoStock === 'limitado') {
+      await prisma.producto.update({
+        where: { id: item.productoId },
+        data: { stock: { increment: cantidadACancelar } },
+      });
+    }
+
+    if (nuevaCantidad === 0) {
+      // Eliminar el ítem del pedido
+      await prisma.itemPedido.delete({ where: { id: item.id } });
+    } else {
+      // Actualizar cantidad
+      await prisma.itemPedido.update({
+        where: { id: item.id },
+        data: { cantidad: nuevaCantidad },
+      });
+    }
+
+    // Recalcular total del pedido
+    const itemsRestantes = await prisma.itemPedido.findMany({
+      where: { pedidoId: id },
+    });
+
+    const nuevoTotal = itemsRestantes.reduce((sum, i) => sum + (i.cantidad * i.precio), 0);
+
+    if (itemsRestantes.length === 0) {
+      // Si no quedan ítems, cancelamos todo el pedido
+      await prisma.pedido.update({
+        where: { id },
+        data: {
+          estado: 'Cancelado',
+          canceladoPor: canceladoPor || 'Sin especificar',
+          motivoCancela: motivo || 'Cancelación completa de ítems',
+          canceladoEn: new Date(),
+          total: 0,
+        },
+      });
+    } else {
+      // Actualizar total
+      await prisma.pedido.update({
+        where: { id },
+        data: { total: nuevoTotal },
+      });
+    }
+
+    let mesaLiberada = false;
+    let nuevoEstadoMesa = 'Libre';
+
+    if (pedido.mesaId) {
+      const activos = await prisma.pedido.findMany({
+        where: { mesaId: pedido.mesaId, estado: { in: ['Cocina', 'Servido'] } },
+      });
+
+      if (activos.length === 0) {
+        await prisma.mesa.update({
+          where: { id: pedido.mesaId },
+          data: { estado: 'Libre' },
+        });
+        mesaLiberada = true;
+      } else {
+        const hayEnCocina = activos.some(p => p.estado === 'Cocina');
+        nuevoEstadoMesa = hayEnCocina ? 'Cocina' : 'Servido';
+        await prisma.mesa.update({
+          where: { id: pedido.mesaId },
+          data: { estado: nuevoEstadoMesa },
+        });
+      }
+    }
+
+    res.json({ ok: true, mesaLiberada, nuevoEstadoMesa, pedidoVacio: itemsRestantes.length === 0 });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -633,8 +779,7 @@ app.delete('/api/productos/:id', async (req, res) => {
 app.get('/api/usuarios', async (req, res) => {
   try {
     const usuarios = await prisma.usuario.findMany({ where: { activo: true } });
-    const seguros = usuarios.map(({ pin, ...u }) => u);
-    res.json(seguros);
+    res.json(usuarios);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -642,9 +787,75 @@ app.get('/api/usuarios', async (req, res) => {
 
 app.post('/api/usuarios', async (req, res) => {
   try {
+    // Validar PIN único
+    const duplicate = await prisma.usuario.findFirst({
+      where: { pin: req.body.pin, activo: true }
+    });
+    if (duplicate) {
+      return res.status(400).json({ error: 'Este PIN ya está asignado a otro empleado. Elige uno diferente.' });
+    }
+
     const user = await prisma.usuario.create({ data: req.body });
     const { pin, ...seguro } = user;
     res.json(seguro);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/usuarios/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    if (req.body.pin) {
+      const duplicate = await prisma.usuario.findFirst({
+        where: { pin: req.body.pin, activo: true, id: { not: id } }
+      });
+      if (duplicate) {
+        return res.status(400).json({ error: 'Este PIN ya está asignado a otro empleado. Elige uno diferente.' });
+      }
+    }
+
+    const user = await prisma.usuario.update({
+      where: { id },
+      data: req.body
+    });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/usuarios/login', async (req, res) => {
+  const { pin } = req.body;
+  try {
+    const user = await prisma.usuario.findFirst({
+      where: { pin, activo: true }
+    });
+    if (!user) {
+      return res.status(401).json({ error: 'PIN incorrecto. Inténtalo de nuevo.' });
+    }
+    const { pin: userPin, ...safeUser } = user;
+    res.json({ ok: true, user: safeUser });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/usuarios/validate-auth', async (req, res) => {
+  const { pin } = req.body;
+  try {
+    const user = await prisma.usuario.findFirst({
+      where: { pin, activo: true }
+    });
+    if (!user) {
+      return res.status(401).json({ error: 'PIN incorrecto.' });
+    }
+    // Solo Administrador o Cajero pueden autorizar cancelaciones/cortesías
+    const rolesAutorizados = ['Administrador', 'Cajero'];
+    if (!rolesAutorizados.includes(user.rol)) {
+      return res.status(403).json({ error: 'Acceso denegado. Se requiere PIN de Administrador o Cajero.' });
+    }
+    res.json({ ok: true, nombre: user.nombre, rol: user.rol });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

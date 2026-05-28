@@ -82,7 +82,7 @@ export default function CocinaPage() {
               return (
                 <div
                   key={p.pedidoId}
-                  className={`rounded-t-xl rounded-b shadow-2xl flex flex-col overflow-hidden transform transition-all hover:-translate-y-1 relative`}
+                  className={`rounded-t-xl rounded-b shadow-2xl flex flex-col transform transition-all hover:-translate-y-1 relative`}
                   style={{ minHeight: '300px' }}
                 >
                   {/* Header del ticket */}
@@ -124,13 +124,20 @@ export default function CocinaPage() {
                   {/* Items (solo cocina, sin bebidas) */}
                   <div className="p-4 flex-1 bg-white min-h-[150px]">
                     {p.items.map((item, i) => (
-                      <div key={i} className="flex items-start py-2 border-b border-dashed border-slate-300 last:border-0">
-                        <span className="font-black text-lg mr-3 text-slate-900 w-6 text-center shrink-0">
-                          {item.cant}
-                        </span>
-                        <span className="flex-1 text-slate-800 font-bold text-sm leading-snug pt-0.5 uppercase">
-                          {item.nombre}
-                        </span>
+                      <div key={i} className="flex flex-col py-2 border-b border-dashed border-slate-200 last:border-0">
+                        <div className="flex items-start">
+                          <span className="font-black text-lg mr-3 text-slate-900 w-6 text-center shrink-0">
+                            {item.cant}
+                          </span>
+                          <span className="flex-1 text-slate-800 font-bold text-sm leading-snug pt-0.5 uppercase">
+                            {item.nombre}
+                          </span>
+                        </div>
+                        {item.notas && (
+                          <div className="ml-9 mt-1">
+                            <span className="inline-block bg-slate-900 border border-slate-700/50 text-amber-400 font-mono text-[10px] px-2 py-0.5 rounded font-black tracking-wide uppercase">📋 NOTA: {item.notas}</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

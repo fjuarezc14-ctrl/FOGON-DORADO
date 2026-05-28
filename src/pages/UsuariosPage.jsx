@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, X, Trash2, LayoutDashboard, LayoutGrid, ChefHat, Calculator, PieChart, UsersRound, Save } from 'lucide-react';
+import { UserPlus, X, Trash2, Edit, Eye, EyeOff, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, UsersRound, Save } from 'lucide-react';
 import { api } from '../api';
 
 export default function UsuariosPage() {
@@ -8,6 +8,10 @@ export default function UsuariosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [newUser, setNewUser] = useState({ nombre: '', rol: '', pin: '', permisos: [] });
+  const [editingUser, setEditingUser] = useState(null); // null si es nuevo
+  const [visiblePins, setVisiblePins] = useState({}); // id -> boolean
+
+  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
 
   const fetchUsuarios = async () => {
     try {
@@ -24,10 +28,11 @@ export default function UsuariosPage() {
 
   const handleRolChange = (rol) => {
     let permisos = [];
-    if (rol === 'Administrador') permisos = ['Dashboard', 'Salon', 'Cocina', 'Caja', 'Reportes', 'Usuarios'];
-    else if (rol === 'Mozo') permisos = ['Salon'];
+    if (rol === 'Administrador') permisos = ['Dashboard', 'Salon', 'Cocina', 'Barra', 'Caja', 'Reportes', 'Usuarios'];
+    else if (rol === 'Mozo') permisos = ['Salon', 'Barra'];
     else if (rol === 'Cocinero') permisos = ['Cocina'];
     else if (rol === 'Cajero') permisos = ['Dashboard', 'Salon', 'Caja'];
+    else if (rol === 'Contador') permisos = ['Dashboard', 'Reportes'];
     setNewUser({ ...newUser, rol, permisos });
   };
 
@@ -36,9 +41,20 @@ export default function UsuariosPage() {
     setNewUser({ ...newUser, permisos: current.includes(permiso) ? current.filter(p => p !== permiso) : [...current, permiso] });
   };
 
-  const abrirModal = () => {
+  const abrirModalNuevo = () => {
+    setEditingUser(null);
     setNewUser({ nombre: '', rol: '', pin: '', permisos: [] });
     setModalOpen(true);
+  };
+
+  const abrirModalEditar = (u) => {
+    setEditingUser(u);
+    setNewUser({ nombre: u.nombre, rol: u.rol, pin: u.pin || '', permisos: u.permisos || [] });
+    setModalOpen(true);
+  };
+
+  const togglePinVisibilidad = (id) => {
+    setVisiblePins(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const guardarUsuario = async () => {
@@ -48,9 +64,18 @@ export default function UsuariosPage() {
     }
     setGuardando(true);
     try {
-      await api.crearUsuario(newUser);
+      if (editingUser) {
+        // Modo Edición
+        const res = await api.editarUsuario(editingUser.id, newUser);
+        if (res.error) throw new Error(res.error);
+      } else {
+        // Modo Creación
+        const res = await api.crearUsuario(newUser);
+        if (res.error) throw new Error(res.error);
+      }
       await fetchUsuarios();
       setModalOpen(false);
+      setEditingUser(null);
     } catch (err) {
       alert('Error guardando usuario: ' + err.message);
     } finally {
@@ -59,12 +84,17 @@ export default function UsuariosPage() {
   };
 
   const eliminarUsuario = async (id) => {
+    if (id === currentUser.id) {
+      alert('⚠️ No puedes eliminar tu propio usuario de la sesión activa.');
+      return;
+    }
     if (window.confirm('¿Estás seguro de eliminar este usuario?')) {
       try {
-        await api.eliminarUsuario(id);
+        const res = await api.eliminarUsuario(id);
+        if (res.error) throw new Error(res.error);
         await fetchUsuarios();
       } catch (err) {
-        alert(err.message);
+        alert('Error al eliminar: ' + err.message);
       }
     }
   };
@@ -72,14 +102,15 @@ export default function UsuariosPage() {
   const permisosDisponibles = [
     { id: 'Dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'Salon', icon: LayoutGrid, label: 'Salón/Mesas' },
-    { id: 'Cocina', icon: ChefHat, label: 'Cocina' },
+    { id: 'Cocina', icon: ChefHat, label: 'Cocina/Pedidos' },
+    { id: 'Barra', icon: GlassWater, label: 'Barra/Bebidas' },
     { id: 'Caja', icon: Calculator, label: 'Caja/Cobros' },
     { id: 'Reportes', icon: PieChart, label: 'Reportes' },
     { id: 'Usuarios', icon: UsersRound, label: 'Usuarios' },
   ];
 
   if (loading) return (
-    <div className="flex-1 flex items-center justify-center">
+    <div className="flex-1 flex items-center justify-center bg-slate-100">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
         <p className="text-slate-500 font-bold">Cargando usuarios...</p>
@@ -92,9 +123,9 @@ export default function UsuariosPage() {
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">Gestión de Usuarios</h1>
-          <p className="text-xs md:text-sm text-slate-500">Crea cuentas, asigna roles y controla accesos. Guardado en Base de Datos.</p>
+          <p className="text-xs md:text-sm text-slate-500">Crea cuentas, edita PINs o asigna roles y permisos a tu personal.</p>
         </div>
-        <button onClick={abrirModal} className="bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl font-black text-sm uppercase tracking-wide hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2">
+        <button onClick={abrirModalNuevo} className="bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl font-black text-sm uppercase tracking-wide hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2">
           <UserPlus className="w-5 h-5" /> Nuevo Usuario
         </button>
       </div>
@@ -117,6 +148,10 @@ export default function UsuariosPage() {
                 if (u.rol === 'Mozo') colorRol = 'bg-blue-100 text-blue-800 border-blue-200';
                 if (u.rol === 'Cocinero') colorRol = 'bg-red-100 text-red-800 border-red-200';
                 if (u.rol === 'Cajero') colorRol = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                if (u.rol === 'Contador') colorRol = 'bg-purple-100 text-purple-800 border-purple-200';
+                
+                const pinVisible = visiblePins[u.id];
+
                 return (
                   <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
@@ -124,7 +159,15 @@ export default function UsuariosPage() {
                         <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs">{u.nombre.substring(0, 2).toUpperCase()}</div>
                         <div>
                           <p className="font-bold text-slate-800">{u.nombre}</p>
-                          <p className="text-xs text-slate-400 font-mono">PIN: ****</p>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono mt-0.5">
+                            <span>PIN: {pinVisible ? u.pin : '••••'}</span>
+                            <button 
+                              onClick={() => togglePinVisibilidad(u.id)}
+                              className="text-slate-400 hover:text-slate-600 transition-colors p-0.5"
+                            >
+                              {pinVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -137,7 +180,22 @@ export default function UsuariosPage() {
                       ))}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button onClick={() => eliminarUsuario(u.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-5 h-5" /></button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button 
+                          onClick={() => abrirModalEditar(u)} 
+                          title="Editar usuario"
+                          className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                        >
+                          <Edit className="w-4.5 h-4.5" />
+                        </button>
+                        <button 
+                          onClick={() => eliminarUsuario(u.id)} 
+                          title="Eliminar usuario"
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all font-bold"
+                        >
+                          <Trash2 className="w-4.5 h-4.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -149,9 +207,9 @@ export default function UsuariosPage() {
 
       {modalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-slide-up">
             <div className="bg-slate-900 p-5 flex justify-between items-center text-white">
-              <h3 className="font-black flex items-center gap-2"><UserPlus className="w-5 h-5 text-amber-500" /> Registrar Empleado</h3>
+              <h3 className="font-black flex items-center gap-2"><UserPlus className="w-5 h-5 text-amber-500" /> {editingUser ? 'Modificar Empleado' : 'Registrar Empleado'}</h3>
               <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-6">
@@ -168,12 +226,26 @@ export default function UsuariosPage() {
                     <option value="Cajero">Cajero / Recepción</option>
                     <option value="Mozo">Mozo / Mesero</option>
                     <option value="Cocinero">Jefe de Cocina</option>
+                    <option value="Contador">Contador</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">PIN de Acceso (4 dígitos)</label>
-                <input type="password" value={newUser.pin} onChange={e => setNewUser({ ...newUser, pin: e.target.value })} placeholder="****" className="w-full sm:w-1/2 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 font-mono" maxLength="4" />
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">PIN de Acceso (4 dígitos únicos)</label>
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  data-lpignore="true"
+                  value={newUser.pin} 
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setNewUser({ ...newUser, pin: val });
+                  }} 
+                  placeholder="Ej. 1234" 
+                  className="w-full sm:w-1/2 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 font-mono tracking-widest text-center text-lg font-black" 
+                  maxLength="4" 
+                />
               </div>
               <div className="border-t border-slate-100 pt-4">
                 <label className="block text-xs font-black text-slate-800 uppercase tracking-wide mb-4">Permisos de Acceso</label>
@@ -182,7 +254,7 @@ export default function UsuariosPage() {
                     const Icon = p.icon;
                     return (
                       <label key={p.id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
-                        <input type="checkbox" checked={newUser.permisos.includes(p.id)} onChange={() => handlePermisoToggle(p.id)} className="w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer" />
+                        <input type="checkbox" checked={newUser.permisos.includes(p.id)} onChange={() => handlePermisoToggle(p.id)} className="w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer animate-pulse" />
                         <span className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Icon className="w-4 h-4 text-slate-400" /> {p.label}</span>
                       </label>
                     );

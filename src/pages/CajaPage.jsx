@@ -286,6 +286,23 @@ export default function CajaPage() {
       alert('Por favor, busca y valida el RUC del cliente antes de cobrar.');
       return;
     }
+
+    // Si es Cortesía, requerir PIN de supervisor/cajero
+    if (metodoPago === 'Cortesía') {
+      const pin = prompt("🔐 AUTORIZACIÓN DE SUPERVISOR:\nIngresa PIN de Administrador o Cajero para autorizar la Cortesía (Costo Cero):");
+      if (pin === null) return;
+      if (!pin.trim()) { alert("El PIN de autorización es obligatorio."); return; }
+      
+      try {
+        const auth = await api.validateAuth(pin);
+        if (auth.error) throw new Error(auth.error);
+        alert(`✅ Cortesía autorizada por: ${auth.nombre} (${auth.rol})`);
+      } catch (err) {
+        alert("Error de Autorización: " + err.message);
+        return;
+      }
+    }
+
     setCobrando(true);
     try {
       const total = mesaSeleccionada.pedidoData.total;

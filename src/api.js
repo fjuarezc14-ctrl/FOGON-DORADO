@@ -20,6 +20,9 @@ export const api = {
   cancelarPedido: (id, body) => fetch(`${API_BASE}/api/pedidos/${id}/cancelar`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
+  cancelarItemPedido: (id, body) => fetch(`${API_BASE}/api/pedidos/${id}/cancelar-item`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
 
   // Delivery / PedidosYa
   crearPedidoLlevar: (body) => fetch(`${API_BASE}/api/pedidos/llevar`, {
@@ -44,6 +47,15 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
   eliminarUsuario: (id) => fetch(`${API_BASE}/api/usuarios/${id}`, { method: 'DELETE' }).then(r => r.json()),
+  editarUsuario: (id, body) => fetch(`${API_BASE}/api/usuarios/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  login: (pin) => fetch(`${API_BASE}/api/usuarios/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }),
+  }).then(r => r.json()),
+  validateAuth: (pin) => fetch(`${API_BASE}/api/usuarios/validate-auth`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }),
+  }).then(r => r.json()),
 
   // Ventas (acepta pedidoIds array)
   cobrar: (body) => fetch(`${API_BASE}/api/ventas`, {
