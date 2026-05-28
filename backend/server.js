@@ -676,8 +676,9 @@ app.post('/api/ventas', async (req, res) => {
   const idPrincipal = idsAPagar[idsAPagar.length - 1]; // El más reciente como venta principal
 
   try {
-    const subtotal = parseFloat((total / 1.18).toFixed(2));
-    const igv = parseFloat((total - subtotal).toFixed(2));
+    const finalTotal = metodoPago === 'Cortesía' ? 0.00 : total;
+    const subtotal = parseFloat((finalTotal / 1.18).toFixed(2));
+    const igv = parseFloat((finalTotal - subtotal).toFixed(2));
 
     // Mover todos los items de los otros pedidos adicionales al pedido principal para que se consoliden en el detalle de la venta
     if (idsAPagar.length > 1) {
@@ -696,8 +697,8 @@ app.post('/api/ventas', async (req, res) => {
         pedidoId: idPrincipal, 
         tipoComprobante, 
         numDocumento, 
-        nombreCliente, 
-        total, 
+        nombreCliente: metodoPago === 'Cortesía' ? (nombreCliente || 'CONSUMO PERSONAL / CORTESÍA') : nombreCliente, 
+        total: finalTotal, 
         igv, 
         subtotal, 
         metodoPago,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer } from 'lucide-react';
+import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift } from 'lucide-react';
 
 import { api } from '../api';
 
@@ -685,6 +685,7 @@ export default function CajaPage() {
                               v.metodoPago === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
                               v.metodoPago === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
                               v.metodoPago === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                              v.metodoPago === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
                               'bg-indigo-50 border-indigo-200 text-indigo-700'
                             }`}>{v.metodoPago}</span>
                           </td>
@@ -739,6 +740,12 @@ export default function CajaPage() {
             : ventas;
           const activeAtendidas = ventasFiltradas.length;
           const activeIngresos = ventasFiltradas.reduce((s, v) => s + v.total, 0);
+          const activeCortesias = ventasFiltradas
+            .filter(v => v.metodoPago === 'Cortesía')
+            .reduce((sum, v) => {
+              const itemsVal = v.items?.reduce((s, i) => s + (i.cant * i.precio), 0) || 0;
+              return sum + itemsVal;
+            }, 0);
 
           return (
             <div className="bg-slate-900 rounded-3xl shadow-xl p-6 text-white flex flex-col sticky top-4">
@@ -764,6 +771,17 @@ export default function CajaPage() {
                     <p className="text-3xl lg:text-4xl font-black font-mono tracking-tighter">S/ {activeIngresos.toFixed(2)}</p>
                   </div>
                 </div>
+
+                {activeCortesias > 0 && (
+                  <div className="bg-gradient-to-br from-indigo-900 to-purple-900 p-5 rounded-2xl relative overflow-hidden text-purple-200 border border-purple-800 shadow-md">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10 animate-pulse"></div>
+                    <p className="text-xs font-black uppercase tracking-wider opacity-90 text-purple-300">🎁 Valor de Cortesías (S/)</p>
+                    <div className="flex items-center gap-3 mt-2 relative z-10">
+                      <div className="w-10 h-10 bg-purple-800 rounded-xl flex items-center justify-center text-white"><Gift className="w-5 h-5 text-amber-400" /></div>
+                      <p className="text-3xl font-black font-mono tracking-tighter text-white">S/ {activeCortesias.toFixed(2)}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* BOTÓN CIERRE DE CAJA TURNO */}
                 <button
@@ -798,13 +816,24 @@ export default function CajaPage() {
               <div className="space-y-5">
                 <div>
                   <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Tipo de Comprobante:</label>
-                  <select value={tipoComprobante} onChange={(e) => handleComprobanteChange(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 font-bold text-slate-800 transition-all text-sm">
-                    <option value="Boleta">Boleta Electrónica (DNI)</option>
-                    <option value="Factura">Factura Electrónica (RUC)</option>
-                    <option value="Ticket">Ticket Interno (Simple)</option>
+                  <select 
+                    value={tipoComprobante} 
+                    onChange={(e) => handleComprobanteChange(e.target.value)} 
+                    disabled={metodoPago === 'Cortesía'}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 font-bold text-slate-800 transition-all text-sm disabled:opacity-60"
+                  >
+                    {metodoPago === 'Cortesía' ? (
+                      <option value="Ticket">🎁 Ticket de Cortesía (Costo Cero)</option>
+                    ) : (
+                      <>
+                        <option value="Boleta">Boleta Electrónica (DNI)</option>
+                        <option value="Factura">Factura Electrónica (RUC)</option>
+                        <option value="Ticket">Ticket Interno (Simple)</option>
+                      </>
+                    )}
                   </select>
                 </div>
-                {(tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') && (
+                {metodoPago !== 'Cortesía' && (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') && (
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm space-y-4">
                     <div>
                       <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">{tipoComprobante === 'Factura' ? 'RUC del Cliente' : 'DNI del Cliente'}:</label>
@@ -828,12 +857,27 @@ export default function CajaPage() {
                 )}
                 <div>
                   <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Método de Pago:</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[{ id: 'Efectivo', icon: Banknote, label: 'Efectivo' }, { id: 'Tarjeta', icon: CreditCard, label: 'Tarjeta' }, { id: 'Yape', icon: Wallet, label: 'Yape / Plin' }].map(item => {
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'Efectivo', icon: Banknote, label: 'Efectivo' }, 
+                      { id: 'Tarjeta', icon: CreditCard, label: 'Tarjeta' }, 
+                      { id: 'Yape', icon: Wallet, label: 'Yape / Plin' },
+                      { id: 'Cortesía', icon: Gift, label: '🎁 Cortesía' }
+                    ].map(item => {
                       const IconComp = item.icon;
                       const active = metodoPago === item.id;
                       return (
-                        <button key={item.id} onClick={() => setMetodoPago(item.id)} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${active ? 'bg-amber-500/10 border-amber-500 text-amber-700 font-black' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300'}`}>
+                        <button 
+                          key={item.id} 
+                          type="button"
+                          onClick={() => {
+                            setMetodoPago(item.id);
+                            if (item.id === 'Cortesía') {
+                              setTipoComprobante('Ticket');
+                            }
+                          }} 
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${active ? 'bg-amber-500/10 border-amber-500 text-amber-700 font-black' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300'}`}
+                        >
                           <IconComp className="w-5 h-5 mb-1 shrink-0" />
                           <span className="text-[10px] uppercase font-bold tracking-tight">{item.label}</span>
                         </button>
@@ -865,11 +909,11 @@ export default function CajaPage() {
                   <div className="space-y-2 mb-4 border-b border-slate-800 pb-4">
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Subtotal (Sin IGV)</span>
-                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData.total / 1.18).toFixed(2)}</span>
+                      <span className="font-mono">S/ {metodoPago === 'Cortesía' ? '0.00' : (mesaSeleccionada.pedidoData.total / 1.18).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>IGV (18%)</span>
-                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData.total - (mesaSeleccionada.pedidoData.total / 1.18)).toFixed(2)}</span>
+                      <span className="font-mono">S/ {metodoPago === 'Cortesía' ? '0.00' : (mesaSeleccionada.pedidoData.total - (mesaSeleccionada.pedidoData.total / 1.18)).toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="flex justify-between items-end">
@@ -877,9 +921,17 @@ export default function CajaPage() {
                       <p className="text-[10px] text-amber-400 font-black uppercase tracking-widest mb-1">Monto Total</p>
                       <p className="text-slate-400 text-xs font-medium">Comprobante: {tipoComprobante}</p>
                     </div>
-                    <p className="text-3xl font-black text-white font-mono tracking-tighter">
-                      <span className="text-lg text-slate-500 mr-1 font-sans">S/</span>{mesaSeleccionada.pedidoData.total.toFixed(2)}
-                    </p>
+                    <div>
+                      {metodoPago === 'Cortesía' && (
+                        <div className="text-right mb-1">
+                          <span className="text-slate-400 text-[9px] uppercase font-bold">VALOR COMERCIAL: </span>
+                          <span className="text-amber-400 text-xs font-mono font-bold">S/ {mesaSeleccionada.pedidoData.total.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <p className="text-3xl font-black text-white font-mono tracking-tighter text-right">
+                        <span className="text-lg text-slate-500 mr-1 font-sans">S/</span>{metodoPago === 'Cortesía' ? '0.00' : mesaSeleccionada.pedidoData.total.toFixed(2)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -997,6 +1049,13 @@ export default function CajaPage() {
         const totalPedidosYa = ventasFiltradas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0);
         const totalCalculado = totalEfectivo + totalTarjeta + totalYape + totalPedidosYa;
 
+        const totalCortesias = ventasFiltradas
+          .filter(v => v.metodoPago === 'Cortesía')
+          .reduce((sum, v) => {
+            const itemsVal = v.items?.reduce((s, i) => s + (i.cant * i.precio), 0) || 0;
+            return sum + itemsVal;
+          }, 0);
+
         return (
           <div id="modal-cierre" className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-slide-up relative">
@@ -1040,6 +1099,12 @@ export default function CajaPage() {
                     <span>🛵 PEDIDOS YA (POS):</span>
                     <span className="font-black text-slate-900">S/ {totalPedidosYa.toFixed(2)}</span>
                   </div>
+                  {totalCortesias > 0 && (
+                    <div className="flex justify-between font-bold text-amber-700 border-t border-dashed border-amber-250 pt-2">
+                      <span>🎁 CORTESÍAS (VALOR):</span>
+                      <span className="font-black text-amber-900">S/ {totalCortesias.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-between items-center text-sm font-black text-slate-900 uppercase">
@@ -1086,7 +1151,7 @@ export default function CajaPage() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
             <div className="bg-slate-950 p-4 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-xs uppercase tracking-wider flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}
+                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.metodoPago === 'Cortesía' ? '🎁 TICKET DE CORTESÍA 🎁' : (activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA')}
               </h3>
               <button onClick={() => setSunatModalOpen(false)} className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
@@ -1094,7 +1159,7 @@ export default function CajaPage() {
             </div>
             
             <div id="comprobante-sunat-ticket-print" className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white text-slate-900 font-mono text-xs leading-relaxed">
-              {activeComprobante.contingencia && (
+              {activeComprobante.contingencia && activeComprobante.metodoPago !== 'Cortesía' && (
                 <div className="bg-amber-100 text-amber-900 border-2 border-dashed border-amber-400 p-2 rounded-lg text-center mb-3 font-bold text-[9px] uppercase tracking-tight no-print">
                   ⚠️ TICKET DE CONTROL INTERNO<br />
                   Emisión electrónica pendiente por contingencia
@@ -1109,8 +1174,8 @@ export default function CajaPage() {
 
 
               
-              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}</div>
-              <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{activeComprobante.serie}-{activeComprobante.correlativo}</div>
+              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.metodoPago === 'Cortesía' ? '🎁 CORTESÍA / CONSUMO INTERNO 🎁' : (activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA')}</div>
+              <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{activeComprobante.metodoPago === 'Cortesía' ? `COR-00${activeComprobante.mesaNum}` : `${activeComprobante.serie}-${activeComprobante.correlativo}`}</div>
               
               <div className="flex justify-between border-t border-b border-dashed border-slate-300 py-1.5 mb-2 font-bold">
                 <span>{activeComprobante.fecha} {activeComprobante.hora}</span>
@@ -1119,7 +1184,9 @@ export default function CajaPage() {
               
               <div className="space-y-1 mb-3">
                 <div><strong>Cliente:</strong> <span className="uppercase">{activeComprobante.clienteNombre}</span></div>
-                <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
+                {activeComprobante.metodoPago !== 'Cortesía' && (
+                  <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
+                )}
                 {activeComprobante.clienteDireccion && (
                   <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
                 )}
@@ -1160,42 +1227,61 @@ export default function CajaPage() {
               
               <div className="mb-4">
                 <strong className="block text-[10px]">IMPORTE EN LETRAS:</strong>
-                <span className="uppercase text-[10px] leading-tight block">{activeComprobante.totalLetras}</span>
+                <span className="uppercase text-[10px] leading-tight block">{activeComprobante.metodoPago === 'Cortesía' ? 'CERO CON 00/100 SOLES (ATENCIÓN GRATUITA)' : activeComprobante.totalLetras}</span>
               </div>
               
-              <div className="mb-3">
-                <strong>RESUMEN:</strong> <span className="font-mono text-[10px]">{activeComprobante.hashResumen}</span>
-              </div>
+              {activeComprobante.metodoPago !== 'Cortesía' && (
+                <div className="mb-3">
+                  <strong>RESUMEN:</strong> <span className="font-mono text-[10px]">{activeComprobante.hashResumen}</span>
+                </div>
+              )}
               
               <div>
-                <strong>FORMA DE PAGO:</strong> <span className="uppercase">{activeComprobante.metodoPago === 'Efectivo' ? 'CONTADO' : 'CONTADO (' + activeComprobante.metodoPago + ')'}</span>
+                <strong>FORMA DE PAGO:</strong> <span className="uppercase">{activeComprobante.metodoPago === 'Efectivo' ? 'CONTADO' : (activeComprobante.metodoPago === 'Cortesía' ? 'CORTESÍA / CONSUMO INTERNO' : 'CONTADO (' + activeComprobante.metodoPago + ')')}</span>
               </div>
               
-              <div className="flex justify-center my-5">
-                <img 
-                  src={activeComprobante.qrImageUrl} 
-                  alt="QR Comprobante" 
-                  style={{ width: '120px', height: '120px' }} 
-                  className="border p-1 bg-white"
-                  onLoad={() => {
-                    if (activeComprobante.shouldAutoPrint) {
-                      setTimeout(() => {
-                        window.print();
-                      }, 200);
-                      activeComprobante.shouldAutoPrint = false; // Evitar disparar de nuevo al recargar
-                    }
-                  }}
-                />
-              </div>
+              {activeComprobante.metodoPago !== 'Cortesía' ? (
+                <div className="flex justify-center my-5">
+                  <img 
+                    src={activeComprobante.qrImageUrl} 
+                    alt="QR Comprobante" 
+                    style={{ width: '120px', height: '120px' }} 
+                    className="border p-1 bg-white"
+                    onLoad={() => {
+                      if (activeComprobante.shouldAutoPrint) {
+                        setTimeout(() => {
+                          window.print();
+                        }, 200);
+                        activeComprobante.shouldAutoPrint = false; // Evitar disparar de nuevo al recargar
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ display: 'none' }}>
+                  <img 
+                    src={activeComprobante.qrImageUrl} 
+                    alt="QR Comprobante" 
+                    onLoad={() => {
+                      if (activeComprobante.shouldAutoPrint) {
+                        setTimeout(() => {
+                          window.print();
+                        }, 200);
+                        activeComprobante.shouldAutoPrint = false; // Evitar disparar de nuevo al recargar
+                      }
+                    }}
+                  />
+                </div>
+              )}
 
               
-              <div className="text-center font-bold" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
+              <div className="text-center font-bold mt-4" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
               <div className="text-center text-[9px] leading-tight text-slate-500 mt-1">
-                Representación impresa de la Factura electrónica. Consulte su documento en: https://www.nubefact.com/buscar
+                {activeComprobante.metodoPago === 'Cortesía' ? 'TICKET DE CONSUMO INTERNO AUTORIZADO' : 'Representación impresa de la Factura electrónica. Consulte su documento en: https://www.nubefact.com/buscar'}
               </div>
 
 
-              {activeComprobante.enlacePdf && (
+              {activeComprobante.enlacePdf && activeComprobante.metodoPago !== 'Cortesía' && (
                 <div className="text-center text-[10px] mt-4 font-bold no-print pt-2 border-t border-slate-100">
                   <a href={activeComprobante.enlacePdf} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800 flex items-center justify-center gap-1.5">
                     📄 Descargar Comprobante SUNAT (PDF)
