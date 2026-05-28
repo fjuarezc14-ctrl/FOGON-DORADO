@@ -652,10 +652,22 @@ export default function CajaPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-slate-800 text-xs">{v.tipoComprobante} ({v.numDocumento || 'S/D'})</span>
-                              <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">{v.nombreCliente}</span>
-                            </div>
+                             <div className="flex flex-col">
+                               <div className="flex items-center gap-2 flex-wrap">
+                                 <span className="font-bold text-slate-800 text-xs">{v.tipoComprobante} ({v.numDocumento || 'S/D'})</span>
+                                 {v.estadoNubefact === 'PENDIENTE_REINTENTO' && (
+                                   <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
+                                     <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
+                                   </span>
+                                 )}
+                                 {v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:') && (
+                                   <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> ✅ ENVIADO
+                                   </span>
+                                 )}
+                               </div>
+                               <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">{v.nombreCliente}</span>
+                             </div>
                           </td>
                           <td className="px-6 py-4">
                             {v.tipoEntrega === 'llevar' ? (
