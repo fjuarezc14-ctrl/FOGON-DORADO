@@ -1079,7 +1079,16 @@ async function enviarANubefact(venta, items) {
     cliente_denominacion: venta.nombreCliente || 'PÚBLICO GENERAL',
     cliente_direccion: venta.clienteDireccion || 'LIMA',
     cliente_email: null,
-    fecha_de_emision: new Date(venta.createdAt).toISOString().split('T')[0],
+    fecha_de_emision: (() => {
+      const dateLima = new Intl.DateTimeFormat('es-PE', {
+        timeZone: 'America/Lima',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date(venta.createdAt));
+      const [day, month, year] = dateLima.split('/');
+      return `${year}-${month}-${day}`;
+    })(),
     moneda: 1, // Soles
     porcentaje_de_igv: 18.00,
     total_gravada: parseFloat(venta.subtotal.toFixed(2)),
