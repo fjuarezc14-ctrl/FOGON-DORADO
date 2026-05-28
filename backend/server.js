@@ -1077,7 +1077,7 @@ async function enviarANubefact(venta, items) {
     cliente_tipo_de_documento: clienteTipoDoc,
     cliente_numero_de_documento: clienteNumDoc,
     cliente_denominacion: venta.nombreCliente || 'PÚBLICO GENERAL',
-    cliente_direccion: venta.clienteDireccion || 'LIMA',
+    cliente_direccion: venta.clienteDireccion || '',
     cliente_email: null,
     fecha_de_emision: (() => {
       const dateLima = new Intl.DateTimeFormat('es-PE', {
