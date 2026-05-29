@@ -26,13 +26,39 @@ export default function CajaPage() {
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState(localStorage.getItem('ultimoCierre') || null);
 
-  // Modal PedidosYa
+  // Modal PedidosYa y Para Llevar
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [codigoPY, setCodigoPY] = useState('');
   const [cajeroNombre, setCajeroNombre] = useState('María');
   const [productosMenu, setProductosMenu] = useState([]);
   const [itemsDelivery, setItemsDelivery] = useState([]);
   const [enviandoDelivery, setEnviandoDelivery] = useState(false);
+  const [tipoDelivery, setTipoDelivery] = useState('PedidosYa'); // 'PedidosYa' | 'ParaLlevar'
+  const [toasts, setToasts] = useState([]);
+  const [prevPedidosLlevar, setPrevPedidosLlevar] = useState([]);
+
+  // Campana de Restaurante Premium (G5 -> C6)
+  const playChimeNotification = () => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration) => {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gainNode.gain.setValueAtTime(0.15, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      playTone(784, audioCtx.currentTime, 0.6);
+      playTone(1046.5, audioCtx.currentTime + 0.12, 0.8);
+    } catch (e) {
+      console.error('AudioContext no soportado:', e);
+    }
+  };
 
   const fetchCajaData = useCallback(async () => {
     try {
@@ -60,6 +86,28 @@ export default function CajaPage() {
     }, 4000);
     return () => clearInterval(interval);
   }, [fetchCajaData, modalOpen, deliveryModal, cierreModalOpen]);
+
+  // Alerta sonora y visual en tiempo real al estar listos
+  useEffect(() => {
+    if (pedidosLlevar.length === 0) {
+      if (prevPedidosLlevar.length === 0) setPrevPedidosLlevar(pedidosLlevar);
+      return;
+    }
+    if (prevPedidosLlevar.length > 0) {
+      pedidosLlevar.forEach(p => {
+        const ant = prevPedidosLlevar.find(prev => prev.pedidoId === p.pedidoId);
+        if (ant && ant.estado === 'Cocina' && p.estado === 'Servido') {
+          playChimeNotification();
+          const toastId = Date.now() + Math.random();
+          setToasts(prev => [...prev, { id: toastId, mensaje: `🛎️ ¡Pedido "${p.codigoPedidosYa}" está LISTO para entregar!` }]);
+          setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== toastId));
+          }, 9000);
+        }
+      });
+    }
+    setPrevPedidosLlevar(pedidosLlevar);
+  }, [pedidosLlevar, prevPedidosLlevar]);
 
   const mesasPendientes = mesas.filter(m => m.estado !== 'Libre' && m.pedidoData);
 
@@ -421,6 +469,14 @@ export default function CajaPage() {
 
   const agregarItemDelivery = (prod) => {
     const idx = itemsDelivery.findIndex(i => i.id === String(prod.id));
+    const cantEnTicket = idx >= 0 ? itemsDelivery[idx].cant : 0;
+    
+    // Validar stock si es limitado
+    if (prod.tipoStock === 'limitado' && cantEnTicket >= prod.stock) {
+      alert(`⚠️ Stock agotado. Solo quedan ${prod.stock} unidades de "${prod.nombre}".`);
+      return;
+    }
+
     if (idx >= 0) {
       const nuevo = [...itemsDelivery];
       nuevo[idx].cant++;
@@ -432,8 +488,14 @@ export default function CajaPage() {
 
   const alterarItemDelivery = (idx, op) => {
     const nuevo = [...itemsDelivery];
-    if (op === '+') nuevo[idx].cant++;
-    else {
+    if (op === '+') {
+      const prodOriginal = productosMenu.find(p => String(p.id) === String(nuevo[idx].id));
+      if (prodOriginal && prodOriginal.tipoStock === 'limitado' && nuevo[idx].cant >= prodOriginal.stock) {
+        alert(`⚠️ Stock agotado. Solo quedan ${prodOriginal.stock} unidades de "${prodOriginal.nombre}".`);
+        return;
+      }
+      nuevo[idx].cant++;
+    } else {
       nuevo[idx].cant--;
       if (nuevo[idx].cant <= 0) nuevo.splice(idx, 1);
     }
@@ -441,13 +503,20 @@ export default function CajaPage() {
   };
 
   const enviarDeliveryACocina = async () => {
-    if (!codigoPY.trim()) { alert('El código de PedidosYa es obligatorio.'); return; }
+    if (!codigoPY.trim()) { 
+      alert(tipoDelivery === 'PedidosYa' ? 'El código de PedidosYa es obligatorio.' : 'El nombre de cliente o nro de ticket es obligatorio.'); 
+      return; 
+    }
     if (itemsDelivery.length === 0) { alert('Debes agregar al menos un producto.'); return; }
     setEnviandoDelivery(true);
     try {
       const total = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
+      const codigoFormateado = tipoDelivery === 'PedidosYa' 
+        ? codigoPY.trim().toUpperCase() 
+        : `LLEVAR - ${codigoPY.trim().toUpperCase()}`;
+
       const result = await api.crearPedidoLlevar({
-        codigoPedidosYa: codigoPY.trim().toUpperCase(),
+        codigoPedidosYa: codigoFormateado,
         cajero: cajeroNombre,
         items: itemsDelivery,
         total,
@@ -567,7 +636,7 @@ export default function CajaPage() {
             <div className="bg-white rounded-3xl border border-blue-200 shadow-sm overflow-hidden">
               <div className="p-4 md:p-5 border-b border-blue-100 bg-blue-50 flex justify-between items-center">
                 <h2 className="font-black text-blue-700 uppercase text-xs tracking-wider flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-blue-500" /> Pedidos Para Llevar (PedidosYa)
+                  <Truck className="w-4 h-4 text-blue-500" /> Pedidos Para Llevar y Delivery (POS / PedidosYa)
                 </h2>
                 <span className="bg-blue-100 text-blue-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                   {pedidosLlevar.length} Pedido{pedidosLlevar.length !== 1 ? 's' : ''}
@@ -589,8 +658,17 @@ export default function CajaPage() {
                       <tr key={p.pedidoId} className="hover:bg-blue-50/50 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-black shadow-sm text-xs">PY</div>
-                            <span className="font-black text-blue-800 tracking-tight font-mono">{p.codigoPedidosYa}</span>
+                            {p.codigoPedidosYa?.startsWith('LLEVAR -') ? (
+                              <>
+                                <div className="w-10 h-10 bg-amber-500 text-slate-900 rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0">POS</div>
+                                <span className="font-black text-slate-800 tracking-tight">{p.codigoPedidosYa}</span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0">PY</div>
+                                <span className="font-black text-blue-800 tracking-tight font-mono">{p.codigoPedidosYa}</span>
+                              </>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -971,41 +1049,90 @@ export default function CajaPage() {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center"><Truck className="w-5 h-5" /></div>
                 <div>
-                  <h2 className="font-black text-lg uppercase tracking-tight leading-none">Nuevo Pedido PedidosYa</h2>
-                  <p className="text-xs text-blue-200">Pago ya procesado en POS externo · Solo registrar y enviar a cocina</p>
+                  <h2 className="font-black text-lg uppercase tracking-tight leading-none">Nuevo Pedido para Llevar / Delivery</h2>
+                  <p className="text-xs text-blue-200">Registrar comanda de venta directa o canal externo</p>
                 </div>
               </div>
-              <button onClick={() => setDeliveryModal(false)} className="bg-blue-800 p-2 rounded-xl hover:bg-blue-900 transition-colors"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setDeliveryModal(false); setCodigoPY(''); setItemsDelivery([]); }} className="bg-blue-800 p-2 rounded-xl hover:bg-blue-900 transition-colors"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="flex flex-col md:flex-row flex-1 min-h-0">
               {/* Productos */}
               <div className="w-full md:w-3/5 flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-slate-200 bg-slate-50">
-                <div className="p-4 border-b border-slate-200 bg-white shrink-0 grid grid-cols-2 gap-3">
+                <div className="p-4 border-b border-slate-200 bg-white shrink-0 flex flex-col gap-4">
+                  {/* Selector de Tipo */}
                   <div>
-                    <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">Código PedidosYa:</label>
-                    <input
-                      type="text"
-                      value={codigoPY}
-                      onChange={(e) => setCodigoPY(e.target.value)}
-                      placeholder="Ej: FG-4821"
-                      className="w-full bg-slate-50 border-2 border-blue-300 focus:border-blue-500 rounded-xl px-3 py-2 font-mono font-black text-slate-900 text-sm focus:outline-none uppercase"
-                    />
+                    <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1.5">Origen / Tipo de Pedido:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button 
+                        type="button" 
+                        onClick={() => { setTipoDelivery('PedidosYa'); setCodigoPY(''); }}
+                        className={`py-2 px-3 text-xs font-black uppercase rounded-xl border-2 transition-all ${tipoDelivery === 'PedidosYa' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                      >
+                        🛵 PedidosYa (Delivery)
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => { setTipoDelivery('ParaLlevar'); setCodigoPY(''); }}
+                        className={`py-2 px-3 text-xs font-black uppercase rounded-xl border-2 transition-all ${tipoDelivery === 'ParaLlevar' ? 'bg-amber-50 border-amber-500 text-amber-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                      >
+                        🛍️ Para Llevar (Caja)
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">Cajero:</label>
-                    <select value={cajeroNombre} onChange={(e) => setCajeroNombre(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 text-sm focus:outline-none">
-                      <option>María</option><option>Carlos</option><option>Luis</option>
-                    </select>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">
+                        {tipoDelivery === 'PedidosYa' ? 'Código PedidosYa:' : 'Nombre del Cliente / Ticket:'}
+                      </label>
+                      <input
+                        type="text"
+                        value={codigoPY}
+                        onChange={(e) => setCodigoPY(e.target.value)}
+                        placeholder={tipoDelivery === 'PedidosYa' ? 'Ej: FG-4821' : 'Ej: PEDRO o T-12'}
+                        className="w-full bg-slate-50 border-2 border-blue-300 focus:border-blue-500 rounded-xl px-3 py-2 font-mono font-black text-slate-900 text-sm focus:outline-none uppercase"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">Cajero:</label>
+                      <select value={cajeroNombre} onChange={(e) => setCajeroNombre(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 text-sm focus:outline-none">
+                        <option>María</option><option>Carlos</option><option>Luis</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
-                  {productosMenu.map(prod => (
-                    <div key={prod.id} onClick={() => agregarItemDelivery(prod)} className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between cursor-pointer hover:border-blue-400 transition-colors shadow-sm h-24">
-                      <p className="font-bold text-slate-800 text-[10px] uppercase leading-tight">{prod.nombre}</p>
-                      <p className="font-black font-mono text-blue-600 text-sm">S/ {prod.precio.toFixed(2)}</p>
-                    </div>
-                  ))}
+                  {productosMenu.map(prod => {
+                    const cantEnTicket = itemsDelivery.filter(i => String(i.id) === String(prod.id)).reduce((sum, item) => sum + item.cant, 0);
+                    const stockDisponible = prod.tipoStock === 'limitado' ? prod.stock - cantEnTicket : Infinity;
+                    const agotado = prod.tipoStock === 'limitado' && stockDisponible <= 0;
+
+                    return (
+                      <div 
+                        key={prod.id} 
+                        onClick={() => !agotado && agregarItemDelivery(prod)} 
+                        className={`bg-white border rounded-xl p-3 flex flex-col justify-between shadow-sm h-24 transition-all ${
+                          agotado 
+                            ? 'opacity-50 grayscale border-slate-200 cursor-not-allowed bg-slate-50' 
+                            : 'cursor-pointer hover:border-blue-400 hover:-translate-y-0.5 active:bg-slate-50'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-bold text-slate-800 text-[10px] uppercase leading-tight pr-2">{prod.nombre}</p>
+                          {prod.tipoStock === 'limitado' && (
+                            <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1.5 ${
+                              agotado ? 'bg-red-100 text-red-650' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {agotado ? 'AGOTADO' : `STOCK: ${stockDisponible}`}
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-black font-mono text-blue-600 text-sm">S/ {prod.precio.toFixed(2)}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1413,7 +1540,27 @@ export default function CajaPage() {
       `}</style>
 
 
+      {/* FLOATING TOASTS NOTIFICATIONS SYSTEM FOR CAJA */}
+      <div className="fixed bottom-6 right-6 z-[250] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+        {toasts.map(t => (
+          <div key={t.id} className="pointer-events-auto bg-slate-900 border border-emerald-500/20 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent"></div>
+            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-lg animate-bounce shrink-0 shadow-lg shadow-emerald-500/20">
+              🛎️
+            </div>
+            <div className="flex-1 pr-2 relative z-10">
+              <h4 className="font-black text-xs text-emerald-400 uppercase tracking-widest leading-none mb-1">¡Pedido Listo!</h4>
+              <p className="font-bold text-sm text-slate-100">{t.mensaje}</p>
+            </div>
+            <button 
+              onClick={() => setToasts(prev => prev.filter(item => item.id !== t.id))}
+              className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-colors relative z-10 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
     </section>
-
   );
 }
