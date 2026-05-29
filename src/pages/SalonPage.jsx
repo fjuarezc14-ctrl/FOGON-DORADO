@@ -108,6 +108,16 @@ export default function SalonPage({ currentUser }) {
   const agregarAlTicket = (prod) => {
     let nuevosItems = [...ticketActual];
     const index = nuevosItems.findIndex(t => String(t.id) === String(prod.id) && !t.yaEnviado);
+    
+    // Calcular cuántos ya hay en el ticket activo
+    const cantEnTicket = index >= 0 ? nuevosItems[index].cant : 0;
+    
+    // Si el stock es limitado y ya no queda disponible
+    if (prod.tipoStock === 'limitado' && cantEnTicket >= prod.stock) {
+      alert(`⚠️ Stock agotado. Solo quedan ${prod.stock} unidades de "${prod.nombre}".`);
+      return;
+    }
+    
     if (index >= 0) {
       nuevosItems[index].cant++;
     } else {
@@ -119,8 +129,15 @@ export default function SalonPage({ currentUser }) {
   const alterarCantidad = (index, operacion) => {
     let nuevos = [...ticketActual];
     if (nuevos[index].yaEnviado) return;
-    if (operacion === '+') nuevos[index].cant++;
-    else {
+    if (operacion === '+') {
+      // Validar stock de nuevo si es limitado
+      const prodOriginal = productos.find(p => String(p.id) === String(nuevos[index].id));
+      if (prodOriginal && prodOriginal.tipoStock === 'limitado' && nuevos[index].cant >= prodOriginal.stock) {
+        alert(`⚠️ Stock agotado. Solo quedan ${prodOriginal.stock} unidades de "${prodOriginal.nombre}".`);
+        return;
+      }
+      nuevos[index].cant++;
+    } else {
       nuevos[index].cant--;
       if (nuevos[index].cant <= 0) nuevos.splice(index, 1);
     }
@@ -384,13 +401,38 @@ export default function SalonPage({ currentUser }) {
                   ))}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
-                  {menuFiltrado.map(prod => (
-                    <div key={prod.id} onClick={() => agregarAlTicket(prod)} className="bg-white border border-slate-200 rounded-xl p-3 md:p-4 flex flex-col justify-between cursor-pointer active:bg-slate-50 transition-colors shadow-sm relative overflow-hidden h-24 md:h-28 hover:border-amber-300">
-                      <p className="font-bold text-slate-800 text-[10px] md:text-xs uppercase leading-tight pr-4 z-10">{prod.nombre}</p>
-                      <p className="font-black font-mono text-emerald-600 text-sm md:text-base z-10">S/ {prod.precio.toFixed(2)}</p>
-                      <PlusCircle className="absolute bottom-[-10px] right-[-10px] w-12 h-12 text-slate-100 opacity-50" />
-                    </div>
-                  ))}
+                  {menuFiltrado.map(prod => {
+                    const cantEnTicket = ticketActual.filter(t => String(t.id) === String(prod.id) && !t.yaEnviado).reduce((sum, item) => sum + item.cant, 0);
+                    const stockDisponible = prod.tipoStock === 'limitado' ? prod.stock - cantEnTicket : Infinity;
+                    const agotado = prod.tipoStock === 'limitado' && stockDisponible <= 0;
+                    
+                    return (
+                      <div 
+                        key={prod.id} 
+                        onClick={() => !agotado && agregarAlTicket(prod)} 
+                        className={`bg-white border rounded-xl p-3 md:p-4 flex flex-col justify-between shadow-sm relative overflow-hidden h-24 md:h-28 transition-all ${
+                          agotado 
+                            ? 'opacity-50 grayscale border-slate-200 cursor-not-allowed bg-slate-50' 
+                            : 'cursor-pointer hover:border-amber-300 hover:-translate-y-0.5 active:bg-slate-50'
+                        }`}
+                      >
+                        <div className="z-10 flex flex-col justify-between h-full w-full">
+                          <div>
+                            <p className="font-bold text-slate-800 text-[10px] md:text-xs uppercase leading-tight pr-4">{prod.nombre}</p>
+                            {prod.tipoStock === 'limitado' && (
+                              <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 ${
+                                agotado ? 'bg-red-100 text-red-650' : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {agotado ? 'AGOTADO' : `STOCK: ${stockDisponible}`}
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-black font-mono text-emerald-600 text-sm md:text-base">S/ {prod.precio.toFixed(2)}</p>
+                        </div>
+                        <PlusCircle className="absolute bottom-[-10px] right-[-10px] w-12 h-12 text-slate-100 opacity-50 pointer-events-none" />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
