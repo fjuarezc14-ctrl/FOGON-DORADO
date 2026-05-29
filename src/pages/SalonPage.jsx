@@ -396,7 +396,7 @@ export default function SalonPage({ currentUser }) {
             <div className="flex flex-col md:flex-row flex-1 min-h-0 bg-slate-50">
               <div className="w-full md:w-3/5 flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-slate-200">
                 <div className="flex gap-2 overflow-x-auto custom-scrollbar p-3 shrink-0 bg-white shadow-sm z-10">
-                  {['Todos', 'Pollos', 'Guarniciones', 'Bebidas'].map(cat => (
+                  {['Todos', ...new Set(productos.map(p => p.categoria))].map(cat => (
                     <button key={cat} onClick={() => setCategoriaActiva(cat)} className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-sm transition-colors ${categoriaActiva === cat ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-amber-50'}`}>{cat}</button>
                   ))}
                 </div>

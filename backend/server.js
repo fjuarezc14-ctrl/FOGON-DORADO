@@ -312,7 +312,7 @@ app.get('/api/pedidos/barra', async (req, res) => {
       }),
       // Barra solo ve bebidas que no se han despachado (historial === false)
       items: p.items
-        .filter(i => !i.historial && i.producto?.categoria === 'Bebidas')
+        .filter(i => !i.historial && ['bebidas', 'tragos', 'refrescos', 'licores', 'cervezas', 'cocteles', 'jugos'].includes(i.producto?.categoria?.toLowerCase()))
         .map(i => ({
           nombre: i.nombre,
           cant: i.cantidad,
@@ -342,7 +342,7 @@ app.patch('/api/pedidos/:id/preparar', async (req, res) => {
 
     // Filtrar los items que corresponden a la sección
     const itemsAActualizar = pedido.items.filter(i => {
-      const esBebida = i.producto?.categoria === 'Bebidas';
+      const esBebida = ['bebidas', 'tragos', 'refrescos', 'licores', 'cervezas', 'cocteles', 'jugos'].includes(i.producto?.categoria?.toLowerCase());
       if (seccion === 'barra') return esBebida;
       if (seccion === 'cocina') return !esBebida;
       return false;
