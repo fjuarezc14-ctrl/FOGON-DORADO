@@ -556,26 +556,10 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
       });
     }
 
-    if (nuevaCantidad === 0) {
-      // Eliminar el ítem del pedido
-      await prisma.itemPedido.delete({ where: { id: item.id } });
-    } else {
-      // Actualizar cantidad
-      await prisma.itemPedido.update({
-        where: { id: item.id },
-        data: { cantidad: nuevaCantidad },
-      });
-    }
+    const esUltimoItem = pedido.items.length === 1 && cantidadACancelar === item.cantidad;
 
-    // Recalcular total del pedido
-    const itemsRestantes = await prisma.itemPedido.findMany({
-      where: { pedidoId: id },
-    });
-
-    const nuevoTotal = itemsRestantes.reduce((sum, i) => sum + (i.cantidad * i.precio), 0);
-
-    if (itemsRestantes.length === 0) {
-      // Si no quedan ítems, cancelamos todo el pedido
+    if (esUltimoItem) {
+      // Treat as a complete cancelation of the comanda!
       await prisma.pedido.update({
         where: { id },
         data: {
@@ -583,15 +567,46 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
           canceladoPor: canceladoPor || 'Sin especificar',
           motivoCancela: motivo || 'Cancelación completa de ítems',
           canceladoEn: new Date(),
-          total: 0,
         },
       });
     } else {
-      // Actualizar total
-      await prisma.pedido.update({
-        where: { id },
-        data: { total: nuevoTotal },
+      if (nuevaCantidad === 0) {
+        // Eliminar el ítem del pedido
+        await prisma.itemPedido.delete({ where: { id: item.id } });
+      } else {
+        // Actualizar cantidad
+        await prisma.itemPedido.update({
+          where: { id: item.id },
+          data: { cantidad: nuevaCantidad },
+        });
+      }
+
+      // Recalcular total del pedido
+      const itemsRestantes = await prisma.itemPedido.findMany({
+        where: { pedidoId: id },
       });
+
+      const nuevoTotal = itemsRestantes.reduce((sum, i) => sum + (i.cantidad * i.precio), 0);
+
+      if (itemsRestantes.length === 0) {
+        // Fallback: Si no quedan ítems, cancelamos todo el pedido
+        await prisma.pedido.update({
+          where: { id },
+          data: {
+            estado: 'Cancelado',
+            canceladoPor: canceladoPor || 'Sin especificar',
+            motivoCancela: motivo || 'Cancelación completa de ítems',
+            canceladoEn: new Date(),
+            total: 0,
+          },
+        });
+      } else {
+        // Actualizar total
+        await prisma.pedido.update({
+          where: { id },
+          data: { total: nuevoTotal },
+        });
+      }
     }
 
     let mesaLiberada = false;

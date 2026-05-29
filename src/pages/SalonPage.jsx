@@ -52,6 +52,7 @@ export default function SalonPage({ currentUser }) {
 
   // Modal de Autorización PIN
   const [authModal, setAuthModal] = useState({ open: false, pin: '', error: '', callback: null, promptText: '' });
+  const [supervisorAprobador, setSupervisorAprobador] = useState(null);
 
   // Estados de Notificación en Tiempo Real
   const [prevMesas, setPrevMesas] = useState([]);
@@ -174,7 +175,7 @@ export default function SalonPage({ currentUser }) {
     try {
       const pedidoId = mesaActual.pedidoData.pedidoId;
       const result = await api.cancelarPedido(pedidoId, {
-        canceladoPor: meseroGlobal,
+        canceladoPor: supervisorAprobador ? `${supervisorAprobador.nombre} (${supervisorAprobador.rol}) | Mozo: ${meseroGlobal}` : meseroGlobal,
         motivo: cancelMotivo.trim(),
       });
       if (result.error) throw new Error(result.error);
@@ -197,7 +198,7 @@ export default function SalonPage({ currentUser }) {
     }
   };
 
-  const handleCancelarItem = async (item) => {
+  const handleCancelarItem = async (item, supervisor) => {
     const motivo = prompt(`Escribe el motivo de cancelación para ${item.nombre}:`);
     if (motivo === null) return;
     if (!motivo.trim()) { alert("El motivo de cancelación es obligatorio."); return; }
@@ -212,7 +213,7 @@ export default function SalonPage({ currentUser }) {
         productoId: item.id,
         cantidadACancelar: cant,
         motivo: motivo.trim(),
-        canceladoPor: meseroGlobal
+        canceladoPor: supervisor ? `${supervisor.nombre} (${supervisor.rol}) | Mozo: ${meseroGlobal}` : meseroGlobal
       });
       if (res.error) throw new Error(res.error);
       
@@ -244,7 +245,7 @@ export default function SalonPage({ currentUser }) {
         if (res.error) throw new Error(res.error);
         
         // Autorización exitosa! Ejecutar el callback
-        authModal.callback();
+        authModal.callback(res);
         setAuthModal({ open: false, pin: '', error: '', callback: null, promptText: '' });
       } catch (err) {
         setAuthModal(prev => ({ ...prev, pin: '', error: err.message || 'Acceso Denegado' }));
@@ -421,7 +422,7 @@ export default function SalonPage({ currentUser }) {
                                     {esCancelable && (
                                       <button 
                                         onClick={() => {
-                                          requestSupervisorAuth(`Anular "${item.nombre}"`, () => handleCancelarItem(item));
+                                          requestSupervisorAuth(`Anular "${item.nombre}"`, (supervisor) => handleCancelarItem(item, supervisor));
                                         }} 
                                         title="Anular o reducir cantidad de este producto"
                                         className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg hover:text-red-700 transition-colors pointer-events-auto shrink-0"
@@ -487,7 +488,10 @@ export default function SalonPage({ currentUser }) {
                               alert("⚠️ No puedes cancelar toda la comanda porque algunos platos ya han sido preparados por Cocina/Bar.\n\nPor favor, anula únicamente los productos pendientes de entrega usando el icono de basura rojo 🗑️ al lado de cada producto.");
                               return;
                             }
-                            requestSupervisorAuth("Cancelar comanda completa", () => setCancelModal(true));
+                            requestSupervisorAuth("Cancelar comanda completa", (supervisor) => {
+                              setSupervisorAprobador(supervisor);
+                              setCancelModal(true);
+                            });
                           }}
                           className="w-full py-2.5 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 font-black uppercase text-[10px] tracking-widest rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
