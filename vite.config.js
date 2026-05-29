@@ -13,6 +13,13 @@ export default defineConfig({
     port: 5173,
     watch: {
       usePolling: true
+    },
+    proxy: {
+      '/api': {
+        target: 'http://backend:3000', // Points to the backend service inside Docker, or http://localhost:3000 if running locally
+        changeOrigin: true,
+        rewrite: (path) => path,
+      }
     }
   }
 })
