@@ -31,7 +31,15 @@ async function main() {
   ];
 
   for (const p of productosBase) {
-    await prisma.producto.create({ data: p });
+    const existe = await prisma.producto.findFirst({
+      where: { nombre: p.nombre, activo: true }
+    });
+    if (!existe) {
+      await prisma.producto.create({ data: p });
+      console.log(`+ Creado producto base: ${p.nombre}`);
+    } else {
+      console.log(`~ Producto base ya existe: ${p.nombre}`);
+    }
   }
 
   // 3. Crear las 15 mesas del salón
@@ -43,7 +51,30 @@ async function main() {
     });
   }
 
-  console.log('✅ Datos iniciales cargados correctamente.');
+  // 4. Limpiar duplicados históricos de productos de forma segura
+  console.log('🧹 Detectando y limpiando productos duplicados de forma segura...');
+  const todosProductos = await prisma.producto.findMany({
+    where: { activo: true },
+    orderBy: { id: 'asc' }
+  });
+  
+  const nombresVistos = new Set();
+  let desactivados = 0;
+  
+  for (const p of todosProductos) {
+    if (nombresVistos.has(p.nombre)) {
+      await prisma.producto.update({
+        where: { id: p.id },
+        data: { activo: false }
+      });
+      desactivados++;
+    } else {
+      nombresVistos.add(p.nombre);
+    }
+  }
+
+  console.log(`✅ Se desactivaron y limpiaron ${desactivados} productos duplicados.`);
+  console.log('✅ Datos iniciales cargados y auditados correctamente.');
 }
 
 main()
