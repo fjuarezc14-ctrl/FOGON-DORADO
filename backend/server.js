@@ -558,6 +558,9 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
 
     const esUltimoItem = pedido.items.length === 1 && cantidadACancelar === item.cantidad;
 
+    // Declarar en el scope externo para que esté disponible en el res.json final
+    let itemsRestantes = [];
+
     if (esUltimoItem) {
       // Treat as a complete cancelation of the comanda!
       await prisma.pedido.update({
@@ -569,6 +572,7 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
           canceladoEn: new Date(),
         },
       });
+      // itemsRestantes queda [] — el pedido se canceló por completo
     } else {
       if (nuevaCantidad === 0) {
         // Eliminar el ítem del pedido
@@ -582,7 +586,7 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
       }
 
       // Recalcular total del pedido
-      const itemsRestantes = await prisma.itemPedido.findMany({
+      itemsRestantes = await prisma.itemPedido.findMany({
         where: { pedidoId: id },
       });
 
