@@ -204,19 +204,19 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
 
     const pedido = await prisma.pedido.create({
       data: {
-        mesaId: mesa.id,
-        mesero,
-        total,
+        mesaId: parseInt(mesa.id),
+        mesero: String(mesero),
+        total: parseFloat(total),
         adicional: adicional || false,
         estado: 'Cocina',
         items: {
           create: itemsNuevos.map(i => ({
             productoId: parseInt(i.id),
-            nombre: i.nombre,
-            precio: i.precio,
-            cantidad: i.cant,
+            nombre: String(i.nombre),
+            precio: parseFloat(i.precio),
+            cantidad: parseInt(i.cant),
             historial: false,
-            notas: i.notas || null,
+            notas: i.notas ? String(i.notas) : null,
           })),
         },
       },
@@ -651,17 +651,17 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     const pedido = await prisma.pedido.create({
       data: {
         mesaId: null,
-        mesero: cajero,
-        total,
+        mesero: String(cajero),
+        total: parseFloat(total),
         estado: 'Cocina',
         tipoEntrega: 'llevar',
-        codigoPedidosYa,
+        codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null,
         items: {
           create: items.map(i => ({
             productoId: parseInt(i.id),
-            nombre: i.nombre,
-            precio: i.precio,
-            cantidad: i.cant,
+            nombre: String(i.nombre),
+            precio: parseFloat(i.precio),
+            cantidad: parseInt(i.cant),
             historial: false,
           })),
         },
@@ -672,7 +672,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     for (const item of items) {
       await prisma.producto.updateMany({
         where: { id: parseInt(item.id), tipoStock: 'limitado' },
-        data: { stock: { decrement: item.cant } },
+        data: { stock: { decrement: parseInt(item.cant) } },
       });
     }
 
@@ -756,7 +756,16 @@ app.get('/api/productos', async (req, res) => {
 
 app.post('/api/productos', async (req, res) => {
   try {
-    const prod = await prisma.producto.create({ data: req.body });
+    const { nombre, categoria, precio, tipoStock, stock } = req.body;
+    const prod = await prisma.producto.create({
+      data: {
+        nombre: String(nombre),
+        categoria: String(categoria),
+        precio: parseFloat(precio),
+        tipoStock: tipoStock ? String(tipoStock) : 'ilimitado',
+        stock: stock ? parseInt(stock) : 0,
+      }
+    });
     res.json(prod);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -765,9 +774,17 @@ app.post('/api/productos', async (req, res) => {
 
 app.put('/api/productos/:id', async (req, res) => {
   try {
+    const data = {};
+    if (req.body.nombre !== undefined) data.nombre = String(req.body.nombre);
+    if (req.body.categoria !== undefined) data.categoria = String(req.body.categoria);
+    if (req.body.precio !== undefined) data.precio = parseFloat(req.body.precio);
+    if (req.body.tipoStock !== undefined) data.tipoStock = String(req.body.tipoStock);
+    if (req.body.stock !== undefined) data.stock = parseInt(req.body.stock);
+    if (req.body.activo !== undefined) data.activo = Boolean(req.body.activo);
+
     const prod = await prisma.producto.update({
       where: { id: parseInt(req.params.id) },
-      data: req.body,
+      data,
     });
     res.json(prod);
   } catch (err) {
@@ -804,14 +821,22 @@ app.post('/api/usuarios', async (req, res) => {
   try {
     // Validar PIN único
     const duplicate = await prisma.usuario.findFirst({
-      where: { pin: req.body.pin, activo: true }
+      where: { pin: String(req.body.pin), activo: true }
     });
     if (duplicate) {
       return res.status(400).json({ error: 'Este PIN ya está asignado a otro empleado. Elige uno diferente.' });
     }
 
-    const user = await prisma.usuario.create({ data: req.body });
-    const { pin, ...seguro } = user;
+    const { nombre, rol, pin, permisos } = req.body;
+    const user = await prisma.usuario.create({
+      data: {
+        nombre: String(nombre),
+        rol: String(rol),
+        pin: String(pin),
+        permisos: Array.isArray(permisos) ? permisos.map(String) : [],
+      }
+    });
+    const { pin: userPin, ...seguro } = user;
     res.json(seguro);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -823,16 +848,23 @@ app.put('/api/usuarios/:id', async (req, res) => {
   try {
     if (req.body.pin) {
       const duplicate = await prisma.usuario.findFirst({
-        where: { pin: req.body.pin, activo: true, id: { not: id } }
+        where: { pin: String(req.body.pin), activo: true, id: { not: id } }
       });
       if (duplicate) {
         return res.status(400).json({ error: 'Este PIN ya está asignado a otro empleado. Elige uno diferente.' });
       }
     }
 
+    const data = {};
+    if (req.body.nombre !== undefined) data.nombre = String(req.body.nombre);
+    if (req.body.rol !== undefined) data.rol = String(req.body.rol);
+    if (req.body.pin !== undefined) data.pin = String(req.body.pin);
+    if (req.body.permisos !== undefined) data.permisos = Array.isArray(req.body.permisos) ? req.body.permisos.map(String) : [];
+    if (req.body.activo !== undefined) data.activo = Boolean(req.body.activo);
+
     const user = await prisma.usuario.update({
       where: { id },
-      data: req.body
+      data
     });
     res.json(user);
   } catch (err) {
@@ -1103,7 +1135,20 @@ app.get('/api/compras', async (req, res) => {
 
 app.post('/api/compras', async (req, res) => {
   try {
-    const compra = await prisma.compra.create({ data: req.body });
+    const { proveedor, ruc, tipoDocumento, serieNumero, baseImponible, igv, total, xmlData, origenCarga } = req.body;
+    const compra = await prisma.compra.create({
+      data: {
+        proveedor: String(proveedor),
+        ruc: ruc ? String(ruc) : null,
+        tipoDocumento: tipoDocumento ? String(tipoDocumento) : 'Factura',
+        serieNumero: serieNumero ? String(serieNumero) : null,
+        baseImponible: parseFloat(baseImponible),
+        igv: parseFloat(igv),
+        total: parseFloat(total),
+        xmlData: xmlData ? String(xmlData) : null,
+        origenCarga: origenCarga ? String(origenCarga) : 'manual',
+      }
+    });
     res.json(compra);
   } catch (err) {
     res.status(500).json({ error: err.message });
