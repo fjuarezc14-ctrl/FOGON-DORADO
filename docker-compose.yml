@@ -26,6 +26,8 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+    env_file:
+      - ./backend/.env          # Lee TODAS las variables desde el archivo .env del backend
     environment:
       - DATABASE_URL=postgresql://fogon_user:fogon_password@db:5432/fogon_dorado
       - PORT=3000
