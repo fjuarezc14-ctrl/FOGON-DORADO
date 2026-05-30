@@ -1405,12 +1405,16 @@ async function enviarANubefact(venta, items) {
 // NUBEFACT — ENDPOINTS DE DIAGNÓSTICO Y REINTENTO MANUAL
 // ============================================================
 
-// GET /api/nubefact/pendientes → Ver ventas en contingencia con su último error
+// GET /api/nubefact/pendientes → Ver todas las ventas con problemas (pendientes + errores)
 app.get('/api/nubefact/pendientes', async (req, res) => {
   try {
     const pendientes = await prisma.venta.findMany({
       where: {
-        estadoNubefact: { startsWith: 'PENDIENTE' },
+        // Mostrar tanto las pendientes de reintento como las que fallaron con error
+        OR: [
+          { estadoNubefact: { startsWith: 'PENDIENTE' } },
+          { estadoNubefact: { startsWith: 'ERROR' } },
+        ],
         tipoComprobante: { in: ['Boleta', 'Factura'] }
       },
       select: {
