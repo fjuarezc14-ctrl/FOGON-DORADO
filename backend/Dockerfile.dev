@@ -8,7 +8,8 @@ RUN apk add --no-cache openssl
 COPY package.json ./
 RUN npm install
 
-# Copiar el schema de Prisma y generar el cliente
+# Copiar el schema de Prisma para generar el cliente
+# (Las migraciones se aplicarán en tiempo de ejecución, no de construcción)
 COPY prisma ./prisma
 RUN npx prisma generate
 
@@ -16,5 +17,7 @@ COPY . .
 
 EXPOSE 3000
 
-# Al iniciar: migrar BD, cargar datos iniciales y luego arrancar servidor
-CMD ["sh", "-c", "npx prisma migrate deploy && node prisma/seed.js && node server.js"]
+# Al iniciar: aplicar TODAS las migraciones pendientes y luego arrancar el servidor.
+# NOTA: El seed.js ya NO se ejecuta aquí para evitar errores por datos duplicados en producción.
+# Si necesitas datos iniciales, corre manualmente: docker compose exec backend node prisma/seed.js
+CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
