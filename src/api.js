@@ -77,5 +77,10 @@ export const api = {
 
   // Consulta DNI/RUC segura
   consultarCliente: (doc) => fetch(`${API_BASE}/api/clientes/consulta/${doc}`).then(r => r.json()),
+
+  // Nubefact — Diagnóstico y reintentos manuales
+  getNubefactPendientes: () => fetch(`${API_BASE}/api/nubefact/pendientes`).then(r => r.json()),
+  reintentarNubefact: (id) => fetch(`${API_BASE}/api/nubefact/reintentar/${id}`, { method: 'POST' }).then(r => r.json()),
+  reintentarTodosNubefact: () => fetch(`${API_BASE}/api/nubefact/reintentar-todos`, { method: 'POST' }).then(r => r.json()),
 };
 

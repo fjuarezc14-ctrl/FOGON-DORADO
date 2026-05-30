@@ -1351,13 +1351,15 @@ async function enviarANubefact(venta, items) {
     cliente_denominacion: venta.nombreCliente || 'PÚBLICO GENERAL',
     cliente_direccion: venta.clienteDireccion || '',
     cliente_email: null,
+    // IMPORTANTE: Siempre usar la fecha ACTUAL de Lima, no la de creación.
+    // Nubefact/SUNAT rechaza comprobantes con fecha pasada en reintentos.
     fecha_de_emision: (() => {
       const dateLima = new Intl.DateTimeFormat('es-PE', {
         timeZone: 'America/Lima',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
-      }).format(new Date(venta.createdAt));
+      }).format(new Date()); // <-- Siempre HOY en hora Lima
       const [day, month, year] = dateLima.split('/');
       return `${year}-${month}-${day}`;
     })(),
@@ -1395,6 +1397,80 @@ async function enviarANubefact(venta, items) {
 
 
 // ============================================================
+// NUBEFACT — ENDPOINTS DE DIAGNÓSTICO Y REINTENTO MANUAL
+// ============================================================
+
+// GET /api/nubefact/pendientes → Ver ventas en contingencia con su último error
+app.get('/api/nubefact/pendientes', async (req, res) => {
+  try {
+    const pendientes = await prisma.venta.findMany({
+      where: {
+        estadoNubefact: { startsWith: 'PENDIENTE' },
+        tipoComprobante: { in: ['Boleta', 'Factura'] }
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        tipoComprobante: true,
+        total: true,
+        nombreCliente: true,
+        numDocumento: true,
+        estadoNubefact: true,
+        pedidoId: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(pendientes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/nubefact/reintentar/:id → Forzar reintento manual de una venta específica
+app.post('/api/nubefact/reintentar/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    const venta = await prisma.venta.findUnique({
+      where: { id },
+      include: { pedido: { include: { items: true } } }
+    });
+    if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
+
+    console.log(`[Nubefact Manual] 🔄 Reintento manual forzado para Venta #${id}...`);
+    const response = await enviarANubefact(venta, venta.pedido.items);
+
+    const updated = await prisma.venta.update({
+      where: { id },
+      data: { estadoNubefact: `ACEPTADO:${JSON.stringify(response)}` }
+    });
+
+    console.log(`[Nubefact Manual] ✅ Venta #${id} ACEPTADA por Nubefact.`);
+    res.json({ ok: true, estadoNubefact: updated.estadoNubefact });
+  } catch (err) {
+    // Guardar el error en BD para poder verlo desde el panel
+    const errorMsg = err.message.substring(0, 500); // Limitar a 500 chars
+    await prisma.venta.update({
+      where: { id },
+      data: { estadoNubefact: `ERROR:${errorMsg}` }
+    }).catch(() => {}); // Silenciar error si la venta no existe
+
+    console.error(`[Nubefact Manual] ❌ Fallo reintento manual Venta #${id}:`, err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/nubefact/reintentar-todos → Forzar reintento de TODAS las ventas pendientes
+app.post('/api/nubefact/reintentar-todos', async (req, res) => {
+  try {
+    await procesarVentasPendientes();
+    res.json({ ok: true, mensaje: 'Reintento masivo ejecutado. Revisa los logs o /api/nubefact/pendientes.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ============================================================
 // WORKER DE REINTENTO AUTOMÁTICO (OFFLINE CONTINGENCY)
 // ============================================================
 
@@ -1428,6 +1504,13 @@ async function procesarVentasPendientes() {
         
         console.log(`[Worker Nubefact] ✅ Venta #${venta.id} enviada y ACEPTADA por Nubefact.`);
       } catch (err) {
+        // Guardar el mensaje de error en BD (truncado a 500 chars) para diagnóstico
+        const errorMsg = err.message.substring(0, 500);
+        await prisma.venta.update({
+          where: { id: venta.id },
+          data: { estadoNubefact: `ERROR:${errorMsg}` }
+        }).catch(() => {});
+
         console.error(`[Worker Nubefact] ❌ Intento fallido para Venta #${venta.id}:`, err.message);
       }
     }
@@ -1436,6 +1519,6 @@ async function procesarVentasPendientes() {
   }
 }
 
-// Iniciar worker de reintentos cada 1 minuto (60000ms)
-setInterval(procesarVentasPendientes, 60000);
+// Iniciar worker de reintentos cada 5 minutos (300000ms)
+setInterval(procesarVentasPendientes, 300000);
 
