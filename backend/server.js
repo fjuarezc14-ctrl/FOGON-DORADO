@@ -1344,7 +1344,8 @@ async function enviarANubefact(venta, items) {
 
   const payload = {
     operacion: "generar_comprobante",
-    codigo_unico: `fogon_venta_${venta.id}`,
+    // El codigo_unico incluye timestamp para evitar que Nubefact rechace reintentos como duplicados
+    codigo_unico: `fogon_v${venta.id}_${Date.now()}`,
     tipo_de_comprobante: tipoComprobanteNum,
     serie: serie,
     numero: null, // Autoincrementar en Nubefact
@@ -1377,7 +1378,7 @@ async function enviarANubefact(venta, items) {
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 segundos de timeout estricto
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos — Nubefact puede ser lento desde Perú
 
   const response = await fetch(url, {
     method: 'POST',
