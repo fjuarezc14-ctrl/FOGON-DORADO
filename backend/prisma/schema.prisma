@@ -28,7 +28,7 @@ model Usuario {
 model Producto {
   id        Int      @id @default(autoincrement())
   nombre    String
-  categoria String   // "Pollos", "Bebidas", "Guarniciones"
+  categoria String   // "Pollos a la Brasa", "Parrillas y Cortes", "Porciones y Piqueos", "Parrilladas Mixtas", "Platos Criollos", "Tallarines Verdes", "Ensaladas", "Guarniciones", "Combos", "Bebidas y Refrescos", "Cervezas", "Bar y Cocteles", "Postres"
   precio    Float
   tipoStock String   @default("ilimitado") // "ilimitado" | "limitado"
   stock     Int      @default(0)
@@ -100,6 +100,9 @@ model Venta {
   subtotal        Float
   metodoPago      String   @default("Efectivo") // "Efectivo", "Tarjeta", "Yape", "PedidosYa"
   estadoNubefact  String   @default("PENDIENTE")
+  // --- Ofertas / Descuentos ---
+  ofertaDescripcion  String?  // Nombre de la oferta aplicada, si hubo
+  descuentoAplicado  Float    @default(0) // Monto total descontado en esta venta
   createdAt       DateTime @default(now())
 }
 
@@ -119,4 +122,21 @@ model Compra {
   xmlData        String?
   origenCarga    String   @default("manual") // "xml", "manual"
   creadoEn       DateTime @default(now())
+}
+
+// ============================================================
+// OFERTAS POR TEMPORADA
+// ============================================================
+model Oferta {
+  id              Int      @id @default(autoincrement())
+  nombre          String   // "Día del Maestro - 20% Bebidas"
+  descripcion     String?
+  tipoDescuento   String   // "porcentaje" | "monto_fijo"
+  valorDescuento  Float    // ej. 20.0 para 20%, o 5.0 para S/5 fijo
+  categorias      String[] // Categorías afectadas, ej. ["Bebidas y Refrescos"]
+  activa          Boolean  @default(false)
+  fechaInicio     DateTime?
+  fechaFin        DateTime?
+  creadoPor       String
+  creadoEn        DateTime @default(now())
 }

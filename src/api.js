@@ -82,5 +82,17 @@ export const api = {
   getNubefactPendientes: () => fetch(`${API_BASE}/api/nubefact/pendientes`).then(r => r.json()),
   reintentarNubefact: (id) => fetch(`${API_BASE}/api/nubefact/reintentar/${id}`, { method: 'POST' }).then(r => r.json()),
   reintentarTodosNubefact: () => fetch(`${API_BASE}/api/nubefact/reintentar-todos`, { method: 'POST' }).then(r => r.json()),
-};
 
+  // Ofertas por Temporada
+  getOfertas: () => fetch(`${API_BASE}/api/ofertas`).then(r => r.json()),
+  crearOferta: (body) => fetch(`${API_BASE}/api/ofertas`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  editarOferta: (id, body) => fetch(`${API_BASE}/api/ofertas/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  activarOferta: (id, activa) => fetch(`${API_BASE}/api/ofertas/${id}/activar`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activa }),
+  }).then(r => r.json()),
+  eliminarOferta: (id) => fetch(`${API_BASE}/api/ofertas/${id}`, { method: 'DELETE' }).then(r => r.json()),
+};

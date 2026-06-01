@@ -37,6 +37,7 @@ function playChimeNotification() {
 export default function SalonPage({ currentUser }) {
   const [mesas, setMesas] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [mesaActual, setMesaActual] = useState(null);
@@ -80,15 +81,29 @@ export default function SalonPage({ currentUser }) {
     }
   }, []);
 
+  // Cargar usuarios para el listado de mozos
+  const fetchUsuarios = useCallback(async () => {
+    try {
+      const data = await api.getUsuarios();
+      setUsuarios(data);
+    } catch (err) {
+      console.error('Error cargando usuarios:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchMesas();
     fetchProductos();
+    fetchUsuarios();
     // Sincronización en tiempo real cada 3 segundos
     const interval = setInterval(() => {
-      if (!modalOpen) fetchMesas();
+      if (!modalOpen) {
+        fetchMesas();
+        fetchUsuarios();
+      }
     }, 3000);
     return () => clearInterval(interval);
-  }, [fetchMesas, fetchProductos, modalOpen]);
+  }, [fetchMesas, fetchProductos, fetchUsuarios, modalOpen]);
 
   const abrirModal = (m) => {
     setMesaActual(m);
@@ -378,13 +393,28 @@ export default function SalonPage({ currentUser }) {
               <div className="flex items-center gap-3">
                 <div className="hidden md:flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
                   <User className="w-3 h-3 text-slate-400" />
-                  <select disabled={currentUser?.rol === 'Mozo'} value={meseroGlobal} onChange={(e) => setMeseroGlobal(e.target.value)} className="bg-transparent text-white text-xs font-bold focus:outline-none disabled:opacity-80">
-                    <option value={meseroGlobal}>{meseroGlobal}</option>
-                    {currentUser?.rol !== 'Mozo' && (
+                  <select 
+                    disabled={currentUser?.rol === 'Mozo'} 
+                    value={meseroGlobal} 
+                    onChange={(e) => setMeseroGlobal(e.target.value)} 
+                    className="bg-slate-800 text-white text-xs font-bold focus:outline-none disabled:opacity-80 border-0"
+                  >
+                    {/* Mostrar los usuarios del sistema que tengan roles de atención (Mozo, Cajero, Admin) */}
+                    {usuarios.filter(u => u.activo).length === 0 ? (
+                      <option value={meseroGlobal} className="bg-slate-800 text-white">{meseroGlobal}</option>
+                    ) : (
                       <>
-                        <option value="Carlos">Carlos</option>
-                        <option value="María">María</option>
-                        <option value="Luis">Luis</option>
+                        {!usuarios.some(u => u.activo && u.nombre === meseroGlobal) && (
+                          <option value={meseroGlobal} className="bg-slate-800 text-white">{meseroGlobal}</option>
+                        )}
+                        {usuarios
+                          .filter(u => u.activo && ['Mozo', 'Cajero', 'Administrador'].includes(u.rol))
+                          .map(u => (
+                            <option key={u.id} value={u.nombre} className="bg-slate-800 text-white">
+                              {u.nombre} ({u.rol})
+                            </option>
+                          ))
+                        }
                       </>
                     )}
                   </select>

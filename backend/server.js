@@ -7,6 +7,14 @@ const app = express();
 const prisma = new PrismaClient();
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000; // 5 minutos
 
+// Categorías que van a la BARRA (el resto va a COCINA)
+const BARRA_CATEGORIAS = [
+  'Bebidas y Refrescos',
+  'Cervezas',
+  'Bar y Cocteles',
+  'Postres',
+];
+
 app.use(cors());
 app.use(express.json());
 
@@ -271,7 +279,7 @@ app.get('/api/pedidos/cocina', async (req, res) => {
       }),
       // Filtrar bebidas: cocina solo ve lo que prepara
       items: p.items
-        .filter(i => !i.historial && i.producto?.categoria !== 'Bebidas')
+        .filter(i => !i.historial && !BARRA_CATEGORIAS.includes(i.producto?.categoria))
         .map(i => ({
           nombre: i.nombre,
           cant: i.cantidad,
@@ -310,9 +318,9 @@ app.get('/api/pedidos/barra', async (req, res) => {
       hora: p.createdAt.toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),
-      // Barra solo ve bebidas que no se han despachado (historial === false)
+      // Barra solo ve items de categorías de barra que no se han despachado (historial === false)
       items: p.items
-        .filter(i => !i.historial && ['bebidas', 'tragos', 'refrescos', 'licores', 'cervezas', 'cocteles', 'jugos'].includes(i.producto?.categoria?.toLowerCase()))
+        .filter(i => !i.historial && BARRA_CATEGORIAS.includes(i.producto?.categoria))
         .map(i => ({
           nombre: i.nombre,
           cant: i.cantidad,
@@ -342,9 +350,9 @@ app.patch('/api/pedidos/:id/preparar', async (req, res) => {
 
     // Filtrar los items que corresponden a la sección
     const itemsAActualizar = pedido.items.filter(i => {
-      const esBebida = ['bebidas', 'tragos', 'refrescos', 'licores', 'cervezas', 'cocteles', 'jugos'].includes(i.producto?.categoria?.toLowerCase());
-      if (seccion === 'barra') return esBebida;
-      if (seccion === 'cocina') return !esBebida;
+      const esItemBarra = BARRA_CATEGORIAS.includes(i.producto?.categoria);
+      if (seccion === 'barra') return esItemBarra;
+      if (seccion === 'cocina') return !esItemBarra;
       return false;
     });
 
@@ -750,9 +758,49 @@ app.get('/api/productos', async (req, res) => {
   try {
     const productos = await prisma.producto.findMany({
       where: { activo: true },
-      orderBy: { categoria: 'asc' },
+      orderBy: [{ categoria: 'asc' }, { nombre: 'asc' }],
     });
-    res.json(productos);
+
+    // Obtener todas las ofertas activas (y que estén en su rango de fecha si se especificó)
+    const ahora = new Date();
+    const ofertasActivas = await prisma.oferta.findMany({
+      where: {
+        activa: true,
+        OR: [
+          { fechaInicio: null },
+          { fechaInicio: { lte: ahora } }
+        ],
+        AND: [
+          { OR: [
+            { fechaFin: null },
+            { fechaFin: { gte: ahora } }
+          ]}
+        ]
+      }
+    });
+
+    // Enriquecer cada producto con precioOferta si hay oferta activa para su categoría
+    const productosEnriquecidos = productos.map(p => {
+      const oferta = ofertasActivas.find(o => o.categorias.includes(p.categoria));
+      if (oferta) {
+        let precioOferta;
+        if (oferta.tipoDescuento === 'porcentaje') {
+          precioOferta = parseFloat((p.precio * (1 - oferta.valorDescuento / 100)).toFixed(2));
+        } else {
+          precioOferta = parseFloat((p.precio - oferta.valorDescuento).toFixed(2));
+        }
+        return { 
+          ...p, 
+          precioOferta: Math.max(0, precioOferta),
+          ofertaNombre: oferta.nombre,
+          ofertaTipo: oferta.tipoDescuento,
+          ofertaValor: oferta.valorDescuento,
+        };
+      }
+      return { ...p, precioOferta: null, ofertaNombre: null };
+    });
+
+    res.json(productosEnriquecidos);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -802,6 +850,91 @@ app.delete('/api/productos/:id', async (req, res) => {
       where: { id: parseInt(req.params.id) },
       data: { activo: false },
     });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// OFERTAS POR TEMPORADA
+// ============================================================
+
+// GET /api/ofertas → Listar todas las ofertas
+app.get('/api/ofertas', async (req, res) => {
+  try {
+    const ofertas = await prisma.oferta.findMany({ orderBy: { creadoEn: 'desc' } });
+    res.json(ofertas);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/ofertas → Crear nueva oferta (solo Admin)
+app.post('/api/ofertas', async (req, res) => {
+  try {
+    const { nombre, descripcion, tipoDescuento, valorDescuento, categorias, activa, fechaInicio, fechaFin, creadoPor } = req.body;
+    if (!nombre || !tipoDescuento || valorDescuento == null || !categorias || !creadoPor) {
+      return res.status(400).json({ error: 'Faltan campos obligatorios: nombre, tipoDescuento, valorDescuento, categorias, creadoPor' });
+    }
+    const oferta = await prisma.oferta.create({
+      data: {
+        nombre: String(nombre),
+        descripcion: descripcion ? String(descripcion) : null,
+        tipoDescuento: String(tipoDescuento),
+        valorDescuento: parseFloat(valorDescuento),
+        categorias: Array.isArray(categorias) ? categorias.map(String) : [],
+        activa: Boolean(activa),
+        fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
+        fechaFin: fechaFin ? new Date(fechaFin) : null,
+        creadoPor: String(creadoPor),
+      }
+    });
+    res.json(oferta);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/ofertas/:id → Editar oferta
+app.put('/api/ofertas/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = {};
+    if (req.body.nombre !== undefined) data.nombre = String(req.body.nombre);
+    if (req.body.descripcion !== undefined) data.descripcion = req.body.descripcion ? String(req.body.descripcion) : null;
+    if (req.body.tipoDescuento !== undefined) data.tipoDescuento = String(req.body.tipoDescuento);
+    if (req.body.valorDescuento !== undefined) data.valorDescuento = parseFloat(req.body.valorDescuento);
+    if (req.body.categorias !== undefined) data.categorias = Array.isArray(req.body.categorias) ? req.body.categorias.map(String) : [];
+    if (req.body.fechaInicio !== undefined) data.fechaInicio = req.body.fechaInicio ? new Date(req.body.fechaInicio) : null;
+    if (req.body.fechaFin !== undefined) data.fechaFin = req.body.fechaFin ? new Date(req.body.fechaFin) : null;
+    const oferta = await prisma.oferta.update({ where: { id }, data });
+    res.json(oferta);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/ofertas/:id/activar → Activar o desactivar oferta
+app.patch('/api/ofertas/:id/activar', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { activa } = req.body;
+    const oferta = await prisma.oferta.update({
+      where: { id },
+      data: { activa: Boolean(activa) }
+    });
+    res.json({ ok: true, activa: oferta.activa, nombre: oferta.nombre });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/ofertas/:id → Eliminar oferta
+app.delete('/api/ofertas/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.oferta.delete({ where: { id } });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -933,7 +1066,7 @@ app.delete('/api/usuarios/:id', async (req, res) => {
 
 // POST /api/ventas → Cobrar mesa (acepta pedidoIds array o pedidoId simple)
 app.post('/api/ventas', async (req, res) => {
-  const { pedidoId, pedidoIds, tipoComprobante, numDocumento, nombreCliente, total, metodoPago, clienteDireccion } = req.body;
+  const { pedidoId, pedidoIds, tipoComprobante, numDocumento, nombreCliente, total, metodoPago, clienteDireccion, ofertaDescripcion, descuentoAplicado } = req.body;
   const idsAPagar = pedidoIds || [pedidoId];
   const idPrincipal = idsAPagar[idsAPagar.length - 1]; // El más reciente como venta principal
 
@@ -964,7 +1097,9 @@ app.post('/api/ventas', async (req, res) => {
         igv, 
         subtotal, 
         metodoPago,
-        estadoNubefact: initEstadoNubefact
+        estadoNubefact: initEstadoNubefact,
+        ofertaDescripcion: ofertaDescripcion ? String(ofertaDescripcion) : null,
+        descuentoAplicado: descuentoAplicado ? parseFloat(descuentoAplicado) : 0,
       },
     });
 
