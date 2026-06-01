@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock } from 'lucide-react';
+import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent } from 'lucide-react';
 import { api } from '../api';
 
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000;
@@ -133,10 +133,22 @@ export default function SalonPage({ currentUser }) {
       return;
     }
     
+    const precioFinal = prod.precioOferta !== null && prod.precioOferta !== undefined ? prod.precioOferta : prod.precio;
+    
     if (index >= 0) {
       nuevosItems[index].cant++;
     } else {
-      nuevosItems.push({ id: String(prod.id), nombre: prod.nombre, precio: prod.precio, cant: 1, yaEnviado: false, historial: false, notas: '' });
+      nuevosItems.push({ 
+        id: String(prod.id), 
+        nombre: prod.nombre, 
+        precio: precioFinal, 
+        cant: 1, 
+        yaEnviado: false, 
+        historial: false, 
+        notas: '',
+        ofertaNombre: prod.ofertaNombre || null,
+        precioOriginal: prod.precio
+      });
     }
     setTicketActual(nuevosItems);
   };
@@ -446,6 +458,12 @@ export default function SalonPage({ currentUser }) {
                             : 'cursor-pointer hover:border-amber-300 hover:-translate-y-0.5 active:bg-slate-50'
                         }`}
                       >
+                        {prod.precioOferta !== null && prod.precioOferta !== undefined && !agotado && (
+                          <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-bl-lg shadow-sm flex items-center gap-1 animate-pulse z-15">
+                            <Tag className="w-2.5 h-2.5" />
+                            {prod.ofertaValor}% OFF
+                          </div>
+                        )}
                         <div className="z-10 flex flex-col justify-between h-full w-full">
                           <div>
                             <p className="font-bold text-slate-800 text-[10px] md:text-xs uppercase leading-tight pr-4">{prod.nombre}</p>
@@ -457,7 +475,14 @@ export default function SalonPage({ currentUser }) {
                               </span>
                             )}
                           </div>
-                          <p className="font-black font-mono text-emerald-600 text-sm md:text-base">S/ {prod.precio.toFixed(2)}</p>
+                          {prod.precioOferta !== null && prod.precioOferta !== undefined ? (
+                            <div className="flex flex-col items-start leading-none -mt-1">
+                              <span className="font-black font-mono text-emerald-600 text-sm md:text-base">S/ {prod.precioOferta.toFixed(2)}</span>
+                              <span className="line-through text-slate-400 font-semibold text-[10px] md:text-xs mt-0.5">S/ {prod.precio.toFixed(2)}</span>
+                            </div>
+                          ) : (
+                            <p className="font-black font-mono text-emerald-600 text-sm md:text-base">S/ {prod.precio.toFixed(2)}</p>
+                          )}
                         </div>
                         <PlusCircle className="absolute bottom-[-10px] right-[-10px] w-12 h-12 text-slate-100 opacity-50 pointer-events-none" />
                       </div>
@@ -485,7 +510,18 @@ export default function SalonPage({ currentUser }) {
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1 pr-2">
                                     <p className={`font-bold text-[10px] md:text-xs leading-tight ${item.historial ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{item.nombre}</p>
-                                    <p className="font-mono text-slate-400 font-bold text-xs md:text-sm mt-1">S/ {sub.toFixed(2)}</p>
+                                    {(() => {
+                                      const prodOriginal = productos.find(p => String(p.id) === String(item.id));
+                                      const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
+                                      return (
+                                        <div className="flex items-baseline gap-1.5 mt-1">
+                                          {tieneDescuento && (
+                                            <span className="line-through text-slate-400 font-semibold text-[10px]">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                                          )}
+                                          <span className="font-mono text-slate-400 font-bold text-xs md:text-sm">S/ {sub.toFixed(2)}</span>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <div className="font-black text-slate-400 text-sm px-3">
@@ -517,7 +553,18 @@ export default function SalonPage({ currentUser }) {
                               <div className="flex items-center justify-between">
                                 <div className="flex-1 pr-2">
                                   <p className="font-bold text-slate-800 text-[10px] md:text-xs leading-tight">{item.nombre}</p>
-                                  <p className="font-mono text-emerald-600 font-bold text-xs md:text-sm mt-1">S/ {sub.toFixed(2)}</p>
+                                  {(() => {
+                                    const prodOriginal = productos.find(p => String(p.id) === String(item.id));
+                                    const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
+                                    return (
+                                      <div className="flex items-baseline gap-1.5 mt-1">
+                                        {tieneDescuento && (
+                                          <span className="line-through text-slate-400 font-semibold text-[10px]">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                                        )}
+                                        <span className="font-mono text-emerald-600 font-bold text-xs md:text-sm">S/ {sub.toFixed(2)}</span>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="flex items-center gap-1 md:gap-2 bg-slate-100 rounded-lg p-1 shrink-0 border border-slate-200">
                                   <button onClick={() => alterarCantidad(idx, '-')} className="w-8 h-8 md:w-7 md:h-7 bg-white rounded-md shadow-sm text-slate-600 font-black text-lg leading-none">-</button>

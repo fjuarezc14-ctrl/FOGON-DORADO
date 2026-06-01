@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift } from 'lucide-react';
+import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent } from 'lucide-react';
 
 import { api } from '../api';
 
@@ -477,12 +477,21 @@ export default function CajaPage() {
       return;
     }
 
+    const precioFinal = prod.precioOferta !== null && prod.precioOferta !== undefined ? prod.precioOferta : prod.precio;
+
     if (idx >= 0) {
       const nuevo = [...itemsDelivery];
       nuevo[idx].cant++;
       setItemsDelivery(nuevo);
     } else {
-      setItemsDelivery([...itemsDelivery, { id: String(prod.id), nombre: prod.nombre, precio: prod.precio, cant: 1 }]);
+      setItemsDelivery([...itemsDelivery, { 
+        id: String(prod.id), 
+        nombre: prod.nombre, 
+        precio: precioFinal, 
+        cant: 1,
+        ofertaNombre: prod.ofertaNombre,
+        precioOriginal: prod.precio
+      }]);
     }
   };
 
@@ -989,15 +998,24 @@ export default function CajaPage() {
                     <span className="text-slate-500">Mesa {mesaSeleccionada.num}</span>
                   </h3>
                   <ul className="space-y-1.5">
-                    {mesaSeleccionada.pedidoData?.items?.map((item, idx) => (
-                      <li key={idx} className="flex justify-between items-start text-xs border-b border-dashed border-slate-100 pb-1.5 last:border-0 last:pb-0">
-                        <span className="text-slate-800 font-medium">
-                          <span className="font-black text-slate-900 mr-1.5">{item.cant}x</span>
-                          <span className="uppercase">{item.nombre}</span>
-                        </span>
-                        <span className="font-mono text-slate-600 font-bold shrink-0">S/ {(item.cant * item.precio).toFixed(2)}</span>
-                      </li>
-                    ))}
+                    {mesaSeleccionada.pedidoData?.items?.map((item, idx) => {
+                      const prodOriginal = productosMenu.find(p => String(p.id) === String(item.id));
+                      const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
+                      return (
+                        <li key={idx} className="flex justify-between items-start text-xs border-b border-dashed border-slate-100 pb-1.5 last:border-0 last:pb-0">
+                          <span className="text-slate-800 font-medium">
+                            <span className="font-black text-slate-900 mr-1.5">{item.cant}x</span>
+                            <span className="uppercase">{item.nombre}</span>
+                          </span>
+                          <span className="font-mono text-slate-600 font-bold shrink-0 flex items-center gap-1.5">
+                            {tieneDescuento && (
+                              <span className="line-through text-slate-400 font-semibold text-[10px]">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                            )}
+                            <span>S/ {(item.cant * item.precio).toFixed(2)}</span>
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
                 <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl text-white">
@@ -1113,14 +1131,20 @@ export default function CajaPage() {
                       <div 
                         key={prod.id} 
                         onClick={() => !agotado && agregarItemDelivery(prod)} 
-                        className={`bg-white border rounded-xl p-3 flex flex-col justify-between shadow-sm h-24 transition-all ${
+                        className={`bg-white border rounded-xl p-3 flex flex-col justify-between shadow-sm h-24 transition-all relative overflow-hidden ${
                           agotado 
                             ? 'opacity-50 grayscale border-slate-200 cursor-not-allowed bg-slate-50' 
                             : 'cursor-pointer hover:border-blue-400 hover:-translate-y-0.5 active:bg-slate-50'
                         }`}
                       >
+                        {prod.precioOferta !== null && prod.precioOferta !== undefined && !agotado && (
+                          <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg shadow-sm flex items-center gap-0.5 animate-pulse z-15">
+                            <Tag className="w-2 h-2" />
+                            {prod.ofertaValor}% OFF
+                          </div>
+                        )}
                         <div>
-                          <p className="font-bold text-slate-800 text-[10px] uppercase leading-tight pr-2">{prod.nombre}</p>
+                          <p className="font-bold text-slate-800 text-[10px] uppercase leading-tight pr-4">{prod.nombre}</p>
                           {prod.tipoStock === 'limitado' && (
                             <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1.5 ${
                               agotado ? 'bg-red-100 text-red-650' : 'bg-blue-100 text-blue-700'
@@ -1129,7 +1153,14 @@ export default function CajaPage() {
                             </span>
                           )}
                         </div>
-                        <p className="font-black font-mono text-blue-600 text-sm">S/ {prod.precio.toFixed(2)}</p>
+                        {prod.precioOferta !== null && prod.precioOferta !== undefined ? (
+                          <div className="flex flex-col items-start leading-none -mt-1">
+                            <span className="font-black font-mono text-blue-600 text-sm">S/ {prod.precioOferta.toFixed(2)}</span>
+                            <span className="line-through text-slate-400 font-semibold text-[10px] mt-0.5">S/ {prod.precio.toFixed(2)}</span>
+                          </div>
+                        ) : (
+                          <p className="font-black font-mono text-blue-600 text-sm">S/ {prod.precio.toFixed(2)}</p>
+                        )}
                       </div>
                     );
                   })}
@@ -1144,19 +1175,28 @@ export default function CajaPage() {
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                   {itemsDelivery.length === 0
                     ? <p className="text-center text-slate-400 text-xs font-medium py-8">Toca un producto para agregarlo</p>
-                    : itemsDelivery.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between py-2 border-b border-dashed border-slate-100 last:border-0">
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs uppercase">{item.nombre}</p>
-                          <p className="font-mono text-blue-600 font-bold text-sm">S/ {(item.cant * item.precio).toFixed(2)}</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200">
-                          <button onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
-                          <span className="font-bold text-slate-900 w-5 text-center text-sm">{item.cant}</span>
-                          <button onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
-                        </div>
-                      </div>
-                    ))
+                    : itemsDelivery.map((item, idx) => {
+                        const prodOriginal = productosMenu.find(p => String(p.id) === String(item.id));
+                        const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
+                        return (
+                          <div key={idx} className="flex items-center justify-between py-2 border-b border-dashed border-slate-100 last:border-0">
+                            <div>
+                              <p className="font-bold text-slate-800 text-xs uppercase">{item.nombre}</p>
+                              <div className="flex items-baseline gap-1.5 mt-0.5">
+                                {tieneDescuento && (
+                                  <span className="line-through text-slate-400 font-semibold text-xs">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                                )}
+                                <span className="font-mono text-blue-600 font-bold text-sm">S/ {(item.cant * item.precio).toFixed(2)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200">
+                              <button onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
+                              <span className="font-bold text-slate-900 w-5 text-center text-sm">{item.cant}</span>
+                              <button onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
+                            </div>
+                          </div>
+                        );
+                      })
                   }
                 </div>
                 <div className="p-4 bg-white border-t border-slate-200 shrink-0">
