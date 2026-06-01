@@ -187,6 +187,59 @@ app.get('/api/mesas', async (req, res) => {
   }
 });
 
+// POST /api/mesas/:num/unir → Unir una mesa a otra principal
+app.post('/api/mesas/:num/unir', async (req, res) => {
+  try {
+    const numPrincipal = parseInt(req.params.num);
+    const { numeroMesaAUnir } = req.body;
+
+    if (!numeroMesaAUnir) {
+      return res.status(400).json({ error: 'Debe especificar el número de mesa a unir.' });
+    }
+
+    const numUnir = parseInt(numeroMesaAUnir);
+
+    // Buscar ambas mesas
+    const mesaPrincipal = await prisma.mesa.findUnique({ where: { numero: numPrincipal } });
+    const mesaAUnir = await prisma.mesa.findUnique({ where: { numero: numUnir } });
+
+    if (!mesaPrincipal || !mesaAUnir) {
+      return res.status(404).json({ error: 'Mesa principal o mesa a unir no encontrada.' });
+    }
+
+    if (mesaAUnir.estado !== 'Libre') {
+      return res.status(400).json({ error: `La mesa ${numUnir} no está libre (estado: ${mesaAUnir.estado}).` });
+    }
+
+    // Unir mesa (cambiar estado a "Unida a Mesa X")
+    await prisma.mesa.update({
+      where: { id: mesaAUnir.id },
+      data: { estado: `Unida a Mesa ${numPrincipal}` },
+    });
+
+    res.json({ ok: true, mensaje: `Mesa ${numUnir} unida con éxito a Mesa ${numPrincipal}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/mesas/:num/separar → Separar todas las mesas unidas a esta
+app.post('/api/mesas/:num/separar', async (req, res) => {
+  try {
+    const numPrincipal = parseInt(req.params.num);
+
+    // Liberar todas las mesas unidas a esta mesa principal
+    await prisma.mesa.updateMany({
+      where: { estado: `Unida a Mesa ${numPrincipal}` },
+      data: { estado: 'Libre' },
+    });
+
+    res.json({ ok: true, mensaje: `Mesas unidas a la Mesa ${numPrincipal} han sido separadas.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/mesas/:num/pedido → Enviar a cocina (con descuento de stock)
 app.post('/api/mesas/:num/pedido', async (req, res) => {
   const { num } = req.params;
@@ -630,8 +683,13 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
       });
 
       if (activos.length === 0) {
-        await prisma.mesa.update({
+        const mObj = await prisma.mesa.update({
           where: { id: pedido.mesaId },
+          data: { estado: 'Libre' },
+        });
+        // Liberar automáticamente las mesas que estaban unidas a esta
+        await prisma.mesa.updateMany({
+          where: { estado: `Unida a Mesa ${mObj.numero}` },
           data: { estado: 'Libre' },
         });
         mesaLiberada = true;
@@ -1112,8 +1170,13 @@ app.post('/api/ventas', async (req, res) => {
     // Liberar la mesa
     const pedidoPrincipal = await prisma.pedido.findUnique({ where: { id: idsAPagar[0] } });
     if (pedidoPrincipal?.mesaId) {
-      await prisma.mesa.update({
+      const mObj = await prisma.mesa.update({
         where: { id: pedidoPrincipal.mesaId },
+        data: { estado: 'Libre' },
+      });
+      // Liberar automáticamente las mesas que estaban unidas a esta
+      await prisma.mesa.updateMany({
+        where: { estado: `Unida a Mesa ${mObj.numero}` },
         data: { estado: 'Libre' },
       });
     }

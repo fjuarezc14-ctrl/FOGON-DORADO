@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent } from 'lucide-react';
+import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2 } from 'lucide-react';
 import { api } from '../api';
 
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000;
@@ -58,6 +58,7 @@ export default function SalonPage({ currentUser }) {
   // Estados de Notificación en Tiempo Real
   const [prevMesas, setPrevMesas] = useState([]);
   const [toasts, setToasts] = useState([]);
+  const [unionDropdownOpen, setUnionDropdownOpen] = useState(false);
 
   // Cargar mesas desde el API real
   const fetchMesas = useCallback(async () => {
@@ -105,7 +106,51 @@ export default function SalonPage({ currentUser }) {
     return () => clearInterval(interval);
   }, [fetchMesas, fetchProductos, fetchUsuarios, modalOpen]);
 
+  const handleUnirMesa = async (numToJoin) => {
+    try {
+      const res = await api.unirMesa(mesaActual.num, numToJoin);
+      if (res.ok) {
+        alert(`✅ Mesa ${numToJoin} unida correctamente a la Mesa ${mesaActual.num}.`);
+        setUnionDropdownOpen(false);
+        fetchMesas();
+      } else {
+        alert(`❌ Error: ${res.error}`);
+      }
+    } catch (err) {
+      alert(`❌ Error: ${err.message}`);
+    }
+  };
+
+  const handleSepararMesas = async () => {
+    if (confirm(`⚠️ ¿Estás seguro de separar todas las mesas unidas a la Mesa ${mesaActual.num}?`)) {
+      try {
+        const res = await api.separarMesas(mesaActual.num);
+        if (res.ok) {
+          alert(`✅ Mesas separadas con éxito.`);
+          setUnionDropdownOpen(false);
+          fetchMesas();
+        } else {
+          alert(`❌ Error: ${res.error}`);
+        }
+      } catch (err) {
+        alert(`❌ Error: ${err.message}`);
+      }
+    }
+  };
+
   const abrirModal = (m) => {
+    // Si la mesa está unida a otra, informar al usuario y bloquear ingreso
+    if (m.estado && m.estado.startsWith("Unida a ")) {
+      const mesaPrincipalNum = m.estado.replace("Unida a Mesa ", "");
+      alert(`⚠️ Esta mesa está UNIDA a la Mesa ${mesaPrincipalNum}. Todo el consumo y pedidos se registran directamente en la Mesa ${mesaPrincipalNum}.`);
+      return;
+    }
+
+    // Si la mesa está ocupada y el mesero asignado no es el mesero global activo, y el usuario es un Mozo, bloquear acceso
+    if (m.pedidoData && m.pedidoData.mesero && m.pedidoData.mesero !== meseroGlobal && currentUser?.rol === 'Mozo') {
+      alert(`⚠️ Esta mesa está ocupada y está siendo atendida por el Mozo "${m.pedidoData.mesero}". No puedes ingresar ni realizar modificaciones.`);
+      return;
+    }
     setMesaActual(m);
     if (m.pedidoData?.items?.length > 0) {
       let items = JSON.parse(JSON.stringify(m.pedidoData.items));
@@ -373,8 +418,13 @@ export default function SalonPage({ currentUser }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-5 pb-20 md:pb-0">
         {mesas.map((m, idx) => {
           let colorBg = 'bg-white hover:bg-emerald-50', colorText = 'text-slate-300', colorBorder = 'border-slate-200', Icon = Receipt;
-          if (m.estado === 'Cocina') { colorBg = 'bg-amber-50'; colorText = 'text-amber-500'; colorBorder = 'border-amber-300 shadow-md'; Icon = ChefHat; }
-          else if (m.estado === 'Servido') { colorBg = 'bg-blue-50'; colorText = 'text-blue-500'; colorBorder = 'border-blue-300 shadow-md'; Icon = CheckCircle; }
+          if (m.estado === 'Cocina') { 
+            colorBg = 'bg-amber-50'; colorText = 'text-amber-500'; colorBorder = 'border-amber-300 shadow-md'; Icon = ChefHat; 
+          } else if (m.estado === 'Servido') { 
+            colorBg = 'bg-blue-50'; colorText = 'text-blue-500'; colorBorder = 'border-blue-300 shadow-md'; Icon = CheckCircle; 
+          } else if (m.estado && m.estado.startsWith("Unida a ")) {
+            colorBg = 'bg-slate-50/70 border-dashed opacity-80'; colorText = 'text-slate-400'; colorBorder = 'border-slate-300 border-dashed'; Icon = Link2;
+          }
 
           return (
             <div key={idx} onClick={() => abrirModal(m)} className={`relative rounded-2xl md:rounded-3xl border-2 ${colorBorder} ${colorBg} p-3 md:p-5 flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95 hover:-translate-y-1 aspect-square md:aspect-auto md:h-40 group`}>
@@ -382,10 +432,20 @@ export default function SalonPage({ currentUser }) {
                 <Icon className="w-4 h-4 md:w-6 md:h-6" />
               </div>
               <h3 className="font-black text-slate-900 text-sm md:text-lg uppercase tracking-tight">Mesa {m.num}</h3>
-              {m.pedidoData
-                ? <p className="font-mono font-black text-sm md:text-lg mt-1 text-slate-800">S/ {m.pedidoData.total.toFixed(2)}</p>
-                : <p className="text-[10px] md:text-xs mt-1 text-slate-400 font-medium">Disponible</p>
-              }
+              {m.estado && m.estado.startsWith("Unida a ") ? (
+                <span className="text-[8px] md:text-[9px] font-black uppercase text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full mt-1.5">
+                  🔗 {m.estado}
+                </span>
+              ) : m.pedidoData ? (
+                <div className="flex flex-col items-center">
+                  <p className="font-mono font-black text-sm md:text-lg mt-1 text-slate-800">S/ {m.pedidoData.total.toFixed(2)}</p>
+                  <span className="text-[8px] md:text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full mt-1.5 uppercase truncate max-w-[110px] text-center">
+                    👤 {m.pedidoData.mesero}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-[10px] md:text-xs mt-1 text-slate-400 font-medium">Disponible</p>
+              )}
             </div>
           );
         })}
@@ -403,6 +463,15 @@ export default function SalonPage({ currentUser }) {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {mesaActual.estado !== 'Libre' && (
+                  <button 
+                    onClick={() => setUnionDropdownOpen(true)}
+                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-955 font-black text-[10px] md:text-xs px-3 py-2 rounded-xl shadow-md transition-all uppercase tracking-wider"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    Unir Mesa
+                  </button>
+                )}
                 <div className="hidden md:flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
                   <User className="w-3 h-3 text-slate-400" />
                   <select 
@@ -773,7 +842,58 @@ export default function SalonPage({ currentUser }) {
           </div>
         </div>
       )}
-
+      {/* UNION DE MESAS COMPONENTE DIALOG */}
+      {unionDropdownOpen && mesaActual && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[150] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 flex flex-col text-slate-900 animate-fade-in">
+            <h3 className="font-black uppercase text-sm border-b border-slate-100 pb-2 mb-3 flex items-center gap-2 text-slate-800"><Link2 className="w-5 h-5 text-amber-500" /> Unir Mesas con Mesa {mesaActual.num}</h3>
+            
+            {/* List of mesas unidas currently */}
+            {mesas.filter(m => m.estado === `Unida a Mesa ${mesaActual.num}`).length > 0 && (
+              <div className="mb-4 bg-amber-50 border border-amber-200/50 p-3 rounded-xl">
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-1">Mesas Unidas Actualmente:</p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {mesas.filter(m => m.estado === `Unida a Mesa ${mesaActual.num}`).map(m => (
+                    <span key={m.num} className="bg-amber-100 text-amber-800 text-xs font-black px-2.5 py-1 rounded-lg">Mesa {m.num}</span>
+                  ))}
+                </div>
+                <button 
+                  onClick={handleSepararMesas}
+                  className="w-full py-2 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-lg text-xs uppercase transition-colors"
+                >
+                  🔓 Separar Todas las Mesas
+                </button>
+              </div>
+            )}
+            
+            <p className="text-xs text-slate-500 font-bold mb-2">Selecciona una mesa libre para unirla:</p>
+            <div className="grid grid-cols-4 gap-2 max-h-[160px] overflow-y-auto custom-scrollbar p-1 mb-4">
+              {mesas.filter(m => m.estado === 'Libre' && m.num !== mesaActual.num).length === 0 ? (
+                <p className="col-span-4 text-center text-xs text-slate-400 py-3">No hay mesas libres disponibles.</p>
+              ) : (
+                mesas
+                  .filter(m => m.estado === 'Libre' && m.num !== mesaActual.num)
+                  .map(m => (
+                    <button 
+                      key={m.num}
+                      onClick={() => handleUnirMesa(m.num)}
+                      className="bg-slate-55 hover:bg-amber-100 border border-slate-200 text-slate-800 text-xs font-black py-2 rounded-xl transition-colors shadow-sm"
+                    >
+                      Mesa {m.num}
+                    </button>
+                  ))
+              )}
+            </div>
+            
+            <button 
+              onClick={() => setUnionDropdownOpen(false)}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs uppercase transition-colors"
+            >
+              Cerrar Ventana
+            </button>
+          </div>
+        </div>
+      )}
       {/* FLOATING TOASTS NOTIFICATIONS SYSTEM */}
       <div className="fixed bottom-6 right-6 z-[250] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
