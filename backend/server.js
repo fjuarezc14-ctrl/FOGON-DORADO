@@ -1232,7 +1232,7 @@ app.get('/api/ventas', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
     } else {
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
@@ -1319,7 +1319,7 @@ app.get('/api/compras', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
     } else {
       const ahora = new Date();
       const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
@@ -1367,7 +1367,7 @@ app.get('/api/reportes/cancelaciones', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
     } else {
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
@@ -1408,7 +1408,7 @@ app.get('/api/reportes/mozos', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
     } else {
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
@@ -1451,7 +1451,7 @@ app.get('/api/reportes/contable', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000Z'), lte: new Date(hasta + 'T23:59:59.999Z') };
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
     } else {
       const ahora = new Date();
       const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
