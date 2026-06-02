@@ -463,15 +463,13 @@ export default function SalonPage({ currentUser }) {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {mesaActual.estado !== 'Libre' && (
-                  <button 
-                    onClick={() => setUnionDropdownOpen(true)}
-                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-955 font-black text-[10px] md:text-xs px-3 py-2 rounded-xl shadow-md transition-all uppercase tracking-wider"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    Unir Mesa
-                  </button>
-                )}
+                <button 
+                  onClick={() => setUnionDropdownOpen(true)}
+                  className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-955 font-black text-[10px] md:text-xs px-3 py-2 rounded-xl shadow-md transition-all uppercase tracking-wider"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  Unir Mesa
+                </button>
                 <div className="hidden md:flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
                   <User className="w-3 h-3 text-slate-400" />
                   <select 
