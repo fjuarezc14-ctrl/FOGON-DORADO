@@ -152,6 +152,7 @@ app.get('/api/mesas', async (req, res) => {
           precio: i.precio,
           cant: i.cantidad,
           historial: i.historial,
+          entregado: i.entregado,
           categoria: i.producto?.categoria || '',
           pedidoId: p.id,
           notas: i.notas || null,
@@ -476,6 +477,51 @@ app.patch('/api/pedidos/:id/servir', async (req, res) => {
           data: { estado: 'Servido' },
         });
       }
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/pedidos/items/:itemId/entregar → Mozo marca un plato de cocina como entregado en la mesa
+app.patch('/api/pedidos/items/:itemId/entregar', async (req, res) => {
+  const itemId = parseInt(req.params.itemId);
+  try {
+    await prisma.itemPedido.update({
+      where: { id: itemId },
+      data: { entregado: true },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/pedidos/:id/entregar-todo → Mozo marca todos los platos listos de cocina del pedido como entregados
+app.patch('/api/pedidos/:id/entregar-todo', async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      include: { items: { include: { producto: true } } },
+    });
+
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+    // Filtrar items que son de Cocina (no barra) y están listos (historial: true) pero no entregados
+    const itemsAActualizar = pedido.items.filter(i => 
+      i.historial && 
+      !i.entregado && 
+      !BARRA_CATEGORIAS.includes(i.producto?.categoria)
+    );
+
+    if (itemsAActualizar.length > 0) {
+      await prisma.itemPedido.updateMany({
+        where: { id: { in: itemsAActualizar.map(item => item.id) } },
+        data: { entregado: true },
+      });
     }
 
     res.json({ ok: true });

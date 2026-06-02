@@ -27,6 +27,12 @@ export const api = {
   cancelarItemPedido: (id, body) => fetch(`${API_BASE}/api/pedidos/${id}/cancelar-item`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
+  entregarItem: (itemId) => fetch(`${API_BASE}/api/pedidos/items/${itemId}/entregar`, {
+    method: 'PATCH',
+  }).then(r => r.json()),
+  entregarTodoPedido: (pedidoId) => fetch(`${API_BASE}/api/pedidos/${pedidoId}/entregar-todo`, {
+    method: 'PATCH',
+  }).then(r => r.json()),
 
   // Delivery / PedidosYa
   crearPedidoLlevar: (body) => fetch(`${API_BASE}/api/pedidos/llevar`, {

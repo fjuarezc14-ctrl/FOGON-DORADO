@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2 } from 'lucide-react';
+import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2, Bell } from 'lucide-react';
 import { api } from '../api';
 
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000;
+
+const BARRA_CATEGORIAS = [
+  'Bebidas y Refrescos',
+  'Cervezas',
+  'Bar y Cocteles',
+  'Postres',
+];
 
 function formatCuentaRegresiva(ms) {
   const seg = Math.max(0, Math.floor(ms / 1000));
@@ -59,6 +66,8 @@ export default function SalonPage({ currentUser }) {
   const prevMesasRef = useRef([]);
   const [toasts, setToasts] = useState([]);
   const [unionDropdownOpen, setUnionDropdownOpen] = useState(false);
+  const [esReclamo, setEsReclamo] = useState(false);
+  const [bandejaOpen, setBandejaOpen] = useState(false);
 
   // Cargar mesas desde el API real
   const fetchMesas = useCallback(async () => {
@@ -279,7 +288,7 @@ export default function SalonPage({ currentUser }) {
     setCancelandoPedido(true);
     try {
       const pedidoId = mesaActual.pedidoData.pedidoId;
-      const isForce = tiempoRestante <= 0 || mesaActual.estado === 'Servido';
+      const isForce = esReclamo || tiempoRestante <= 0 || mesaActual.estado === 'Servido';
       const result = await api.cancelarPedido(pedidoId, {
         canceladoPor: supervisorAprobador ? `${supervisorAprobador.nombre} (${supervisorAprobador.rol}) | Mozo: ${meseroGlobal}` : meseroGlobal,
         motivo: cancelMotivo.trim(),
@@ -287,6 +296,7 @@ export default function SalonPage({ currentUser }) {
       });
       if (result.error) throw new Error(result.error);
       setCancelModal(false);
+      setEsReclamo(false);
       setModalOpen(false);
       const mesaNum = mesaActual.num;
       setMesaActual(null);
@@ -418,6 +428,29 @@ export default function SalonPage({ currentUser }) {
     </div>
   );
 
+  const activeMeseroName = currentUser?.nombre || meseroGlobal;
+  const isElevatedRole = ['Administrador', 'Cajero'].includes(currentUser?.rol);
+
+  const platosListosDespacho = mesas.flatMap(m => {
+    if (!m.pedidoData || !m.pedidoData.items) return [];
+    
+    const esMiMesa = m.pedidoData.mesero === activeMeseroName || isElevatedRole;
+    if (!esMiMesa) return [];
+
+    const itemsListos = m.pedidoData.items.filter(i => 
+      i.historial && 
+      !i.entregado && 
+      !BARRA_CATEGORIAS.includes(i.categoria)
+    );
+
+    return itemsListos.map(item => ({
+      ...item,
+      mesaNum: m.num,
+      mesero: m.pedidoData.mesero,
+      pedidoId: item.pedidoId,
+    }));
+  });
+
   return (
     <section className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar relative">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -438,8 +471,21 @@ export default function SalonPage({ currentUser }) {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-5 pb-20 md:pb-0">
         {mesas.map((m, idx) => {
+          const esMiMesa = m.pedidoData?.mesero === activeMeseroName || isElevatedRole;
+          const tieneListos = esMiMesa && (m.pedidoData?.items?.some(i => 
+            i.historial && 
+            !i.entregado && 
+            !BARRA_CATEGORIAS.includes(i.categoria)
+          ) || false);
+
           let colorBg = 'bg-white hover:bg-emerald-50', colorText = 'text-slate-300', colorBorder = 'border-slate-200', Icon = Receipt;
-          if (m.estado === 'Cocina') { 
+          
+          if (tieneListos) {
+            colorBg = 'bg-indigo-50/80 hover:bg-indigo-100/80 border-indigo-400 shadow-lg';
+            colorText = 'text-indigo-600';
+            colorBorder = 'border-indigo-400';
+            Icon = Bell;
+          } else if (m.estado === 'Cocina') { 
             colorBg = 'bg-amber-50'; colorText = 'text-amber-500'; colorBorder = 'border-amber-300 shadow-md'; Icon = ChefHat; 
           } else if (m.estado === 'Servido') { 
             colorBg = 'bg-blue-50'; colorText = 'text-blue-500'; colorBorder = 'border-blue-300 shadow-md'; Icon = CheckCircle; 
@@ -449,6 +495,11 @@ export default function SalonPage({ currentUser }) {
 
           return (
             <div key={idx} onClick={() => abrirModal(m)} className={`relative rounded-2xl md:rounded-3xl border-2 ${colorBorder} ${colorBg} p-3 md:p-5 flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95 hover:-translate-y-1 aspect-square md:aspect-auto md:h-40 group`}>
+              {tieneListos && (
+                <div className="absolute top-2 right-2 bg-indigo-600 text-white rounded-full p-1.5 animate-bounce shadow-md" title="¡Platos listos en cocina!">
+                  <Bell className="w-3.5 h-3.5 animate-ring" />
+                </div>
+              )}
               <div className={`w-8 h-8 md:w-12 md:h-12 rounded-full flex items-center justify-center ${colorText} mb-1 md:mb-2 bg-white shadow-sm border border-slate-100`}>
                 <Icon className="w-4 h-4 md:w-6 md:h-6" />
               </div>
@@ -684,7 +735,7 @@ export default function SalonPage({ currentUser }) {
                     <span className="font-black font-mono text-2xl md:text-3xl text-slate-900 leading-none">S/ {totalTicket.toFixed(2)}</span>
                   </div>
 
-                  {/* Botón cancelar pedido */}
+                   {/* Botón cancelar pedido */}
                   {mesaActual?.pedidoData && (
                     <div className="mb-3">
                       {mesaActual.estado === 'Cocina' && tiempoRestante > 0 ? (
@@ -697,6 +748,7 @@ export default function SalonPage({ currentUser }) {
                             }
                             requestSupervisorAuth("Cancelar comanda completa", (supervisor) => {
                               setSupervisorAprobador(supervisor);
+                              setEsReclamo(false);
                               setCancelModal(true);
                             });
                           }}
@@ -713,6 +765,7 @@ export default function SalonPage({ currentUser }) {
                           onClick={() => {
                             requestSupervisorAuth("Autorizar Anulación Especial / Reclamo", (supervisor) => {
                               setSupervisorAprobador(supervisor);
+                              setEsReclamo(true);
                               setCancelModal(true);
                             });
                           }}
@@ -943,6 +996,132 @@ export default function SalonPage({ currentUser }) {
           </div>
         ))}
       </div>
+
+      {/* Botón flotante para Bandeja de Cocina (Platos Listos) */}
+      <button
+        onClick={() => setBandejaOpen(true)}
+        className="fixed bottom-6 left-6 z-[220] flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs md:text-sm px-4 py-3 rounded-2xl shadow-2xl transition-all active:scale-95 hover:-translate-y-1 uppercase tracking-wider border border-indigo-500/30"
+      >
+        <Bell className={`w-5 h-5 ${platosListosDespacho.length > 0 ? 'animate-bounce' : ''}`} />
+        <span className="hidden sm:inline">Bandeja de Cocina</span>
+        {platosListosDespacho.length > 0 ? (
+          <span className="bg-red-500 text-white font-black text-xs px-2 py-0.5 rounded-full border border-white shadow ml-1 animate-pulse">
+            {platosListosDespacho.length}
+          </span>
+        ) : (
+          <span className="bg-indigo-800 text-indigo-200 text-[10px] px-1.5 py-0.5 rounded-full ml-1">0</span>
+        )}
+      </button>
+
+      {/* DRAWER / MODAL DE BANDEJA DE DESPACHO */}
+      {bandejaOpen && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[230] flex justify-end">
+          <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col overflow-hidden animate-slide-left">
+            <div className="p-4 bg-indigo-600 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center text-white">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-black text-sm md:text-base uppercase tracking-tight leading-none">Bandeja de Cocina</h2>
+                  <p className="text-[10px] text-indigo-200 mt-1 uppercase tracking-wider">Platos listos para servir</p>
+                </div>
+              </div>
+              <button onClick={() => setBandejaOpen(false)} className="bg-indigo-700 hover:bg-red-500 p-2 rounded-xl transition-colors text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50">
+              {platosListosDespacho.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 py-10">
+                  <CheckCircle className="w-16 h-16 text-slate-300 mb-3" />
+                  <p className="font-black uppercase tracking-wider text-sm">Bandeja Vacía</p>
+                  <p className="text-xs text-slate-400 text-center mt-1">No hay platos listos pendientes de entregar en cocina.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(
+                    platosListosDespacho.reduce((groups, item) => {
+                      const key = item.mesaNum;
+                      if (!groups[key]) groups[key] = [];
+                      groups[key].push(item);
+                      return groups;
+                    }, {})
+                  ).map(([mesaNum, items]) => {
+                    const primerItem = items[0];
+                    return (
+                      <div key={mesaNum} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+                          <div>
+                            <h3 className="font-black text-slate-900 text-sm md:text-base uppercase tracking-tight">Mesa {mesaNum}</h3>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Mozo: {primerItem.mesero}</p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await api.entregarTodoPedido(primerItem.pedidoId);
+                                if (res.error) throw new Error(res.error);
+                                await fetchMesas();
+                              } catch (err) {
+                                alert("Error al entregar: " + err.message);
+                              }
+                            }}
+                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-[10px] px-3 py-1.5 rounded-lg border border-indigo-100 transition-colors uppercase tracking-wider active:scale-95"
+                          >
+                            Servir Todo
+                          </button>
+                        </div>
+                        <ul className="space-y-2">
+                          {items.map((item, idx) => (
+                            <li key={idx} className="flex items-center justify-between text-xs bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+                              <span className="font-bold text-slate-800 uppercase flex-1 pr-2">
+                                <span className="font-black text-indigo-600 mr-2">{item.cant}x</span> {item.nombre}
+                              </span>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.entregarItem(item.id);
+                                    if (res.error) throw new Error(res.error);
+                                    await fetchMesas();
+                                  } catch (err) {
+                                    alert("Error al entregar: " + err.message);
+                                  }
+                                }}
+                                className="p-1.5 bg-white hover:bg-emerald-500 hover:text-white border border-slate-200 rounded-lg text-slate-400 hover:border-emerald-500 transition-all active:scale-90"
+                                title="Marcar como Servido"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        .animate-slide-left { animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-ring { animation: ring 1.5s ease-in-out infinite; }
+        @keyframes slideLeft { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes ring {
+          0% { transform: rotate(0); }
+          10% { transform: rotate(15deg); }
+          20% { transform: rotate(-10deg); }
+          30% { transform: rotate(10deg); }
+          40% { transform: rotate(-8deg); }
+          50% { transform: rotate(5deg); }
+          60% { transform: rotate(-5deg); }
+          70% { transform: rotate(0); }
+          100% { transform: rotate(0); }
+        }
+      `}</style>
     </section>
   );
 }
