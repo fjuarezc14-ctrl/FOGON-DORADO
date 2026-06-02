@@ -11,6 +11,15 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ numeroMesaAUnir }),
   }).then(r => r.json()),
   separarMesas: (num) => fetch(`${API_BASE}/api/mesas/${num}/separar`, { method: 'POST' }).then(r => r.json()),
+  crearMesa: (body) => fetch(`${API_BASE}/api/mesas`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  editarMesa: (numero, body) => fetch(`${API_BASE}/api/mesas/${numero}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  eliminarMesa: (numero) => fetch(`${API_BASE}/api/mesas/${numero}`, {
+    method: 'DELETE',
+  }).then(r => r.json()),
 
   // Cocina (unificado: salón + delivery)
   getPedidosCocina: () => fetch(`${API_BASE}/api/pedidos/cocina`).then(r => r.json()),

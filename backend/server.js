@@ -189,6 +189,92 @@ app.get('/api/mesas', async (req, res) => {
   }
 });
 
+// POST /api/mesas → Crear una nueva mesa
+app.post('/api/mesas', async (req, res) => {
+  const { numero } = req.body;
+  const num = parseInt(numero);
+
+  if (isNaN(num) || num <= 0) {
+    return res.status(400).json({ error: 'El número de mesa debe ser un número entero positivo.' });
+  }
+
+  try {
+    const existe = await prisma.mesa.findUnique({ where: { numero: num } });
+    if (existe) {
+      return res.status(400).json({ error: 'El número de mesa ya está en uso.' });
+    }
+
+    const nuevaMesa = await prisma.mesa.create({
+      data: { numero: num, estado: 'Libre' }
+    });
+    res.json(nuevaMesa);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/mesas/:numero → Modificar el número de una mesa
+app.put('/api/mesas/:numero', async (req, res) => {
+  const numeroActual = parseInt(req.params.numero);
+  const { nuevoNumero } = req.body;
+  const nuevoNum = parseInt(nuevoNumero);
+
+  if (isNaN(nuevoNum) || nuevoNum <= 0) {
+    return res.status(400).json({ error: 'El nuevo número de mesa debe ser un número entero positivo.' });
+  }
+
+  try {
+    const mesa = await prisma.mesa.findUnique({
+      where: { numero: numeroActual },
+      include: { Pedidos: { where: { estado: { in: ['Cocina', 'Servido'] } } } }
+    });
+
+    if (!mesa) return res.status(404).json({ error: 'Mesa no encontrada.' });
+
+    if (mesa.estado !== 'Libre' || mesa.Pedidos.length > 0) {
+      return res.status(400).json({ error: 'No se puede modificar el número de una mesa con comandas activas.' });
+    }
+
+    if (numeroActual !== nuevoNum) {
+      const existe = await prisma.mesa.findUnique({ where: { numero: nuevoNum } });
+      if (existe) {
+        return res.status(400).json({ error: 'El nuevo número de mesa ya está en uso.' });
+      }
+    }
+
+    const mesaActualizada = await prisma.mesa.update({
+      where: { numero: numeroActual },
+      data: { numero: nuevoNum }
+    });
+    res.json(mesaActualizada);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/mesas/:numero → Eliminar una mesa
+app.delete('/api/mesas/:numero', async (req, res) => {
+  const numero = parseInt(req.params.numero);
+
+  try {
+    const mesa = await prisma.mesa.findUnique({
+      where: { numero },
+      include: { Pedidos: { where: { estado: { in: ['Cocina', 'Servido'] } } } }
+    });
+
+    if (!mesa) return res.status(404).json({ error: 'Mesa no encontrada.' });
+
+    if (mesa.estado !== 'Libre' || mesa.Pedidos.length > 0) {
+      return res.status(400).json({ error: 'No se puede eliminar una mesa con comandas activas.' });
+    }
+
+    await prisma.mesa.delete({ where: { numero } });
+    res.json({ ok: true, mensaje: `Mesa ${numero} eliminada correctamente.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/mesas/:num/unir → Unir una mesa a otra principal
 app.post('/api/mesas/:num/unir', async (req, res) => {
   try {
