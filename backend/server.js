@@ -490,7 +490,7 @@ app.patch('/api/pedidos/:id/servir', async (req, res) => {
 
 app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
   const id = parseInt(req.params.id);
-  const { canceladoPor, motivo } = req.body;
+  const { canceladoPor, motivo, force } = req.body;
 
   try {
     const pedido = await prisma.pedido.findUnique({
@@ -503,17 +503,20 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
 
     if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado.' });
 
-    if (pedido.estado !== 'Cocina') {
-      return res.status(400).json({
-        error: 'Este pedido ya no puede cancelarse. Solo se cancelan pedidos en estado "Cocina".',
-      });
-    }
+    // Si no es una cancelación forzada por supervisor, aplicar filtros normales
+    if (!force) {
+      if (pedido.estado !== 'Cocina') {
+        return res.status(400).json({
+          error: 'Este pedido ya no puede cancelarse. Solo se cancelan pedidos en estado "Cocina".',
+        });
+      }
 
-    const elapsed = Date.now() - new Date(pedido.createdAt).getTime();
-    if (elapsed > LIMITE_CANCELACION_MS) {
-      return res.status(400).json({
-        error: 'El tiempo límite de 5 minutos para cancelar ha expirado. Consulta con el administrador.',
-      });
+      const elapsed = Date.now() - new Date(pedido.createdAt).getTime();
+      if (elapsed > LIMITE_CANCELACION_MS) {
+        return res.status(400).json({
+          error: 'El tiempo límite de 5 minutos para cancelar ha expirado. Consulta con el administrador.',
+        });
+      }
     }
 
     // Cancelar el pedido
@@ -573,7 +576,7 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
 
 app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
   const id = parseInt(req.params.id);
-  const { productoId, cantidadACancelar, motivo, canceladoPor } = req.body;
+  const { productoId, cantidadACancelar, motivo, canceladoPor, force } = req.body;
 
   try {
     const pedido = await prisma.pedido.findUnique({
@@ -586,20 +589,26 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
 
     if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado.' });
 
-    if (pedido.estado !== 'Cocina') {
-      return res.status(400).json({
-        error: 'Este pedido ya no puede modificarse. Solo se cancelan ítems de pedidos en estado "Cocina".',
-      });
+    // Si no es una cancelación forzada por supervisor, aplicar filtros normales
+    if (!force) {
+      if (pedido.estado !== 'Cocina') {
+        return res.status(400).json({
+          error: 'Este pedido ya no puede modificarse. Solo se cancelan ítems de pedidos en estado "Cocina".',
+        });
+      }
+
+      const elapsed = Date.now() - new Date(pedido.createdAt).getTime();
+      if (elapsed > LIMITE_CANCELACION_MS) {
+        return res.status(400).json({
+          error: 'El tiempo límite de 5 minutos para cancelar ha expirado. Consulta con el administrador.',
+        });
+      }
     }
 
-    const elapsed = Date.now() - new Date(pedido.createdAt).getTime();
-    if (elapsed > LIMITE_CANCELACION_MS) {
-      return res.status(400).json({
-        error: 'El tiempo límite de 5 minutos para cancelar ha expirado. Consulta con el administrador.',
-      });
-    }
-
-    const item = pedido.items.find(i => String(i.productoId) === String(productoId) && !i.historial);
+    const item = force 
+      ? pedido.items.find(i => String(i.productoId) === String(productoId))
+      : pedido.items.find(i => String(i.productoId) === String(productoId) && !i.historial);
+      
     if (!item) return res.status(404).json({ error: 'El ítem seleccionado no se encuentra en la comanda activa.' });
 
     if (cantidadACancelar > item.cantidad) {

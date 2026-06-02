@@ -279,9 +279,11 @@ export default function SalonPage({ currentUser }) {
     setCancelandoPedido(true);
     try {
       const pedidoId = mesaActual.pedidoData.pedidoId;
+      const isForce = tiempoRestante <= 0 || mesaActual.estado === 'Servido';
       const result = await api.cancelarPedido(pedidoId, {
         canceladoPor: supervisorAprobador ? `${supervisorAprobador.nombre} (${supervisorAprobador.rol}) | Mozo: ${meseroGlobal}` : meseroGlobal,
         motivo: cancelMotivo.trim(),
+        force: isForce,
       });
       if (result.error) throw new Error(result.error);
       setCancelModal(false);
@@ -313,12 +315,15 @@ export default function SalonPage({ currentUser }) {
     const cant = parseInt(cantStr);
     if (isNaN(cant) || cant <= 0 || cant > item.cant) { alert("Cantidad no válida."); return; }
 
+    const isForce = tiempoRestante <= 0 || mesaActual.estado === 'Servido' || item.historial;
+
     try {
       const res = await api.cancelarItemPedido(item.pedidoId, {
         productoId: item.id,
         cantidadACancelar: cant,
         motivo: motivo.trim(),
-        canceladoPor: supervisor ? `${supervisor.nombre} (${supervisor.rol}) | Mozo: ${meseroGlobal}` : meseroGlobal
+        canceladoPor: supervisor ? `${supervisor.nombre} (${supervisor.rol})` : meseroGlobal,
+        force: isForce,
       });
       if (res.error) throw new Error(res.error);
       
@@ -587,7 +592,7 @@ export default function SalonPage({ currentUser }) {
                       : ticketActual.map((item, idx) => {
                           const sub = item.cant * item.precio;
                           if (item.yaEnviado) {
-                            const esCancelable = item.pedidoId === mesaActual.pedidoData?.pedidoId && tiempoRestante > 0 && mesaActual.estado === 'Cocina' && !item.historial;
+                            const esCancelable = item.pedidoId === mesaActual.pedidoData?.pedidoId;
                             return (
                               <li key={idx} className="bg-slate-50 border border-slate-200 p-2.5 md:p-3 rounded-xl flex flex-col gap-1.5 opacity-60 grayscale">
                                 <div className="flex items-center justify-between">
@@ -679,15 +684,15 @@ export default function SalonPage({ currentUser }) {
                     <span className="font-black font-mono text-2xl md:text-3xl text-slate-900 leading-none">S/ {totalTicket.toFixed(2)}</span>
                   </div>
 
-                  {/* Botón cancelar pedido (solo si hay pedido en Cocina) */}
-                  {mesaActual?.pedidoData && mesaActual.estado === 'Cocina' && (
+                  {/* Botón cancelar pedido */}
+                  {mesaActual?.pedidoData && (
                     <div className="mb-3">
-                      {tiempoRestante > 0 ? (
+                      {mesaActual.estado === 'Cocina' && tiempoRestante > 0 ? (
                         <button
                           onClick={() => {
                             const algunItemPreparado = ticketActual.some(i => i.yaEnviado && i.historial && i.pedidoId === mesaActual.pedidoData?.pedidoId);
                             if (algunItemPreparado) {
-                              alert("⚠️ No puedes cancelar toda la comanda porque algunos platos ya han sido preparados por Cocina/Bar.\n\nPor favor, anula únicamente los productos pendientes de entrega usando el icono de basura rojo 🗑️ al lado de cada producto.");
+                              alert("⚠️ No puedes realizar una cancelación normal porque algunos platos ya han sido preparados.\n\nPara cancelar platos servidos, usa el botón de 'Anulación Especial (Reclamo)'.");
                               return;
                             }
                             requestSupervisorAuth("Cancelar comanda completa", (supervisor) => {
@@ -704,9 +709,18 @@ export default function SalonPage({ currentUser }) {
                           </span>
                         </button>
                       ) : (
-                        <div className="w-full py-2.5 bg-slate-100 text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
-                          <Clock className="w-4 h-4" /> Cancelación · Tiempo agotado
-                        </div>
+                        <button
+                          onClick={() => {
+                            requestSupervisorAuth("Autorizar Anulación Especial / Reclamo", (supervisor) => {
+                              setSupervisorAprobador(supervisor);
+                              setCancelModal(true);
+                            });
+                          }}
+                          className="w-full py-2.5 bg-rose-900/10 hover:bg-rose-900/20 text-rose-700 border border-rose-350 border-dashed font-black uppercase text-[10px] tracking-widest rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Lock className="w-4 h-4" />
+                          Anulación Especial (Reclamo)
+                        </button>
                       )}
                     </div>
                   )}
