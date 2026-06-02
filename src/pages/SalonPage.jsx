@@ -976,7 +976,7 @@ export default function SalonPage({ currentUser }) {
         </div>
       )}
       {/* FLOATING TOASTS NOTIFICATIONS SYSTEM */}
-      <div className="fixed bottom-6 right-6 z-[250] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+      <div className="fixed top-20 right-6 z-[250] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto bg-slate-900 border border-emerald-500/20 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent"></div>
@@ -1000,7 +1000,7 @@ export default function SalonPage({ currentUser }) {
       {/* Botón flotante para Bandeja de Cocina (Platos Listos) */}
       <button
         onClick={() => setBandejaOpen(true)}
-        className="fixed bottom-6 left-6 z-[220] flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs md:text-sm px-4 py-3 rounded-2xl shadow-2xl transition-all active:scale-95 hover:-translate-y-1 uppercase tracking-wider border border-indigo-500/30"
+        className="fixed bottom-6 right-6 z-[220] flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs md:text-sm px-4 py-3 rounded-2xl shadow-2xl transition-all active:scale-95 hover:-translate-y-1 uppercase tracking-wider border border-indigo-500/30"
       >
         <Bell className={`w-5 h-5 ${platosListosDespacho.length > 0 ? 'animate-bounce' : ''}`} />
         <span className="hidden sm:inline">Bandeja de Cocina</span>
