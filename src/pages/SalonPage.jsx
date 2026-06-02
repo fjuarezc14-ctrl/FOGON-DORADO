@@ -1,8 +1,71 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2, Bell, Settings, Plus, Utensils, Save, Trash2 } from 'lucide-react';
+import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2, Bell, Settings, Plus, Utensils, Save, Trash2, Search } from 'lucide-react';
 import { api } from '../api';
 
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000;
+
+// --- SISTEMA DE BÚSQUEDA INTELIGENTE Y FONÉTICA ---
+const SINONIMOS = {
+  gaseosa: ['cola', 'inca', 'coca', 'refresco', 'sprite', 'fanta', 'gaseosa'],
+  bebida: ['chicha', 'limonada', 'gaseosa', 'cerveza', 'pisco', 'trago', 'coctel', 'jugo', 'agua'],
+  chela: ['cerveza', 'cristal', 'pilsen', 'cusquena'],
+  papas: ['papa', 'patata', 'fritas'],
+  carne: ['lomo', 'bife', 'parrilla', 'anticucho', 'res', 'corte'],
+  pollo: ['brasa', 'broaster', 'alitas', 'pechuga'],
+  piqueo: ['entrada', 'porcion', 'tequenos', 'salchipapa']
+};
+
+const normalizePhonetic = (text) => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // eliminar acentos
+    .replace(/[^a-z0-9]/g, " ")      // remover caracteres especiales
+    .replace(/ch/g, "x")            // ch -> x
+    .replace(/ll/g, "y")            // ll -> y
+    .replace(/z/g, "s")             // z -> s
+    .replace(/c([ei])/g, "s$1")      // ce, ci -> se, si
+    .replace(/h/g, "")              // h muda
+    .replace(/b/g, "v")              // b -> v equivalencia
+    .replace(/k/g, "c")              // k -> c
+    .replace(/q/g, "c")              // q -> c
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const matchProductSemantic = (prod, query) => {
+  if (!query) return true;
+  const cleanQuery = query.toLowerCase().trim();
+  const queryTokens = cleanQuery.split(/\s+/);
+  
+  const cleanProdName = (prod.nombre || '').toLowerCase();
+  const cleanProdCat = (prod.categoria || '').toLowerCase();
+  
+  const phoneticName = normalizePhonetic(prod.nombre);
+  const phoneticCat = normalizePhonetic(prod.categoria);
+  
+  return queryTokens.every(qToken => {
+    // 1. Coincidencia directa simple
+    if (cleanProdName.includes(qToken) || cleanProdCat.includes(qToken)) return true;
+    
+    // 2. Coincidencia fonética
+    const phoneticToken = normalizePhonetic(qToken);
+    if (phoneticName.includes(phoneticToken) || phoneticCat.includes(phoneticToken)) return true;
+    
+    // 3. Coincidencia por sinónimos
+    for (const [key, syns] of Object.entries(SINONIMOS)) {
+      if (key.includes(qToken) || qToken.includes(key)) {
+        if (syns.some(syn => cleanProdName.includes(syn) || normalizePhonetic(syn) === phoneticToken)) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  });
+};
+
 
 const BARRA_CATEGORIAS = [
   'Bebidas y Refrescos',
@@ -73,6 +136,7 @@ export default function SalonPage({ currentUser }) {
   const [adminMesasOpen, setAdminMesasOpen] = useState(false);
   const [nuevaMesaNum, setNuevaMesaNum] = useState('');
   const [editandoMesas, setEditandoMesas] = useState({}); // { [mesaNum]: nuevoMesaNum }
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Cargar mesas desde el API real
   const fetchMesas = useCallback(async () => {
@@ -189,6 +253,7 @@ export default function SalonPage({ currentUser }) {
       setTicketActual([]);
     }
     setCategoriaActiva('Todos');
+    setSearchQuery('');
     setModalOpen(true);
   };
 
@@ -471,7 +536,10 @@ export default function SalonPage({ currentUser }) {
     }
   };
 
-  const menuFiltrado = categoriaActiva === 'Todos' ? productos : productos.filter(p => p.categoria === categoriaActiva);
+  const menuFiltrado = productos.filter(p => {
+    if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
+    return matchProductSemantic(p, searchQuery);
+  });
   const totalTicket = ticketActual.reduce((acc, item) => acc + (item.cant * item.precio), 0);
   const badgeEstado = mesaActual?.estado === 'Servido' && ticketActual.length > 0
     ? 'text-blue-700 bg-blue-100' : (ticketActual.length > 0 ? 'text-amber-700 bg-amber-100' : 'text-emerald-700 bg-emerald-100');
@@ -651,10 +719,32 @@ export default function SalonPage({ currentUser }) {
 
             <div className="flex flex-col md:flex-row flex-1 min-h-0 bg-slate-50">
               <div className="w-full md:w-3/5 flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-slate-200">
-                <div className="flex gap-2 overflow-x-auto custom-scrollbar p-3 shrink-0 bg-white shadow-sm z-10">
-                  {['Todos', ...new Set(productos.map(p => p.categoria))].map(cat => (
-                    <button key={cat} onClick={() => setCategoriaActiva(cat)} className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-sm transition-colors ${categoriaActiva === cat ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-amber-50'}`}>{cat}</button>
-                  ))}
+                <div className="p-3 bg-white border-b border-slate-100 flex flex-col gap-2.5 shrink-0 z-10 shadow-sm">
+                  {/* Buscador de platos */}
+                  <div className="relative w-full">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar plato (ej: 'poyo papas', 'chela', 'parri')..." 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-amber-500 focus:bg-white font-medium text-slate-800"
+                    />
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery('')} 
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Categorías */}
+                  <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-0.5 whitespace-nowrap">
+                    {['Todos', ...new Set(productos.map(p => p.categoria))].map(cat => (
+                      <button key={cat} onClick={() => setCategoriaActiva(cat)} className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-sm transition-colors ${categoriaActiva === cat ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-amber-50'}`}>{cat}</button>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
                   {menuFiltrado.map(prod => {

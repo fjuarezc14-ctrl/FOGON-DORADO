@@ -1,6 +1,68 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PlusCircle, Utensils, CupSoda, Wine, AlertCircle, Trash2, BookOpen, Save, X, Tag, ToggleLeft, ToggleRight, Edit2, ChevronDown, ChevronUp, Percent, DollarSign } from 'lucide-react';
+import { PlusCircle, Utensils, CupSoda, Wine, AlertCircle, Trash2, BookOpen, Save, X, Tag, ToggleLeft, ToggleRight, Edit2, ChevronDown, ChevronUp, Percent, DollarSign, Search } from 'lucide-react';
 import { api } from '../api';
+
+// --- SISTEMA DE BÚSQUEDA INTELIGENTE Y FONÉTICA ---
+const SINONIMOS = {
+  gaseosa: ['cola', 'inca', 'coca', 'refresco', 'sprite', 'fanta', 'gaseosa'],
+  bebida: ['chicha', 'limonada', 'gaseosa', 'cerveza', 'pisco', 'trago', 'coctel', 'jugo', 'agua'],
+  chela: ['cerveza', 'cristal', 'pilsen', 'cusquena'],
+  papas: ['papa', 'patata', 'fritas'],
+  carne: ['lomo', 'bife', 'parrilla', 'anticucho', 'res', 'corte'],
+  pollo: ['brasa', 'broaster', 'alitas', 'pechuga'],
+  piqueo: ['entrada', 'porcion', 'tequenos', 'salchipapa']
+};
+
+const normalizePhonetic = (text) => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // eliminar acentos
+    .replace(/[^a-z0-9]/g, " ")      // remover caracteres especiales
+    .replace(/ch/g, "x")            // ch -> x
+    .replace(/ll/g, "y")            // ll -> y
+    .replace(/z/g, "s")             // z -> s
+    .replace(/c([ei])/g, "s$1")      // ce, ci -> se, si
+    .replace(/h/g, "")              // h muda
+    .replace(/b/g, "v")              // b -> v equivalencia
+    .replace(/k/g, "c")              // k -> c
+    .replace(/q/g, "c")              // q -> c
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const matchProductSemantic = (prod, query) => {
+  if (!query) return true;
+  const cleanQuery = query.toLowerCase().trim();
+  const queryTokens = cleanQuery.split(/\s+/);
+  
+  const cleanProdName = (prod.nombre || '').toLowerCase();
+  const cleanProdCat = (prod.categoria || '').toLowerCase();
+  
+  const phoneticName = normalizePhonetic(prod.nombre);
+  const phoneticCat = normalizePhonetic(prod.categoria);
+  
+  return queryTokens.every(qToken => {
+    // 1. Coincidencia directa simple
+    if (cleanProdName.includes(qToken) || cleanProdCat.includes(qToken)) return true;
+    
+    // 2. Coincidencia fonética
+    const phoneticToken = normalizePhonetic(qToken);
+    if (phoneticName.includes(phoneticToken) || phoneticCat.includes(phoneticToken)) return true;
+    
+    // 3. Coincidencia por sinónimos
+    for (const [key, syns] of Object.entries(SINONIMOS)) {
+      if (key.includes(qToken) || qToken.includes(key)) {
+        if (syns.some(syn => cleanProdName.includes(syn) || normalizePhonetic(syn) === phoneticToken)) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  });
+};
 
 // Categorías de Barra (el resto va a Cocina)
 const BARRA_CATEGORIAS = ['Bebidas y Refrescos', 'Cervezas', 'Bar y Cocteles', 'Postres'];
@@ -29,6 +91,7 @@ export default function CartaPage({ currentUser }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editProd, setEditProd] = useState({ id: '', nombre: '', categoria: 'Pollos a la Brasa', precio: '', tipoStock: 'ilimitado', stock: '' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Ofertas
   const [ofertas, setOfertas] = useState([]);
@@ -69,7 +132,10 @@ export default function CartaPage({ currentUser }) {
 
   // Categorías dinámicas desde los productos en BD
   const categoriasEnBD = ['Todos', ...new Set(productos.map(p => p.categoria))];
-  const productosFiltrados = categoriaActiva === 'Todos' ? productos : productos.filter(p => p.categoria === categoriaActiva);
+  const productosFiltrados = productos.filter(p => {
+    if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
+    return matchProductSemantic(p, searchQuery);
+  });
 
   const abrirModal = (p = null) => {
     setEditProd(p
@@ -295,6 +361,26 @@ export default function CartaPage({ currentUser }) {
         <button onClick={() => abrirModal()} className="bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl font-black text-sm uppercase tracking-wide hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2">
           <PlusCircle className="w-5 h-5" /> Agregar Producto
         </button>
+      </div>
+
+      {/* ── BUSCADOR DE PRODUCTOS ── */}
+      <div className="mb-5 relative w-full">
+        <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+        <input 
+          type="text" 
+          placeholder="Buscar producto por nombre o categoría (ej: 'poyo', 'chela', 'parri')..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-12 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 font-medium text-slate-850 shadow-sm"
+        />
+        {searchQuery && (
+          <button 
+            onClick={() => setSearchQuery('')} 
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* ── FILTROS DE CATEGORÍA ─────────────────────────── */}
