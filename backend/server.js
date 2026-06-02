@@ -148,6 +148,7 @@ app.get('/api/mesas', async (req, res) => {
       const todosLosItems = pedidosActivos.flatMap(p =>
         p.items.map(i => ({
           id: String(i.productoId),
+          itemId: i.id,
           nombre: i.nombre,
           precio: i.precio,
           cant: i.cantidad,
@@ -335,6 +336,7 @@ app.get('/api/pedidos/cocina', async (req, res) => {
       items: p.items
         .filter(i => !i.historial && !BARRA_CATEGORIAS.includes(i.producto?.categoria))
         .map(i => ({
+          id: i.id,
           nombre: i.nombre,
           cant: i.cantidad,
           categoria: i.producto?.categoria || '',
@@ -384,6 +386,43 @@ app.get('/api/pedidos/barra', async (req, res) => {
     })).filter(p => p.items.length > 0);
 
     res.json(formateados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/pedidos/items/:itemId/preparar → Cocinero o Barman marca listo un item de cocina/barra de forma individual
+app.patch('/api/pedidos/items/:itemId/preparar', async (req, res) => {
+  const itemId = parseInt(req.params.itemId);
+  try {
+    const item = await prisma.itemPedido.update({
+      where: { id: itemId },
+      data: { historial: true },
+      include: { pedido: { include: { items: true } } },
+    });
+
+    const todosListos = item.pedido.items.every(i => i.historial === true);
+    if (todosListos) {
+      const ped = await prisma.pedido.update({
+        where: { id: item.pedidoId },
+        data: { estado: 'Servido' },
+        include: { mesa: true },
+      });
+
+      if (ped.mesaId && ped.tipoEntrega === 'salon') {
+        const enCocina = await prisma.pedido.count({
+          where: { mesaId: ped.mesaId, estado: 'Cocina' },
+        });
+        if (enCocina === 0) {
+          await prisma.mesa.update({
+            where: { id: ped.mesaId },
+            data: { estado: 'Servido' },
+          });
+        }
+      }
+    }
+
+    res.json({ ok: true, todosListos });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

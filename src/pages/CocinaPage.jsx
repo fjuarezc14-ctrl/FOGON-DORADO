@@ -36,6 +36,15 @@ export default function CocinaPage() {
     }
   };
 
+  const marcarItemListo = async (itemId) => {
+    try {
+      await api.prepararItem(itemId);
+      await fetchPedidos();
+    } catch (err) {
+      alert('Error al marcar listo el plato: ' + err.message);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden w-full bg-slate-900">
       <header className="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 md:px-8 z-10 shrink-0 text-white">
@@ -125,13 +134,22 @@ export default function CocinaPage() {
                   <div className="p-4 flex-1 bg-white min-h-[150px]">
                     {p.items.map((item, i) => (
                       <div key={i} className="flex flex-col py-2 border-b border-dashed border-slate-200 last:border-0">
-                        <div className="flex items-start">
-                          <span className="font-black text-lg mr-3 text-slate-900 w-6 text-center shrink-0">
-                            {item.cant}
-                          </span>
-                          <span className="flex-1 text-slate-800 font-bold text-sm leading-snug pt-0.5 uppercase">
-                            {item.nombre}
-                          </span>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start">
+                            <span className="font-black text-lg mr-3 text-slate-900 w-6 text-center shrink-0">
+                              {item.cant}
+                            </span>
+                            <span className="flex-1 text-slate-800 font-bold text-sm leading-snug pt-0.5 uppercase">
+                              {item.nombre}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => marcarItemListo(item.id)}
+                            className="p-1.5 hover:bg-emerald-500 hover:text-white rounded-lg text-slate-450 border border-slate-200 hover:border-emerald-500 transition-all active:scale-90 ml-2 shrink-0"
+                            title="Marcar este plato como Listo"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
                         </div>
                         {item.notas && (
                           <div className="ml-9 mt-1">

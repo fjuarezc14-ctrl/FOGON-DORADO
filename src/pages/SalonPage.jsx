@@ -461,6 +461,7 @@ export default function SalonPage({ currentUser }) {
         <div className="flex flex-wrap gap-2">
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600 uppercase bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Libre</div>
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600 uppercase bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"><div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Cocina</div>
+          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600 uppercase bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"><div className="w-2.5 h-2.5 rounded-full bg-indigo-500"></div> Platos Listos</div>
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-600 uppercase bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Servido</div>
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-700 uppercase bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 shadow-sm">
             <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
@@ -478,7 +479,7 @@ export default function SalonPage({ currentUser }) {
             !BARRA_CATEGORIAS.includes(i.categoria)
           ) || false);
 
-          let colorBg = 'bg-white hover:bg-emerald-50', colorText = 'text-slate-300', colorBorder = 'border-slate-200', Icon = Receipt;
+          let colorBg = 'bg-white hover:bg-emerald-50', colorText = 'text-emerald-500', colorBorder = 'border-slate-200', Icon = Receipt;
           
           if (tieneListos) {
             colorBg = 'bg-indigo-50/80 hover:bg-indigo-100/80 border-indigo-400 shadow-lg';
@@ -1081,7 +1082,7 @@ export default function SalonPage({ currentUser }) {
                               <button
                                 onClick={async () => {
                                   try {
-                                    const res = await api.entregarItem(item.id);
+                                    const res = await api.entregarItem(item.itemId);
                                     if (res.error) throw new Error(res.error);
                                     await fetchMesas();
                                   } catch (err) {

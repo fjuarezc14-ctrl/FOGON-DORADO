@@ -19,6 +19,9 @@ export const api = {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seccion }),
   }).then(r => r.json()),
   servirPedido: (id) => fetch(`${API_BASE}/api/pedidos/${id}/servir`, { method: 'PATCH' }).then(r => r.json()),
+  prepararItem: (itemId) => fetch(`${API_BASE}/api/pedidos/items/${itemId}/preparar`, {
+    method: 'PATCH',
+  }).then(r => r.json()),
 
   // Cancelación de pedidos (mozo)
   cancelarPedido: (id, body) => fetch(`${API_BASE}/api/pedidos/${id}/cancelar`, {
