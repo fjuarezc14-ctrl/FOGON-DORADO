@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent } from 'lucide-react';
 
 import { api } from '../api';
@@ -35,7 +35,7 @@ export default function CajaPage() {
   const [enviandoDelivery, setEnviandoDelivery] = useState(false);
   const [tipoDelivery, setTipoDelivery] = useState('PedidosYa'); // 'PedidosYa' | 'ParaLlevar'
   const [toasts, setToasts] = useState([]);
-  const [prevPedidosLlevar, setPrevPedidosLlevar] = useState([]);
+  const prevPedidosLlevarRef = useRef([]);
 
   // Campana de Restaurante Premium (G5 -> C6)
   const playChimeNotification = () => {
@@ -62,16 +62,18 @@ export default function CajaPage() {
 
   const fetchCajaData = useCallback(async () => {
     try {
-      const [mesasData, resumenData, llevarData, ventasData] = await Promise.all([
+      const [mesasData, resumenData, llevarData, ventasData, prods] = await Promise.all([
         api.getMesas(),
         api.getResumenVentas(),
         api.getPedidosLlevar(),
         api.getHistorialVentas(),
+        api.getProductos(), // <-- Recargar productos dinámicamente para ofertas en vivo
       ]);
       setMesas(mesasData);
       setPedidosLlevar(llevarData);
       setStats({ atendidas: resumenData.atendidas || 0, ingresos: resumenData.ingresos || 0 });
       setVentas(ventasData || []);
+      setProductosMenu(prods); // <-- Actualizar el menú con precios de oferta en vivo
     } catch (err) {
       console.error('Error cargando datos de caja:', err);
     } finally {
@@ -90,12 +92,12 @@ export default function CajaPage() {
   // Alerta sonora y visual en tiempo real al estar listos
   useEffect(() => {
     if (pedidosLlevar.length === 0) {
-      if (prevPedidosLlevar.length === 0) setPrevPedidosLlevar(pedidosLlevar);
+      if (prevPedidosLlevarRef.current.length === 0) prevPedidosLlevarRef.current = pedidosLlevar;
       return;
     }
-    if (prevPedidosLlevar.length > 0) {
+    if (prevPedidosLlevarRef.current.length > 0) {
       pedidosLlevar.forEach(p => {
-        const ant = prevPedidosLlevar.find(prev => prev.pedidoId === p.pedidoId);
+        const ant = prevPedidosLlevarRef.current.find(prev => prev.pedidoId === p.pedidoId);
         if (ant && ant.estado === 'Cocina' && p.estado === 'Servido') {
           playChimeNotification();
           const toastId = Date.now() + Math.random();
@@ -106,8 +108,8 @@ export default function CajaPage() {
         }
       });
     }
-    setPrevPedidosLlevar(pedidosLlevar);
-  }, [pedidosLlevar, prevPedidosLlevar]);
+    prevPedidosLlevarRef.current = pedidosLlevar;
+  }, [pedidosLlevar]);
 
   const mesasPendientes = mesas.filter(m => m.estado !== 'Libre' && m.pedidoData);
 

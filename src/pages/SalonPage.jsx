@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2 } from 'lucide-react';
 import { api } from '../api';
 
@@ -56,7 +56,7 @@ export default function SalonPage({ currentUser }) {
   const [supervisorAprobador, setSupervisorAprobador] = useState(null);
 
   // Estados de Notificación en Tiempo Real
-  const [prevMesas, setPrevMesas] = useState([]);
+  const prevMesasRef = useRef([]);
   const [toasts, setToasts] = useState([]);
   const [unionDropdownOpen, setUnionDropdownOpen] = useState(false);
 
@@ -92,15 +92,26 @@ export default function SalonPage({ currentUser }) {
     }
   }, []);
 
+  // Mantener meseroGlobal sincronizado con currentUser si este se carga después
+  useEffect(() => {
+    if (currentUser?.nombre) {
+      setMeseroGlobal(currentUser.nombre);
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     fetchMesas();
     fetchProductos();
     fetchUsuarios();
-    // Sincronización en tiempo real cada 3 segundos
+    // Sincronización en tiempo real cada 3 segundos (sincroniza mesas y productos para ofertas en vivo)
     const interval = setInterval(() => {
+      fetchProductos(); // <-- Traer productos para actualizar ofertas en tiempo real
       if (!modalOpen) {
         fetchMesas();
         fetchUsuarios();
+      } else {
+        // Si el modal está abierto, seguimos actualizando las mesas en segundo plano
+        fetchMesas();
       }
     }, 3000);
     return () => clearInterval(interval);
@@ -146,8 +157,10 @@ export default function SalonPage({ currentUser }) {
       return;
     }
 
+    const activeMeseroName = currentUser?.nombre || meseroGlobal;
+
     // Si la mesa está ocupada y el mesero asignado no es el mesero global activo, y el usuario es un Mozo, bloquear acceso
-    if (m.pedidoData && m.pedidoData.mesero && m.pedidoData.mesero !== meseroGlobal && currentUser?.rol === 'Mozo') {
+    if (m.pedidoData && m.pedidoData.mesero && m.pedidoData.mesero !== activeMeseroName && currentUser?.rol === 'Mozo') {
       alert(`⚠️ Esta mesa está ocupada y está siendo atendida por el Mozo "${m.pedidoData.mesero}". No puedes ingresar ni realizar modificaciones.`);
       return;
     }
@@ -219,15 +232,18 @@ export default function SalonPage({ currentUser }) {
   // Detector de mesas listas para el mesero activo (Sonido + Toast)
   useEffect(() => {
     if (mesas.length === 0) {
-      if (prevMesas.length === 0) setPrevMesas(mesas);
+      if (prevMesasRef.current.length === 0) prevMesasRef.current = mesas;
       return;
     }
-    if (prevMesas.length > 0) {
+    if (prevMesasRef.current.length > 0) {
       const listasNuevas = [];
+      const activeMeseroName = currentUser?.nombre || meseroGlobal;
       mesas.forEach(m => {
-        const ant = prevMesas.find(p => p.num === m.num);
+        const ant = prevMesasRef.current.find(p => p.num === m.num);
         if (ant && ant.estado === 'Cocina' && m.estado === 'Servido') {
-          if (m.pedidoData?.mesero === meseroGlobal) {
+          // Si corresponde a mi mesa, o si soy Administrador/Cajero, me alerta
+          const esMiMesa = m.pedidoData?.mesero === activeMeseroName || ['Administrador', 'Cajero'].includes(currentUser?.rol);
+          if (esMiMesa) {
             listasNuevas.push(m.num);
           }
         }
@@ -243,8 +259,8 @@ export default function SalonPage({ currentUser }) {
         });
       }
     }
-    setPrevMesas(mesas);
-  }, [mesas, meseroGlobal, prevMesas]);
+    prevMesasRef.current = mesas;
+  }, [mesas, meseroGlobal, currentUser]);
 
   // Countdown timer para cancelación
   useEffect(() => {
