@@ -5,11 +5,16 @@ import { api } from '../api';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ ocupadas: 0, totalMesas: 15, enCocina: 0, atendidas: 0, ingresos: 0 });
+  const [topProducts, setTopProducts] = useState([]);
 
   useEffect(() => {
     const updateStats = async () => {
       try {
-        const [mesas, resumen] = await Promise.all([api.getMesas(), api.getResumenVentas()]);
+        const [mesas, resumen, rotacion] = await Promise.all([
+          api.getMesas(),
+          api.getResumenVentas(),
+          api.getRotacion(),
+        ]);
         setStats({
           ocupadas: mesas.filter(m => m.estado !== 'Libre').length,
           totalMesas: mesas.length,
@@ -17,6 +22,7 @@ export default function DashboardPage() {
           atendidas: resumen.atendidas || 0,
           ingresos: resumen.ingresos || 0,
         });
+        setTopProducts(rotacion.slice(0, 5));
       } catch (err) {
         console.error('Error cargando dashboard:', err);
       }
@@ -26,6 +32,7 @@ export default function DashboardPage() {
     const interval = setInterval(updateStats, 3000);
     return () => clearInterval(interval);
   }, []);
+
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden w-full">
@@ -88,6 +95,49 @@ export default function DashboardPage() {
               <p className="text-2xl font-black mt-1 font-mono">S/ {stats.ingresos.toFixed(2)}</p>
             </div>
           </div>
+        </div>
+
+        {/* TOP 5 PRODUCTOS MÁS VENDIDOS WIDGET */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-sm">
+              <Flame className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-black text-slate-800 uppercase text-sm tracking-wider">Top 5 Productos Más Vendidos (Hoy)</h2>
+              <p className="text-xs text-slate-400">Rotación de platos de hoy ordenados por volumen de venta.</p>
+            </div>
+          </div>
+          {topProducts.length > 0 ? (
+            <div className="divide-y divide-slate-100">
+              {topProducts.map((p, idx) => (
+                <div key={p.id || idx} className="py-3 flex items-center justify-between font-bold text-slate-700 text-sm">
+                  <div className="flex items-center gap-4">
+                    <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-black">
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <span className="text-slate-850 font-black">{p.nombre}</span>
+                      <span className="text-[10px] text-slate-400 uppercase ml-2 px-2 py-0.5 rounded bg-slate-50 border border-slate-100">
+                        {p.categoria}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-8 font-mono">
+                    <div className="text-right">
+                      <span className="text-slate-400 text-xs mr-1">Cant:</span>
+                      <span className="text-slate-900 font-black">{p.cantidad}</span>
+                    </div>
+                    <div className="text-right w-24">
+                      <span className="text-emerald-600 font-black">S/ {p.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center py-8 text-slate-400 font-bold uppercase text-xs">No hay ventas registradas el día de hoy.</p>
+          )}
         </div>
 
         <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Accesos Rápidos</h2>

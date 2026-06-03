@@ -37,6 +37,25 @@ export default function ReportesPage() {
   const [ventas, setVentas] = useState([]);
   const [activeComprobante, setActiveComprobante] = useState(null);
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
+  const [rotacion, setRotacion] = useState([]);
+
+  const getChickenEquivalency = (name) => {
+    const normalized = name.toLowerCase();
+    if (normalized.includes('1/2 pollo') || normalized.includes('medio pollo')) {
+      return 0.5;
+    }
+    if (normalized.includes('1/4 pollo') || normalized.includes('cuarto de pollo') || normalized.includes('cuarto pollo')) {
+      return 0.25;
+    }
+    if (normalized.includes('1/8 pollo') || normalized.includes('octavo de pollo') || normalized.includes('octavo pollo')) {
+      return 0.125;
+    }
+    if (normalized.includes('1 pollo') || normalized.includes('pollo entero') || normalized.includes('un pollo')) {
+      return 1.0;
+    }
+    return 0;
+  };
+
 
   const numeroALetras = (num) => {
     const unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
@@ -154,16 +173,18 @@ export default function ReportesPage() {
   const fetchReportes = useCallback(async (desde, hasta) => {
     setFiltrando(true);
     try {
-      const [data, cancs, mzs, vts] = await Promise.all([
+      const [data, cancs, mzs, vts, rot] = await Promise.all([
         api.getReporteContable(desde, hasta),
         api.getCancelaciones(desde, hasta),
         api.getReporteMozos(desde, hasta),
         api.getHistorialVentas(desde, hasta),
+        api.getRotacion(desde, hasta),
       ]);
       setResumen(data);
       setCancelaciones(cancs || []);
       setMozos(mzs || []);
       setVentas(vts || []);
+      setRotacion(rot || []);
     } catch(err) {
       console.error('Error cargando reportes:', err);
     } finally {
@@ -356,6 +377,80 @@ export default function ReportesPage() {
             <span>Periodo Auditoría</span>
             <span className="font-bold text-amber-400 uppercase tracking-widest text-[10px]">Rango Activo</span>
           </div>
+        </div>
+      </div>
+
+      {/* ROTACIÓN DE PRODUCTOS Y EQUIVALENCIA DE POLLOS */}
+      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
+        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-amber-500" /> Rotación de Productos y Consumo de Pollos
+            </h2>
+            <p className="text-[10px] text-slate-450 mt-0.5">Productos vendidos ordenados por cantidad. Incluye cálculo de equivalencias en pollos enteros.</p>
+          </div>
+          {(() => {
+            const calculateChickenTotal = () => {
+              let total = 0;
+              rotacion.forEach(item => {
+                const equiv = getChickenEquivalency(item.nombre);
+                total += item.cantidad * equiv;
+              });
+              return total;
+            };
+            return (
+              <span className="bg-amber-100 text-amber-900 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+                Total Pollos Enteros: {calculateChickenTotal().toFixed(3)}
+              </span>
+            );
+          })()}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[500px]">
+            <thead className="bg-white text-slate-450 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4">Producto</th>
+                <th className="px-6 py-4">Categoría</th>
+                <th className="px-6 py-4 text-center">Cantidad Vendida</th>
+                <th className="px-6 py-4 text-center">Equivalencia (Pollo Entero)</th>
+                <th className="px-6 py-4 text-right">Total (S/)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+              {rotacion.length > 0 ? rotacion.map((r, i) => {
+                const equiv = getChickenEquivalency(r.nombre);
+                return (
+                  <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="font-bold text-slate-800">{r.nombre}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[10px] text-slate-400 uppercase font-medium">{r.categoria}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700">
+                        {r.cantidad}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {equiv > 0 ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-700 font-mono">
+                          {equiv} ({(equiv * r.cantidad).toFixed(3)} total)
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-mono">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900">
+                      S/ {r.total.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr><td colSpan="5" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">Sin registros de rotación en este rango de fechas.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

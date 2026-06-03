@@ -1660,6 +1660,62 @@ app.get('/api/reportes/contable', async (req, res) => {
   }
 });
 
+// GET /api/reportes/rotacion → Cantidad vendida de cada producto por rango de fechas
+app.get('/api/reportes/rotacion', async (req, res) => {
+  const { desde, hasta } = req.query;
+  try {
+    let filtroFecha = {};
+    if (desde && hasta) {
+      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
+    } else {
+      const ahora = new Date();
+      const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+      hoyPeru.setHours(0, 0, 0, 0);
+      const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+      filtroFecha = { gte: inicioUTC };
+    }
+
+    const pedidos = await prisma.pedido.findMany({
+      where: {
+        estado: 'Cobrado',
+        createdAt: filtroFecha
+      },
+      include: {
+        items: {
+          include: {
+            producto: true
+          }
+        }
+      }
+    });
+
+    const rotacion = {};
+    for (const p of pedidos) {
+      for (const item of p.items) {
+        const prodId = item.productoId;
+        if (!rotacion[prodId]) {
+          rotacion[prodId] = {
+            id: prodId,
+            nombre: item.nombre,
+            categoria: item.producto?.categoria || 'Sin categoría',
+            cantidad: 0,
+            precio: item.precio,
+            total: 0
+          };
+        }
+        rotacion[prodId].cantidad += item.cantidad;
+        rotacion[prodId].total += item.cantidad * item.precio;
+      }
+    }
+
+    const resultado = Object.values(rotacion).sort((a, b) => b.cantidad - a.cantidad);
+    res.json(resultado);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ============================================================
 // INICIO DEL SERVIDOR
 // ============================================================
