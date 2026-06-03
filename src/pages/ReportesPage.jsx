@@ -38,6 +38,7 @@ export default function ReportesPage() {
   const [activeComprobante, setActiveComprobante] = useState(null);
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
   const [rotacion, setRotacion] = useState([]);
+  const [gerencialModalOpen, setGerencialModalOpen] = useState(false);
 
   const getChickenEquivalency = (name) => {
     const normalized = name.toLowerCase();
@@ -322,6 +323,13 @@ export default function ReportesPage() {
             className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-5 py-2.5 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 transition-all active:scale-95 disabled:opacity-50 h-[38px]"
           >
             <Download className="w-4 h-4" /> Exportar RCE / Ventas
+          </button>
+          <button 
+            onClick={() => setGerencialModalOpen(true)}
+            disabled={filtrando}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 transition-all active:scale-95 disabled:opacity-50 h-[38px]"
+          >
+            <Printer className="w-4 h-4" /> Reporte Gerencial (PDF)
           </button>
         </div>
       </div>
@@ -752,15 +760,182 @@ export default function ReportesPage() {
         </div>
       )}
 
+      {/* Modal Reporte Gerencial */}
+      {gerencialModalOpen && (
+        <div id="modal-reporte-gerencial-container" className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
+            <div className="bg-slate-950 p-4 text-white flex justify-between items-center shrink-0 no-print">
+              <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                <Printer className="w-5 h-5 text-amber-500" /> Reporte Gerencial Ejecutivo
+              </h3>
+              <div className="flex gap-2">
+                <button onClick={() => window.print()} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
+                  <Printer className="w-3.5 h-3.5" /> Imprimir / Guardar PDF
+                </button>
+                <button onClick={() => setGerencialModalOpen(false)} className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-white text-slate-900 font-sans">
+              <div className="text-center border-b pb-6 mb-6">
+                <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase">El Fogón Dorado</h1>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Reporte de Gestión Gerencial</p>
+                <p className="text-xs text-slate-400 mt-2 font-mono">Periodo: {fechaDesde} al {fechaHasta}</p>
+                <p className="text-[10px] text-slate-400 mt-1 font-mono">Generado el: {new Date().toLocaleString('es-PE')}</p>
+              </div>
+
+              <div className="mb-8">
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                  1. Balance y Resumen Contable (IGV)
+                </h2>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="border rounded-2xl p-4 bg-slate-50/50">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ventas</p>
+                    <p className="text-xl font-black font-mono text-slate-800 mt-1">S/ {resumen.ventasTotal.toFixed(2)}</p>
+                    <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
+                      <p>Base Imp.: S/ {resumen.ventasBase.toFixed(2)}</p>
+                      <p className="font-semibold text-blue-600">IGV (18%): S/ {resumen.ventasIGV.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="border rounded-2xl p-4 bg-slate-50/50">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Compras / Gastos</p>
+                    <p className="text-xl font-black font-mono text-slate-800 mt-1">S/ {resumen.comprasTotal.toFixed(2)}</p>
+                    <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
+                      <p>Base Imp.: S/ {resumen.comprasBase.toFixed(2)}</p>
+                      <p className="font-semibold text-rose-600">IGV (18%): S/ {resumen.comprasIGV.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="border rounded-2xl p-4 bg-slate-900 text-white">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">IGV Neto a Liquidar</p>
+                    <p className="text-xl font-black font-mono text-amber-400 mt-1">S/ {resumen.igvAPagar.toFixed(2)}</p>
+                    <p className="text-[9px] text-slate-400 mt-2">Diferencia entre débito fiscal de ventas y crédito fiscal de compras.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                  2. Rendimiento de Mozos (Mesas Atendidas)
+                </h2>
+                <div className="border rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b">
+                      <tr>
+                        <th className="px-4 py-3">Nombre Mozo</th>
+                        <th className="px-4 py-3 text-center">Mesas Activas</th>
+                        <th className="px-4 py-3 text-center">Mesas Atendidas y Cobradas</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y font-medium text-slate-700">
+                      {mozos.length > 0 ? mozos.map((m, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-3 font-bold text-slate-800">{m.nombre}</td>
+                          <td className="px-4 py-3 text-center">{m.mesasActivas}</td>
+                          <td className="px-4 py-3 text-center text-emerald-600 font-bold">{m.mesasAtendidas}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="3" className="px-4 py-3 text-center text-slate-400">Sin registros en el periodo</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    3. Top 5 Platos Más Vendidos
+                  </h2>
+                  <div className="border rounded-2xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b">
+                        <tr>
+                          <th className="px-4 py-3">Plato</th>
+                          <th className="px-4 py-3 text-center">Cantidad</th>
+                          <th className="px-4 py-3 text-right">Recaudado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y font-medium text-slate-700">
+                        {[...rotacion]
+                          .sort((a, b) => b.cantidad - a.cantidad)
+                          .slice(0, 5)
+                          .map((r, idx) => (
+                            <tr key={idx}>
+                              <td className="px-4 py-3 font-bold text-slate-800">{r.nombre}</td>
+                              <td className="px-4 py-3 text-center font-bold text-slate-900">{r.cantidad}</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">S/ {r.total.toFixed(2)}</td>
+                            </tr>
+                          ))
+                        }
+                        {rotacion.length === 0 && (
+                          <tr>
+                            <td colSpan="3" className="px-4 py-3 text-center text-slate-400">Sin datos de rotación</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-700"></span>
+                    4. Consumo de Pollos (Equivalencias)
+                  </h2>
+                  <div className="border rounded-2xl p-4 bg-amber-50/30 flex flex-col justify-between h-[155px]">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Consumo Total de Pollos</p>
+                      <p className="text-4xl font-black text-amber-800 mt-2 font-mono font-sans">
+                        {(() => {
+                          let total = 0;
+                          rotacion.forEach(item => {
+                            const equiv = getChickenEquivalency(item.nombre);
+                            total += item.cantidad * equiv;
+                          });
+                          return total.toFixed(2);
+                        })()} <span className="text-lg font-bold">Unidades</span>
+                      </p>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      Cálculo en base a las porciones de pollo a la brasa vendidas (1 entero = 1.0, 1/2 = 0.5, 1/4 = 0.25, 1/8 = 0.125).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-16 flex justify-around text-xs">
+                <div className="text-center w-48">
+                  <div className="border-b border-slate-350 h-10 mb-2"></div>
+                  <p className="font-bold text-slate-700">Firma Administrador</p>
+                  <p className="text-[10px] text-slate-400">CHICKEN ERP</p>
+                </div>
+                <div className="text-center w-48">
+                  <div className="border-b border-slate-350 h-10 mb-2"></div>
+                  <p className="font-bold text-slate-700">Firma Propietario</p>
+                  <p className="text-[10px] text-slate-400">El Fogón Dorado</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @media print {
           /* Ocultar elementos de navegación y fondos */
-          aside, header, #sidebar-menu, #sidebar-backdrop, button, nav, .shrink-0 {
+          aside, header, #sidebar-menu, #sidebar-backdrop, button, nav, .shrink-0, .no-print {
             display: none !important;
           }
           /* Ocultar el resto del contenido de la página excepto el modal a imprimir */
           main > *:not(section),
-          section > *:not(#modal-comprobante-sunat-print-container):not(#modal-cierre) {
+          section > *:not(#modal-comprobante-sunat-print-container):not(#modal-reporte-gerencial-container):not(#modal-cierre) {
             display: none !important;
           }
           /* Garantizar que el body y contenedores no tengan alturas fijas o desbordamientos */
@@ -807,6 +982,27 @@ export default function ReportesPage() {
             font-size: 11px !important;
             line-height: 1.3 !important;
             color: black !important;
+          }
+          #modal-reporte-gerencial-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            background: white !important;
+            z-index: 99999 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          #modal-reporte-gerencial-container > div {
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
         }
       `}</style>
