@@ -400,7 +400,7 @@ export default function ReportesPage() {
             };
             return (
               <span className="bg-amber-100 text-amber-900 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider">
-                Total Pollos Enteros: {calculateChickenTotal().toFixed(3)}
+                Total Pollos Enteros: {calculateChickenTotal().toFixed(2)}
               </span>
             );
           })()}
@@ -435,7 +435,7 @@ export default function ReportesPage() {
                     <td className="px-6 py-4 text-center">
                       {equiv > 0 ? (
                         <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-700 font-mono">
-                          {equiv} ({(equiv * r.cantidad).toFixed(3)} total)
+                          {(equiv * r.cantidad).toFixed(2)}
                         </span>
                       ) : (
                         <span className="text-slate-400 font-mono">-</span>
