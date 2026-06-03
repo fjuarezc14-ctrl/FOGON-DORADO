@@ -863,17 +863,20 @@ export default function ReportesPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y font-medium text-slate-700">
-                        {[...rotacion]
-                          .sort((a, b) => b.cantidad - a.cantidad)
-                          .slice(0, 5)
-                          .map((r, idx) => (
-                            <tr key={idx}>
-                              <td className="px-4 py-3 font-bold text-slate-800">{r.nombre}</td>
-                              <td className="px-4 py-3 text-center font-bold text-slate-900">{r.cantidad}</td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">S/ {r.total.toFixed(2)}</td>
-                            </tr>
-                          ))
-                        }
+                        {(() => {
+                          const categoriasExcluidas = ['Bebidas y Refrescos', 'Cervezas', 'Bar y Cocteles', 'Postres'];
+                          return [...rotacion]
+                            .filter(p => !categoriasExcluidas.includes(p.categoria))
+                            .sort((a, b) => b.cantidad - a.cantidad)
+                            .slice(0, 5)
+                            .map((r, idx) => (
+                              <tr key={idx}>
+                                <td className="px-4 py-3 font-bold text-slate-800">{r.nombre}</td>
+                                <td className="px-4 py-3 text-center font-bold text-slate-900">{r.cantidad}</td>
+                                <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">S/ {r.total.toFixed(2)}</td>
+                              </tr>
+                            ));
+                        })()}
                         {rotacion.length === 0 && (
                           <tr>
                             <td colSpan="3" className="px-4 py-3 text-center text-slate-400">Sin datos de rotación</td>

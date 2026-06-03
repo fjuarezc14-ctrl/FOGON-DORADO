@@ -22,7 +22,9 @@ export default function DashboardPage() {
           atendidas: resumen.atendidas || 0,
           ingresos: resumen.ingresos || 0,
         });
-        setTopProducts(rotacion.slice(0, 5));
+        const categoriasExcluidas = ['Bebidas y Refrescos', 'Cervezas', 'Bar y Cocteles', 'Postres'];
+        const platosFiltrados = rotacion.filter(p => !categoriasExcluidas.includes(p.categoria));
+        setTopProducts(platosFiltrados.slice(0, 5));
       } catch (err) {
         console.error('Error cargando dashboard:', err);
       }
