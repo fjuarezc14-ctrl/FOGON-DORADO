@@ -914,10 +914,9 @@ export default function ReportesPage() {
                 <div className="text-center w-48">
                   <div className="border-b border-slate-350 h-10 mb-2"></div>
                   <p className="font-bold text-slate-700">Firma Administrador</p>
-                  <p className="text-[10px] text-slate-400">CHICKEN ERP</p>
                 </div>
                 <div className="text-center w-48">
-                  <div className="border-b border-slate-350 h-10 mb-2"></div>
+                  <div className="border-b border-slate-355 h-10 mb-2"></div>
                   <p className="font-bold text-slate-700">Firma Propietario</p>
                   <p className="text-[10px] text-slate-400">El Fogón Dorado</p>
                 </div>
@@ -994,6 +993,7 @@ export default function ReportesPage() {
             z-index: 99999 !important;
             padding: 0 !important;
             margin: 0 !important;
+            overflow: visible !important;
           }
           #modal-reporte-gerencial-container > div {
             border-radius: 0 !important;
@@ -1003,6 +1003,13 @@ export default function ReportesPage() {
             height: auto !important;
             padding: 0 !important;
             margin: 0 !important;
+            overflow: visible !important;
+          }
+          #modal-reporte-gerencial-container .overflow-y-auto {
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            padding: 0 !important;
           }
         }
       `}</style>
