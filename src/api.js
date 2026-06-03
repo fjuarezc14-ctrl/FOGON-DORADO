@@ -91,6 +91,13 @@ export const api = {
   crearCompra: (body) => fetch(`${API_BASE}/api/compras`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
+  getComprasStats: () => fetch(`${API_BASE}/api/compras/stats`).then(r => r.json()),
+  sincronizarSunat: (body) => fetch(`${API_BASE}/api/compras/sincronizar-sunat`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  actualizarCategoriaCompra: (id, categoria) => fetch(`${API_BASE}/api/compras/${id}/categoria`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ categoria }),
+  }).then(r => r.json()),
 
   // Reportes
   getReporteContable: (desde, hasta) => fetch(`${API_BASE}/api/reportes/contable${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),

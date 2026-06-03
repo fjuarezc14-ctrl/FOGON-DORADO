@@ -1515,9 +1515,196 @@ app.get('/api/compras', async (req, res) => {
   }
 });
 
+// GET /api/compras/stats → KPIs del mes actual
+app.get('/api/compras/stats', async (req, res) => {
+  try {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const compras = await prisma.compra.findMany({
+      where: { creadoEn: { gte: inicioMes } },
+    });
+
+    const totalGastado = compras.reduce((s, c) => s + c.total, 0);
+    const totalIGV = compras.reduce((s, c) => s + c.igv, 0);
+    const numFacturas = compras.length;
+
+    // Top proveedor
+    const porProveedor = {};
+    compras.forEach(c => {
+      porProveedor[c.proveedor] = (porProveedor[c.proveedor] || 0) + c.total;
+    });
+    const topProveedor = Object.entries(porProveedor).sort((a, b) => b[1] - a[1])[0];
+
+    // Breakdown por categoría
+    const porCategoria = {};
+    compras.forEach(c => {
+      const cat = c.categoria || 'Sin Categoría';
+      porCategoria[cat] = (porCategoria[cat] || 0) + c.total;
+    });
+
+    res.json({
+      totalGastado,
+      totalIGV,
+      numFacturas,
+      topProveedor: topProveedor ? { nombre: topProveedor[0], total: topProveedor[1] } : null,
+      porCategoria,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/compras/sincronizar-sunat → Proxy seguro a apisunat.pe
+// Modo demo: si APISUNAT_TOKEN no está configurado, retorna datos de ejemplo reales.
+app.post('/api/compras/sincronizar-sunat', async (req, res) => {
+  const { periodo, fechaInicio, fechaFin } = req.body;
+  const token = process.env.APISUNAT_TOKEN;
+  const MODO_DEMO = !token || token.includes('tu_token') || token === '';
+
+  // Datos de demo basados en la respuesta real de la documentación oficial de apisunat.pe
+  const DEMO_ITEMS = [
+    {
+      emisor: { ruc: '10061488176', razon_social: 'AGUILA ULLOA EFRAIN VICTOR' },
+      detalle: {
+        tipo_comprobante: '01', nombre_comprobante: 'Factura Electrónica',
+        serie: 'E001', numero: '88', fecha_emision: '2025-12-01', estado_comprobante: 'Aceptado',
+      },
+      totales: { total_grav_oner: '438.98', total_igv: '79.02', monto_total_general: '518.00' },
+      url_descarga: {
+        pdf: 'https://apisunat.pe/rce/document/pdf/10061488176-01-E001-88',
+        xml: 'https://apisunat.pe/rce/document/xml/10061488176-01-E001-88',
+      },
+    },
+    {
+      emisor: { ruc: '10080275973', razon_social: 'REYES MARIÑOS DE ZEGARRA YSABEL' },
+      detalle: {
+        tipo_comprobante: '01', nombre_comprobante: 'Factura Electrónica',
+        serie: 'FF01', numero: '693', fecha_emision: '2025-12-01', estado_comprobante: 'Aceptado',
+      },
+      totales: { total_grav_oner: '667.46', total_igv: '120.14', monto_total_general: '787.60' },
+      url_descarga: {
+        pdf: 'https://apisunat.pe/rce/document/pdf/10080275973-01-FF01-693',
+        xml: 'https://apisunat.pe/rce/document/xml/10080275973-01-FF01-693',
+      },
+    },
+    {
+      emisor: { ruc: '20601245789', razon_social: 'DISTRIBUIDORA ALIMENTOS & INSUMOS S.A.C.' },
+      detalle: {
+        tipo_comprobante: '01', nombre_comprobante: 'Factura Electrónica',
+        serie: 'F001', numero: '2145', fecha_emision: '2025-12-03', estado_comprobante: 'Aceptado',
+      },
+      totales: { total_grav_oner: '1186.44', total_igv: '213.56', monto_total_general: '1400.00' },
+      url_descarga: {
+        pdf: 'https://apisunat.pe/rce/document/pdf/20601245789-01-F001-2145',
+        xml: 'https://apisunat.pe/rce/document/xml/20601245789-01-F001-2145',
+      },
+    },
+    {
+      emisor: { ruc: '20100128056', razon_social: 'BACKUS Y JOHNSTON S.A.A.' },
+      detalle: {
+        tipo_comprobante: '01', nombre_comprobante: 'Factura Electrónica',
+        serie: 'F001', numero: '98443', fecha_emision: '2025-12-05', estado_comprobante: 'Aceptado',
+      },
+      totales: { total_grav_oner: '423.73', total_igv: '76.27', monto_total_general: '500.00' },
+      url_descarga: {
+        pdf: 'https://apisunat.pe/rce/document/pdf/20100128056-01-F001-98443',
+        xml: 'https://apisunat.pe/rce/document/xml/20100128056-01-F001-98443',
+      },
+    },
+  ];
+
+  try {
+    let itemsParaProcesar = [];
+
+    if (MODO_DEMO) {
+      itemsParaProcesar = DEMO_ITEMS;
+    } else {
+      // Llamada real a apisunat.pe con paginación
+      const params = new URLSearchParams();
+      if (periodo) params.set('period', periodo);
+      if (fechaInicio) params.set('start_date', fechaInicio);
+      if (fechaFin) params.set('end_date', fechaFin);
+      params.set('page', '1');
+
+      const resp = await fetch(`https://dev.apisunat.pe/api/v1/sunat/rce?${params.toString()}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token,
+        },
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        return res.status(resp.status).json({ error: `apisunat.pe respondió con ${resp.status}: ${txt}` });
+      }
+
+      const data = await resp.json();
+      itemsParaProcesar = (data.payload?.items) || [];
+    }
+
+    // Mapear tipo_comprobante a nombre legible
+    const TIPOS = { '01': 'Factura', '03': 'Boleta', '07': 'Nota de Crédito', '08': 'Nota de Débito' };
+
+    let importadas = 0;
+    let duplicadas = 0;
+
+    for (const item of itemsParaProcesar) {
+      const serieNumero = `${item.detalle.serie}-${item.detalle.numero}`;
+
+      // Verificar duplicado por serieNumero + RUC del emisor
+      const existe = await prisma.compra.findFirst({
+        where: { serieNumero, ruc: item.emisor.ruc },
+      });
+
+      if (existe) {
+        duplicadas++;
+        continue;
+      }
+
+      const baseImponible = parseFloat(item.totales.total_grav_oner || 0);
+      const igv = parseFloat(item.totales.total_igv || 0);
+      const total = parseFloat(item.totales.monto_total_general || 0);
+      const tipoDoc = TIPOS[item.detalle.tipo_comprobante] || 'Factura';
+      const fechaEmision = item.detalle.fecha_emision ? new Date(item.detalle.fecha_emision + 'T00:00:00.000-05:00') : null;
+
+      await prisma.compra.create({
+        data: {
+          proveedor: item.emisor.razon_social,
+          ruc: item.emisor.ruc,
+          tipoDocumento: tipoDoc,
+          serieNumero,
+          baseImponible,
+          igv,
+          total,
+          origenCarga: MODO_DEMO ? 'demo' : 'sunat',
+          fechaEmision,
+          urlPdf: item.url_descarga?.pdf || null,
+          urlXml: item.url_descarga?.xml || null,
+        },
+      });
+
+      importadas++;
+    }
+
+    res.json({
+      ok: true,
+      modoDemo: MODO_DEMO,
+      importadas,
+      duplicadas,
+      total: importadas + duplicadas,
+      mensaje: MODO_DEMO
+        ? `✅ MODO DEMO: ${importadas} facturas de ejemplo importadas desde la documentación de apisunat.pe. (${duplicadas} ya existían)`
+        : `✅ ${importadas} facturas importadas desde SUNAT. (${duplicadas} ya existían)`,
+    });
+  } catch (err) {
+    console.error('[Sync SUNAT]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/compras', async (req, res) => {
   try {
-    const { proveedor, ruc, tipoDocumento, serieNumero, baseImponible, igv, total, xmlData, origenCarga } = req.body;
+    const { proveedor, ruc, tipoDocumento, serieNumero, baseImponible, igv, total, xmlData, origenCarga, categoria, fechaEmision } = req.body;
     const compra = await prisma.compra.create({
       data: {
         proveedor: String(proveedor),
@@ -1529,7 +1716,24 @@ app.post('/api/compras', async (req, res) => {
         total: parseFloat(total),
         xmlData: xmlData ? String(xmlData) : null,
         origenCarga: origenCarga ? String(origenCarga) : 'manual',
+        categoria: categoria ? String(categoria) : null,
+        fechaEmision: fechaEmision ? new Date(fechaEmision) : null,
       }
+    });
+    res.json(compra);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/compras/:id/categoria → Actualizar categoría de una compra
+app.patch('/api/compras/:id/categoria', async (req, res) => {
+  const { id } = req.params;
+  const { categoria } = req.body;
+  try {
+    const compra = await prisma.compra.update({
+      where: { id: parseInt(id) },
+      data: { categoria: categoria ? String(categoria) : null },
     });
     res.json(compra);
   } catch (err) {

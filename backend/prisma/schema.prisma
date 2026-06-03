@@ -111,18 +111,22 @@ model Venta {
 // COMPRAS / GASTOS (RCE - SUNAT)
 // ============================================================
 model Compra {
-  id             Int      @id @default(autoincrement())
-  fecha          DateTime @default(now())
+  id             Int       @id @default(autoincrement())
+  fecha          DateTime  @default(now())
   proveedor      String
   ruc            String?
-  tipoDocumento  String   @default("Factura") // "Factura", "Boleta"
+  tipoDocumento  String    @default("Factura") // "Factura", "Boleta", "Nota de Crédito", "Nota de Débito"
   serieNumero    String?
   baseImponible  Float
   igv            Float
   total          Float
   xmlData        String?
-  origenCarga    String   @default("manual") // "xml", "manual"
-  creadoEn       DateTime @default(now())
+  origenCarga    String    @default("manual") // "xml", "manual", "sunat"
+  categoria      String?   // "Insumos y Alimentos", "Bebidas", "Gas y Carbón", "Limpieza e Higiene", "Personal", "Otros"
+  fechaEmision   DateTime? // Fecha real de la factura emitida por el proveedor
+  urlPdf         String?   // URL de descarga del PDF desde apisunat.pe
+  urlXml         String?   // URL de descarga del XML desde apisunat.pe
+  creadoEn       DateTime  @default(now())
 }
 
 // ============================================================
