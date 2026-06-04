@@ -100,7 +100,12 @@ model Venta {
   igv             Float
   subtotal        Float
   metodoPago      String   @default("Efectivo") // "Efectivo", "Tarjeta", "Yape", "PedidosYa"
-  estadoNubefact  String   @default("PENDIENTE")
+  estadoNubefact  String   @default("PENDIENTE") // Obsoleto (usar estadoSunat en su lugar)
+  estadoSunat     String   @default("PENDIENTE")
+  serie           String?  // "F001" o "B001"
+  numero          Int?     // Número correlativo asignado
+  urlPdf          String?  // Enlace del PDF del comprobante
+  urlXml          String?  // Enlace del XML del comprobante
   // --- Ofertas / Descuentos ---
   ofertaDescripcion  String?  // Nombre de la oferta aplicada, si hubo
   descuentoAplicado  Float    @default(0) // Monto total descontado en esta venta

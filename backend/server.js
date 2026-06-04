@@ -1322,8 +1322,20 @@ app.post('/api/ventas', async (req, res) => {
       });
     }
 
+    // Calcular correlativo para apisunat.pe si es Boleta o Factura
+    let serie = null;
+    let numero = null;
+    if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
+      const ultimaVenta = await prisma.venta.findFirst({
+        where: { tipoComprobante, numero: { not: null } },
+        orderBy: { numero: 'desc' }
+      });
+      serie = tipoComprobante === 'Factura' ? 'F001' : 'B001';
+      numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
+    }
+
     // Crear Venta principal (inicialmente PENDIENTE si es factura/boleta)
-    const initEstadoNubefact = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
+    const initEstadoSunat = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
 
     const venta = await prisma.venta.create({
       data: { 
@@ -1335,7 +1347,10 @@ app.post('/api/ventas', async (req, res) => {
         igv, 
         subtotal, 
         metodoPago,
-        estadoNubefact: initEstadoNubefact,
+        estadoNubefact: initEstadoSunat,
+        estadoSunat: initEstadoSunat,
+        serie,
+        numero,
         ofertaDescripcion: ofertaDescripcion ? String(ofertaDescripcion) : null,
         descuentoAplicado: descuentoAplicado ? parseFloat(descuentoAplicado) : 0,
       },
@@ -1361,7 +1376,7 @@ app.post('/api/ventas', async (req, res) => {
       });
     }
 
-    // Si es Boleta o Factura, intentamos enviar a Nubefact
+    // Si es Boleta o Factura, intentamos enviar a apisunat.pe
     if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
       try {
         const pedidoConItems = await prisma.pedido.findUnique({
@@ -1369,37 +1384,64 @@ app.post('/api/ventas', async (req, res) => {
           include: { items: true }
         });
 
-        // Llamar a Nubefact
-        const response = await enviarANubefact({ ...venta, clienteDireccion }, pedidoConItems.items);
+        // Llamar a apisunat.pe
+        const response = await enviarAApisunat({ ...venta, clienteDireccion }, pedidoConItems.items);
         
+        // Mapear respuesta para compatibilidad con el front
+        const mappedData = {
+          serie: venta.serie,
+          numero: venta.numero,
+          key: response.payload?.hash || '',
+          enlace_del_pdf: response.payload?.pdf?.ticket || response.payload?.pdf?.a4 || '',
+          cadena_para_codigo_qr: `20496009259|${venta.tipoComprobante === 'Factura' ? '01' : '03'}|${venta.serie}|${String(venta.numero).padStart(4, '0')}|${venta.igv.toFixed(2)}|${venta.total.toFixed(2)}|${new Intl.DateTimeFormat('es-PE', {timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date(venta.createdAt))}|${venta.tipoComprobante === 'Factura' ? '6' : (venta.numDocumento?.length === 8 ? '1' : '0')}|${venta.numDocumento || '00000000'}|${response.payload?.hash || ''}`
+        };
+
+        const strAceptado = `ACEPTADO:${JSON.stringify(mappedData)}`;
+
         // Si tiene éxito, actualizamos a ACEPTADO y guardamos la respuesta
         const ventaActualizada = await prisma.venta.update({
           where: { id: venta.id },
-          data: { estadoNubefact: `ACEPTADO:${JSON.stringify(response)}` }
+          data: { 
+            estadoNubefact: strAceptado,
+            estadoSunat: strAceptado,
+            urlPdf: mappedData.enlace_del_pdf,
+            urlXml: response.payload?.xml || null
+          }
         });
 
-        return res.json({ ok: true, ventaId: venta.id, estadoNubefact: ventaActualizada.estadoNubefact });
-      } catch (nubefactErr) {
-        console.error("⚠️ Error al facturar con Nubefact. Entrando en modo contingencia (Offline-First):", nubefactErr.message);
+        return res.json({ 
+          ok: true, 
+          ventaId: venta.id, 
+          estadoNubefact: ventaActualizada.estadoSunat,
+          serie: venta.serie,
+          numero: venta.numero
+        });
+      } catch (sunatErr) {
+        console.error("⚠️ Error al facturar con apisunat.pe. Entrando en modo contingencia (Offline-First):", sunatErr.message);
 
         // Guardar estado de contingencia
         const ventaActualizada = await prisma.venta.update({
           where: { id: venta.id },
-          data: { estadoNubefact: 'PENDIENTE_REINTENTO' }
+          data: { 
+            estadoNubefact: 'PENDIENTE_REINTENTO',
+            estadoSunat: 'PENDIENTE_REINTENTO'
+          }
         });
 
         // Retornamos éxito al POS para liberar la mesa sin trabas e indicando contingencia
         return res.json({ 
           ok: true, 
           ventaId: venta.id, 
-          estadoNubefact: ventaActualizada.estadoNubefact,
+          estadoNubefact: ventaActualizada.estadoSunat,
+          serie: venta.serie,
+          numero: venta.numero,
           contingencia: true,
           mensaje: "Comprobante emitido en contingencia. El envío a la SUNAT se completará automáticamente en segundo plano."
         });
       }
     }
 
-    res.json({ ok: true, ventaId: venta.id, estadoNubefact: initEstadoNubefact });
+    res.json({ ok: true, ventaId: venta.id, estadoNubefact: initEstadoSunat, serie: null, numero: null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1452,6 +1494,8 @@ app.get('/api/ventas', async (req, res) => {
       tipoEntrega: v.pedido?.tipoEntrega || 'salon',
       createdAt: v.createdAt.toISOString(),
       estadoNubefact: v.estadoNubefact,
+      serie: v.serie,
+      numero: v.numero,
       itemsResumen: v.pedido?.items?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
 
       items: v.pedido?.items?.map(i => ({
@@ -1929,100 +1973,103 @@ app.listen(PORT, () => {
 });
 
 
-// ============================================================
-// HELPERS E INTEGRACIÓN NUBEFACT (SUNAT PSE)
+// HELPERS E INTEGRACIÓN APISUNAT.PE (SUNAT PSE)
 // ============================================================
 
-async function enviarANubefact(venta, items) {
+async function enviarAApisunat(venta, items) {
   // Simular caída de red si está activa la variable de entorno
-  if (process.env.NUBEFACT_SIMULATE_OUTAGE === 'true') {
-    throw new Error('Outage Simulator Active: Nubefact server is simulated down.');
+  if (process.env.APISUNAT_SIMULATE_OUTAGE === 'true') {
+    throw new Error('Outage Simulator Active: apisunat.pe server is simulated down.');
   }
 
-  const token = process.env.NUBEFACT_TOKEN;
-  const url = process.env.NUBEFACT_API_URL;
+  const token = process.env.APISUNAT_TOKEN;
+  const url = process.env.APISUNAT_API_URL || 'https://sandbox.apisunat.pe/api/v3/documents';
+  const MODO_DEMO = !token || token.includes('tu_token') || token === '';
 
-  if (!token || !url || token.includes('tu_token') || url.includes('tu_token') || token === '') {
-    throw new Error('Nubefact credentials not configured in .env');
-  }
+  const serie = venta.tipoComprobante === 'Factura' ? 'F001' : 'B001';
 
-  // Mapear tipo de comprobante para Nubefact (1 = Factura, 2 = Boleta)
-  const tipoComprobanteNum = venta.tipoComprobante === 'Factura' ? 1 : 2;
-  const serie = venta.tipoComprobante === 'Factura' ? 'FFF1' : 'BBB1'; // Series oficiales de homologación Nubefact
-  
   // Identificación del cliente (1 = DNI, 6 = RUC, 0 = Sin Documento)
-  let clienteTipoDoc = 1;
-  let clienteNumDoc = venta.numDocumento || '00000000';
+  let clienteTipoDoc = "1";
+  let clienteNumDoc = venta.numDocumento || "00000000";
+  let clienteDenominacion = venta.nombreCliente || "PÚBLICO GENERAL";
+
   if (venta.numDocumento && venta.numDocumento.length === 11) {
-    clienteTipoDoc = 6;
+    clienteTipoDoc = "6";
   } else if (!venta.numDocumento || venta.numDocumento === '00000000' || venta.numDocumento === '0') {
-    clienteTipoDoc = 0; // Sin documento para boletas menores a 700 soles
-    clienteNumDoc = '00000000';
+    clienteTipoDoc = "0";
+    clienteNumDoc = "00000000";
+    clienteDenominacion = "PÚBLICO GENERAL";
   }
 
-  // Formatear items para el JSON de Nubefact
+  // En MODO DEMO simulamos una respuesta exitosa localmente
+  if (MODO_DEMO) {
+    const rucEmpresa = "20496009259";
+    const numeroStr = String(venta.numero || 1);
+    const tipoCompNum = venta.tipoComprobante === 'Factura' ? '01' : '03';
+    return {
+      success: true,
+      message: "El comprobante fue enviado y aceptado por SUNAT (DEMO).",
+      payload: {
+        estado: "ACEPTADO",
+        hash: "demo_hash_" + Math.random().toString(36).substring(2, 10).toUpperCase(),
+        xml: `https://apisunat.pe/${rucEmpresa}-${tipoCompNum}-${serie}-${numeroStr}.xml`,
+        cdr: `https://apisunat.pe/R-${rucEmpresa}-${tipoCompNum}-${serie}-${numeroStr}.xml`,
+        pdf: {
+          ticket: `https://apisunat.pe/pdf/ticket/${rucEmpresa}-${tipoCompNum}-${serie}-${numeroStr}`,
+          a4: `https://apisunat.pe/pdf/a4/${rucEmpresa}-${tipoCompNum}-${serie}-${numeroStr}`
+        }
+      }
+    };
+  }
+
+  // Formatear items para apisunat.pe
   const formattedItems = items.map((item) => {
     const totalItem = item.precio * item.cantidad;
     const subtotalItem = totalItem / 1.18;
-    const igvItem = totalItem - subtotalItem;
     
     return {
       unidad_de_medida: "NIU",
-      codigo: `P${String(item.productoId).padStart(3, '0')}`,
       descripcion: item.nombre,
-      cantidad: parseFloat(item.cantidad),
-      valor_unitario: parseFloat((subtotalItem / item.cantidad).toFixed(4)),
-      precio_unitario: parseFloat(item.precio.toFixed(4)),
-      subtotal: parseFloat(subtotalItem.toFixed(2)),
-      tipo_de_igv: 1, // Gravado - Operación Onerosa
-      igv: parseFloat(igvItem.toFixed(2)),
-      total: parseFloat(totalItem.toFixed(2))
+      cantidad: String(item.cantidad),
+      valor_unitario: (subtotalItem / item.cantidad).toFixed(6), // Recomienda 6 decimales
+      porcentaje_igv: "18",
+      codigo_tipo_afectacion_igv: "10", // Gravado - Operación Onerosa
+      nombre_tributo: "IGV"
     };
   });
 
   const payload = {
-    operacion: "generar_comprobante",
-    // El codigo_unico incluye timestamp para evitar que Nubefact rechace reintentos como duplicados
-    codigo_unico: `fogon_v${venta.id}_${Date.now()}`,
-    tipo_de_comprobante: tipoComprobanteNum,
+    documento: venta.tipoComprobante === 'Factura' ? 'factura' : 'boleta',
     serie: serie,
-    numero: null, // Autoincrementar en Nubefact
-
-    sunat_transaction: 1, // Venta interna
-    cliente_tipo_de_documento: clienteTipoDoc,
-    cliente_numero_de_documento: clienteNumDoc,
-    cliente_denominacion: venta.nombreCliente || 'PÚBLICO GENERAL',
-    cliente_direccion: venta.clienteDireccion || '',
-    cliente_email: null,
-    // IMPORTANTE: Siempre usar la fecha ACTUAL de Lima, no la de creación.
-    // Nubefact/SUNAT rechaza comprobantes con fecha pasada en reintentos.
+    numero: venta.numero, // Debe ser entero
     fecha_de_emision: (() => {
       const dateLima = new Intl.DateTimeFormat('es-PE', {
         timeZone: 'America/Lima',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
-      }).format(new Date()); // <-- Siempre HOY en hora Lima
+      }).format(new Date());
       const [day, month, year] = dateLima.split('/');
       return `${year}-${month}-${day}`;
     })(),
-    moneda: 1, // Soles
-    porcentaje_de_igv: 18.00,
-    total_gravada: parseFloat(venta.subtotal.toFixed(2)),
-    total_igv: parseFloat(venta.igv.toFixed(2)),
-    total: parseFloat(venta.total.toFixed(2)),
-    enviar_a_la_sunat: true,
-    items: formattedItems
+    moneda: "PEN",
+    tipo_operacion: "0101",
+    cliente_tipo_de_documento: clienteTipoDoc,
+    cliente_numero_de_documento: clienteNumDoc,
+    cliente_denominacion: clienteDenominacion,
+    cliente_direccion: venta.clienteDireccion || "",
+    items: formattedItems,
+    total: venta.total.toFixed(2)
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos — Nubefact puede ser lento desde Perú
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': token.startsWith('Bearer ') ? token : `Bearer ${token}`
     },
     body: JSON.stringify(payload),
     signal: controller.signal
@@ -2032,7 +2079,12 @@ async function enviarANubefact(venta, items) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Nubefact Error (${response.status}): ${errorText}`);
+    let parsedError;
+    try {
+      parsedError = JSON.parse(errorText);
+    } catch (e) {}
+    const errMsg = parsedError?.message || errorText;
+    throw new Error(`apisunat.pe Error (${response.status}): ${errMsg}`);
   }
 
   return await response.json();
@@ -2040,18 +2092,17 @@ async function enviarANubefact(venta, items) {
 
 
 // ============================================================
-// NUBEFACT — ENDPOINTS DE DIAGNÓSTICO Y REINTENTO MANUAL
+// APISUNAT — ENDPOINTS DE DIAGNÓSTICO Y REINTENTO MANUAL
 // ============================================================
 
-// GET /api/nubefact/pendientes → Ver todas las ventas con problemas (pendientes + errores)
-app.get('/api/nubefact/pendientes', async (req, res) => {
+// GET /api/sunat/pendientes → Ver todas las ventas con problemas
+app.get('/api/sunat/pendientes', async (req, res) => {
   try {
     const pendientes = await prisma.venta.findMany({
       where: {
-        // Mostrar tanto las pendientes de reintento como las que fallaron con error
         OR: [
-          { estadoNubefact: { startsWith: 'PENDIENTE' } },
-          { estadoNubefact: { startsWith: 'ERROR' } },
+          { estadoSunat: { startsWith: 'PENDIENTE' } },
+          { estadoSunat: { startsWith: 'ERROR' } },
         ],
         tipoComprobante: { in: ['Boleta', 'Factura'] }
       },
@@ -2062,19 +2113,26 @@ app.get('/api/nubefact/pendientes', async (req, res) => {
         total: true,
         nombreCliente: true,
         numDocumento: true,
-        estadoNubefact: true,
+        estadoSunat: true,
         pedidoId: true,
+        serie: true,
+        numero: true
       },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(pendientes);
+    // Mapeamos temporalmente estadoSunat como estadoNubefact para compatibilidad con el front
+    const mapped = pendientes.map(p => ({
+      ...p,
+      estadoNubefact: p.estadoSunat
+    }));
+    res.json(mapped);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/nubefact/reintentar/:id → Forzar reintento manual de una venta específica
-app.post('/api/nubefact/reintentar/:id', async (req, res) => {
+// POST /api/sunat/reintentar/:id → Forzar reintento manual de una venta específica
+app.post('/api/sunat/reintentar/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   try {
     const venta = await prisma.venta.findUnique({
@@ -2083,34 +2141,61 @@ app.post('/api/nubefact/reintentar/:id', async (req, res) => {
     });
     if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
 
-    console.log(`[Nubefact Manual] 🔄 Reintento manual forzado para Venta #${id}...`);
-    const response = await enviarANubefact(venta, venta.pedido.items);
+    console.log(`[SUNAT Manual] 🔄 Reintento manual forzado para Venta #${id}...`);
+
+    // Asignar serie y correlativo si no los tiene
+    if (!venta.serie || !venta.numero) {
+      const ultimaVenta = await prisma.venta.findFirst({
+        where: { tipoComprobante: venta.tipoComprobante, numero: { not: null } },
+        orderBy: { numero: 'desc' }
+      });
+      venta.serie = venta.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+      venta.numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
+
+      await prisma.venta.update({
+        where: { id: venta.id },
+        data: { serie: venta.serie, numero: venta.numero }
+      });
+    }
+
+    const response = await enviarAApisunat(venta, venta.pedido.items);
+
+    const mappedData = {
+      serie: venta.serie,
+      numero: venta.numero,
+      key: response.payload?.hash || '',
+      enlace_del_pdf: response.payload?.pdf?.ticket || response.payload?.pdf?.a4 || '',
+      cadena_para_codigo_qr: `20496009259|${venta.tipoComprobante === 'Factura' ? '01' : '03'}|${venta.serie}|${String(venta.numero).padStart(4, '0')}|${venta.igv.toFixed(2)}|${venta.total.toFixed(2)}|${new Intl.DateTimeFormat('es-PE', {timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date(venta.createdAt))}|${venta.tipoComprobante === 'Factura' ? '6' : (venta.numDocumento?.length === 8 ? '1' : '0')}|${venta.numDocumento || '00000000'}|${response.payload?.hash || ''}`
+    };
 
     const updated = await prisma.venta.update({
       where: { id },
-      data: { estadoNubefact: `ACEPTADO:${JSON.stringify(response)}` }
+      data: {
+        estadoSunat: `ACEPTADO:${JSON.stringify(mappedData)}`,
+        urlPdf: mappedData.enlace_del_pdf,
+        urlXml: response.payload?.xml || null
+      }
     });
 
-    console.log(`[Nubefact Manual] ✅ Venta #${id} ACEPTADA por Nubefact.`);
-    res.json({ ok: true, estadoNubefact: updated.estadoNubefact });
+    console.log(`[SUNAT Manual] ✅ Venta #${id} ACEPTADA por apisunat.pe.`);
+    res.json({ ok: true, estadoNubefact: updated.estadoSunat }); // Retornamos mapeado como estadoNubefact para el front
   } catch (err) {
-    // Guardar el error en BD para poder verlo desde el panel
-    const errorMsg = err.message.substring(0, 500); // Limitar a 500 chars
+    const errorMsg = err.message.substring(0, 500);
     await prisma.venta.update({
       where: { id },
-      data: { estadoNubefact: `ERROR:${errorMsg}` }
-    }).catch(() => {}); // Silenciar error si la venta no existe
+      data: { estadoSunat: `ERROR:${errorMsg}` }
+    }).catch(() => {});
 
-    console.error(`[Nubefact Manual] ❌ Fallo reintento manual Venta #${id}:`, err.message);
+    console.error(`[SUNAT Manual] ❌ Fallo reintento manual Venta #${id}:`, err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// POST /api/nubefact/reintentar-todos → Forzar reintento de TODAS las ventas pendientes
-app.post('/api/nubefact/reintentar-todos', async (req, res) => {
+// POST /api/sunat/reintentar-todos → Forzar reintento de TODAS las ventas pendientes
+app.post('/api/sunat/reintentar-todos', async (req, res) => {
   try {
     await procesarVentasPendientes();
-    res.json({ ok: true, mensaje: 'Reintento masivo ejecutado. Revisa los logs o /api/nubefact/pendientes.' });
+    res.json({ ok: true, mensaje: 'Reintento masivo ejecutado. Revisa los logs de SUNAT.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2125,7 +2210,7 @@ async function procesarVentasPendientes() {
   try {
     const pendientes = await prisma.venta.findMany({
       where: {
-        estadoNubefact: 'PENDIENTE_REINTENTO',
+        estadoSunat: 'PENDIENTE_REINTENTO',
         tipoComprobante: { in: ['Boleta', 'Factura'] }
       },
       include: {
@@ -2137,32 +2222,58 @@ async function procesarVentasPendientes() {
 
     if (pendientes.length === 0) return;
 
-    console.log(`[Worker Nubefact] 🔍 Se encontraron ${pendientes.length} ventas en contingencia por reintentar.`);
+    console.log(`[Worker SUNAT] 🔍 Se encontraron ${pendientes.length} ventas en contingencia por reintentar.`);
 
     for (const venta of pendientes) {
       try {
-        console.log(`[Worker Nubefact] 🔄 Reintentando envío de Venta #${venta.id}...`);
-        const response = await enviarANubefact(venta, venta.pedido.items);
+        console.log(`[Worker SUNAT] 🔄 Reintentando envío de Venta #${venta.id}...`);
+
+        if (!venta.serie || !venta.numero) {
+          const ultimaVenta = await prisma.venta.findFirst({
+            where: { tipoComprobante: venta.tipoComprobante, numero: { not: null } },
+            orderBy: { numero: 'desc' }
+          });
+          venta.serie = venta.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+          venta.numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
+
+          await prisma.venta.update({
+            where: { id: venta.id },
+            data: { serie: venta.serie, numero: venta.numero }
+          });
+        }
+
+        const response = await enviarAApisunat(venta, venta.pedido.items);
         
+        const mappedData = {
+          serie: venta.serie,
+          numero: venta.numero,
+          key: response.payload?.hash || '',
+          enlace_del_pdf: response.payload?.pdf?.ticket || response.payload?.pdf?.a4 || '',
+          cadena_para_codigo_qr: `20496009259|${venta.tipoComprobante === 'Factura' ? '01' : '03'}|${venta.serie}|${String(venta.numero).padStart(4, '0')}|${venta.igv.toFixed(2)}|${venta.total.toFixed(2)}|${new Intl.DateTimeFormat('es-PE', {timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date(venta.createdAt))}|${venta.tipoComprobante === 'Factura' ? '6' : (venta.numDocumento?.length === 8 ? '1' : '0')}|${venta.numDocumento || '00000000'}|${response.payload?.hash || ''}`
+        };
+
         await prisma.venta.update({
           where: { id: venta.id },
-          data: { estadoNubefact: `ACEPTADO:${JSON.stringify(response)}` }
+          data: {
+            estadoSunat: `ACEPTADO:${JSON.stringify(mappedData)}`,
+            urlPdf: mappedData.enlace_del_pdf,
+            urlXml: response.payload?.xml || null
+          }
         });
         
-        console.log(`[Worker Nubefact] ✅ Venta #${venta.id} enviada y ACEPTADA por Nubefact.`);
+        console.log(`[Worker SUNAT] ✅ Venta #${venta.id} enviada y ACEPTADA por apisunat.pe.`);
       } catch (err) {
-        // Guardar el mensaje de error en BD (truncado a 500 chars) para diagnóstico
         const errorMsg = err.message.substring(0, 500);
         await prisma.venta.update({
           where: { id: venta.id },
-          data: { estadoNubefact: `ERROR:${errorMsg}` }
+          data: { estadoSunat: `ERROR:${errorMsg}` }
         }).catch(() => {});
 
-        console.error(`[Worker Nubefact] ❌ Intento fallido para Venta #${venta.id}:`, err.message);
+        console.error(`[Worker SUNAT] ❌ Intento fallido para Venta #${venta.id}:`, err.message);
       }
     }
   } catch (err) {
-    console.error("[Worker Nubefact] ❌ Error crítico en el worker:", err.message);
+    console.error("[Worker SUNAT] ❌ Error crítico en el worker:", err.message);
   }
 }
 

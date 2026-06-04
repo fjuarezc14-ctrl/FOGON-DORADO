@@ -214,9 +214,9 @@ export default function CajaPage() {
     if (!v) return;
     const rucEmpresa = "R.U.C. N° 20496009259";
     
-    let serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
-    let correlativoStr = String(v.id % 10000).padStart(4, '0');
-    let qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${v.igv.toFixed(2)}|${v.total.toFixed(2)}|${v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}|${v.tipoComprobante === 'Factura'?'6':'1'}|${v.numDocumento || '00000000'}`;
+    let serie = v.serie || (v.tipoComprobante === 'Factura' ? 'F001' : 'B001');
+    let correlativoStr = String(v.numero || (v.id % 10000)).padStart(4, '0');
+    let qrData = `${rucEmpresa}|${v.tipoComprobante === 'Factura' ? '01' : '03'}|${serie}|${correlativoStr}|${v.igv.toFixed(2)}|${v.total.toFixed(2)}|${v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}|${v.tipoComprobante === 'Factura'?'6':(v.numDocumento?.length === 8 ? '1' : '0')}|${v.numDocumento || '00000000'}`;
     let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
     let enlacePdf = null;
     let contingencia = v.estadoNubefact === 'PENDIENTE_REINTENTO';
@@ -299,7 +299,7 @@ export default function CajaPage() {
     
     let serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
     let correlativoStr = String(v.id % 10000).padStart(4, '0');
-    let enlace = 'https://www.nubefact.com/buscar';
+    let enlace = 'https://www.sunat.gob.pe';
 
     if (v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:')) {
       try {
@@ -366,23 +366,18 @@ export default function CajaPage() {
         clienteDireccion: clienteDireccion || '',
       });
 
-      // Incrementar correlativo SUNAT
-      const keyCorrelativo = tipoComprobante === 'Factura' ? 'polleria_factura_correlativo' : 'polleria_boleta_correlativo';
-      const correlativoActual = parseInt(localStorage.getItem(keyCorrelativo) || '1');
-      localStorage.setItem(keyCorrelativo, String(correlativoActual + 1));
-
       // Guardar en activeComprobante
       const fecha = new Date().toLocaleDateString('es-PE');
       const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
       
-      let serie = tipoComprobante === 'Factura' ? 'F001' : 'B001';
-      let correlativoStr = String(correlativoActual).padStart(4, '0');
+      let serie = response.serie || (tipoComprobante === 'Factura' ? 'F001' : 'B001');
+      let correlativoStr = String(response.numero || 1).padStart(4, '0');
       let subtotal = total / 1.18;
       let igv = total - subtotal;
       let totalLetras = numeroALetras(total);
       let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
       const rucEmpresa = "R.U.C. N° 20496009259";
-      let qrData = `${rucEmpresa}|03|${serie}|${correlativoStr}|${igv.toFixed(2)}|${total.toFixed(2)}|${fecha}|${tipoComprobante === 'Factura'?'6':'1'}|${numDocumento || '00000000'}`;
+      let qrData = `${rucEmpresa}|${tipoComprobante === 'Factura' ? '01' : '03'}|${serie}|${correlativoStr}|${igv.toFixed(2)}|${total.toFixed(2)}|${fecha}|${tipoComprobante === 'Factura' ? '6' : (numDocumento?.length === 8 ? '1' : '0')}|${numDocumento || '00000000'}`;
       let enlacePdf = null;
 
       let contingencia = response.contingencia || false;
@@ -1463,7 +1458,7 @@ export default function CajaPage() {
               
               <div className="text-center font-bold mt-4" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
               <div className="text-center text-[9px] leading-tight text-slate-500 mt-1">
-                {activeComprobante.metodoPago === 'Cortesía' ? 'TICKET DE CONSUMO INTERNO AUTORIZADO' : 'Representación impresa de la Factura electrónica. Consulte su documento en: https://www.nubefact.com/buscar'}
+                {activeComprobante.metodoPago === 'Cortesía' ? 'TICKET DE CONSUMO INTERNO AUTORIZADO' : 'Representación impresa del comprobante electrónico. Consulte su validez en el portal de la SUNAT.'}
               </div>
 
 
