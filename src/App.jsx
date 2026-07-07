@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, LogOut, Lock } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import logoUrl from './assets/logo.jpg';
 import { api } from './api';
 import DashboardPage from './pages/DashboardPage';
 import SalonPage from './pages/SalonPage';
@@ -81,10 +82,8 @@ const LoginGate = ({ onLoginSuccess }) => {
     <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-4 z-[9999]">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 md:p-8 shadow-2xl flex flex-col items-center">
         {/* Branding */}
-        <div className="flex items-center gap-3 mb-6 md:mb-8">
-          <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-slate-900 shadow-xl shadow-amber-500/20">
-            <UtensilsCrossed className="w-6 h-6" />
-          </div>
+        <div className="flex flex-col items-center mb-6 md:mb-8 text-center">
+          <img src={logoUrl} className="w-20 h-20 rounded-full border-2 border-amber-500/30 object-cover shadow-xl shadow-amber-500/10 mb-3 animate-pulse" alt="Fogón Dorado Logo" />
           <div>
             <h1 className="text-white font-black text-2xl tracking-tighter leading-none">FOGÓN<span className="text-amber-500">ERP</span></h1>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Control de Acceso</p>
@@ -176,9 +175,7 @@ const Sidebar = ({ isOpen, toggleSidebar, currentUser, onLogout }) => {
       <aside className={`fixed md:relative inset-y-0 left-0 w-64 bg-slate-900 text-slate-400 flex flex-col shadow-2xl z-50 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out`}>
         <div className="p-6 flex items-center justify-between md:justify-start gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-slate-900 shadow-lg shadow-amber-500/20 shrink-0">
-              <UtensilsCrossed />
-            </div>
+            <img src={logoUrl} className="w-10 h-10 rounded-full border border-slate-700/50 object-cover shrink-0 shadow-lg shadow-amber-500/10" alt="Fogón Dorado Logo" />
             <span className="text-white font-black text-xl tracking-tighter">FOGÓN<span className="text-amber-500">ERP</span></span>
           </div>
           <button onClick={toggleSidebar} className="text-slate-400 hover:text-white md:hidden p-2">
