@@ -893,18 +893,38 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
 // DELIVERY / PEDIDOS YA
 // ============================================================
 
-// POST /api/pedidos/llevar → Crear pedido de delivery (pago ya procesado en POS)
+// POST /api/pedidos/llevar → Crear pedido de delivery / para llevar / delivery propio
 app.post('/api/pedidos/llevar', async (req, res) => {
-  const { codigoPedidosYa, cajero, items, total } = req.body;
+  const { 
+    codigoPedidosYa, 
+    cajero, 
+    items, 
+    total, 
+    tipoDelivery, 
+    tipoComprobante, 
+    metodoPago, 
+    numDocumento, 
+    nombreCliente, 
+    clienteDireccion, 
+    montoDelivery,
+    telefono
+  } = req.body;
 
   try {
+    const isTakeout = tipoDelivery === 'ParaLlevar';
+    const isOwnDelivery = tipoDelivery === 'DeliveryPropio';
+    
+    const shippingFee = parseFloat(montoDelivery || 0);
+    const itemsTotal = parseFloat(total);
+    const grandTotal = itemsTotal + shippingFee;
+
     const pedido = await prisma.pedido.create({
       data: {
         mesaId: null,
         mesero: String(cajero),
-        total: parseFloat(total),
-        estado: 'Cocina',
-        tipoEntrega: 'llevar',
+        total: grandTotal,
+        estado: isTakeout ? 'Cobrado' : 'Cocina', // Para Llevar ya pagado inmediatamente
+        tipoEntrega: isOwnDelivery ? 'delivery' : 'llevar',
         codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null,
         items: {
           create: items.map(i => ({
@@ -927,23 +947,109 @@ app.post('/api/pedidos/llevar', async (req, res) => {
       });
     }
 
-    // Registrar venta inmediatamente (pago externo ya confirmado)
-    const subtotal = parseFloat((total / 1.18).toFixed(2));
-    const igv = parseFloat((total - subtotal).toFixed(2));
-    await prisma.venta.create({
+    // Registrar venta inmediatamente
+    const subtotal = parseFloat((grandTotal / 1.18).toFixed(2));
+    const igv = parseFloat((grandTotal - subtotal).toFixed(2));
+    
+    // Asignar nombres por defecto segun tipo
+    let finalNombreCliente = nombreCliente;
+    if (!finalNombreCliente) {
+      if (tipoDelivery === 'PedidosYa') finalNombreCliente = 'PEDIDOS YA';
+      else finalNombreCliente = 'CONSUMIDOR FINAL';
+    }
+
+    // Calcular correlativo para apisunat.pe si es Boleta o Factura
+    const finalTipoComprobante = tipoComprobante || 'Ticket';
+    const finalMetodoPago = metodoPago || (tipoDelivery === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
+
+    let serie = null;
+    let numero = null;
+    if (finalTipoComprobante === 'Boleta' || finalTipoComprobante === 'Factura') {
+      const ultimaVenta = await prisma.venta.findFirst({
+        where: { tipoComprobante: finalTipoComprobante, numero: { not: null } },
+        orderBy: { numero: 'desc' }
+      });
+      serie = finalTipoComprobante === 'Factura' ? 'F001' : 'B001';
+      numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
+    }
+
+    const initEstadoSunat = (finalTipoComprobante === 'Boleta' || finalTipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
+
+    let venta = await prisma.venta.create({
       data: {
         pedidoId: pedido.id,
-        tipoComprobante: 'Ticket',
-        nombreCliente: 'PEDIDOS YA',
-        numDocumento: codigoPedidosYa,
-        total,
+        tipoComprobante: finalTipoComprobante,
+        nombreCliente: finalNombreCliente,
+        numDocumento: numDocumento || codigoPedidosYa || 'S/D',
+        total: grandTotal,
         igv,
         subtotal,
-        metodoPago: 'PedidosYa',
+        metodoPago: finalMetodoPago,
+        estadoNubefact: initEstadoSunat,
+        estadoSunat: initEstadoSunat,
+        serie,
+        numero,
       },
     });
 
-    res.json({ ok: true, pedidoId: pedido.id });
+    let apisunatResponse = null;
+
+    // Si es Boleta o Factura, intentamos enviar a apisunat.pe
+    if (finalTipoComprobante === 'Boleta' || finalTipoComprobante === 'Factura') {
+      try {
+        const mappedItems = items.map(i => ({
+          productoId: parseInt(i.id),
+          nombre: String(i.nombre),
+          precio: parseFloat(i.precio),
+          cantidad: parseInt(i.cant),
+        }));
+        
+        // Agregar cargo por delivery al detalle de items si corresponde para que cuadre el total en SUNAT
+        if (shippingFee > 0) {
+          mappedItems.push({
+            productoId: 9999, // ID ficticio para delivery
+            nombre: "SERVICIO DE DELIVERY",
+            precio: shippingFee,
+            cantidad: 1,
+          });
+        }
+
+        const response = await enviarAApisunat({ ...venta, clienteDireccion }, mappedItems);
+        
+        const mappedData = {
+          serie: venta.serie,
+          numero: venta.numero,
+          key: response.payload?.hash || '',
+          enlace_del_pdf: response.payload?.pdf?.ticket || response.payload?.pdf?.a4 || '',
+          cadena_para_codigo_qr: `20496009259|${venta.tipoComprobante === 'Factura' ? '01' : '03'}|${venta.serie}|${String(venta.numero).padStart(4, '0')}|${venta.igv.toFixed(2)}|${venta.total.toFixed(2)}|${new Intl.DateTimeFormat('es-PE', {timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date(venta.createdAt))}|${venta.tipoComprobante === 'Factura' ? '6' : (venta.numDocumento?.length === 8 ? '1' : '0')}|${venta.numDocumento || '00000000'}|${response.payload?.hash || ''}`
+        };
+
+        const strAceptado = `ACEPTADO:${JSON.stringify(mappedData)}`;
+        
+        venta = await prisma.venta.update({
+          where: { id: venta.id },
+          data: {
+            estadoNubefact: strAceptado,
+            estadoSunat: 'ACEPTADO',
+            urlPdf: mappedData.enlace_del_pdf,
+            urlXml: response.payload?.xml || null,
+          },
+        });
+        apisunatResponse = mappedData;
+      } catch (apiErr) {
+        console.error("Error al enviar a APISUNAT en pedido directo:", apiErr);
+      }
+    }
+
+    res.json({ 
+      ok: true, 
+      pedidoId: pedido.id, 
+      serie: venta.serie, 
+      numero: venta.numero,
+      contingencia: false,
+      estadoNubefact: venta.estadoNubefact,
+      venta
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -953,7 +1059,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
 app.get('/api/pedidos/llevar', async (req, res) => {
   try {
     const pedidos = await prisma.pedido.findMany({
-      where: { tipoEntrega: 'llevar', estado: { in: ['Cocina', 'Servido'] } },
+      where: { tipoEntrega: { in: ['llevar', 'delivery'] }, estado: { in: ['Cocina', 'Servido'] } },
       orderBy: { createdAt: 'asc' },
       include: { items: true },
     });

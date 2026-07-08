@@ -12,7 +12,11 @@ const SINONIMOS = {
   papas: ['papa', 'patata', 'fritas'],
   carne: ['lomo', 'bife', 'parrilla', 'anticucho', 'res', 'corte'],
   pollo: ['brasa', 'broaster', 'alitas', 'pechuga'],
-  piqueo: ['entrada', 'porcion', 'tequenos', 'salchipapa']
+  piqueo: ['entrada', 'porcion', 'tequenos', 'salchipapa'],
+  "1/8": ['octavo', 'octavos', '1/8', 'un octavo'],
+  "1/4": ['cuarto', 'cuartos', '1/4', 'un cuarto'],
+  "1/2": ['medio', 'medios', '1/2', 'un medio', 'mitad'],
+  entero: ['entero', 'completo', 'pollo entero', '1', 'uno']
 };
 
 const normalizePhonetic = (text) => {

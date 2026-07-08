@@ -45,7 +45,11 @@ const SINONIMOS = {
   papas: ['papa', 'patata', 'fritas'],
   carne: ['lomo', 'bife', 'parrilla', 'anticucho', 'res', 'corte'],
   pollo: ['brasa', 'broaster', 'alitas', 'pechuga'],
-  piqueo: ['entrada', 'porcion', 'tequenos', 'salchipapa']
+  piqueo: ['entrada', 'porcion', 'tequenos', 'salchipapa'],
+  "1/8": ['octavo', 'octavos', '1/8', 'un octavo'],
+  "1/4": ['cuarto', 'cuartos', '1/4', 'un cuarto'],
+  "1/2": ['medio', 'medios', '1/2', 'un medio', 'mitad'],
+  entero: ['entero', 'completo', 'pollo entero', '1', 'uno']
 };
 
 const normalizePhonetic = (text) => {
@@ -133,6 +137,16 @@ export default function CajaPage({ currentUser }) {
   const [cobrando, setCobrando] = useState(false);
   const [activeComprobante, setActiveComprobante] = useState(null);
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
+
+  // Campos para Delivery Propio y Para Llevar en modal
+  const [deliveryTelefono, setDeliveryTelefono] = useState('');
+  const [deliveryDireccion, setDeliveryDireccion] = useState('');
+  const [deliveryMontoEnvio, setDeliveryMontoEnvio] = useState('');
+  const [deliveryConCuanto, setDeliveryConCuanto] = useState('');
+  const [deliveryTipoComprobante, setDeliveryTipoComprobante] = useState('Ticket');
+  const [deliveryMetodoPago, setDeliveryMetodoPago] = useState('Efectivo');
+  const [deliveryClienteNombre, setDeliveryClienteNombre] = useState('');
+  const [deliveryNumDocumento, setDeliveryNumDocumento] = useState('');
 
 
   // Historial de Ventas y Arqueo/Cierre de Caja
@@ -494,70 +508,22 @@ export default function CajaPage({ currentUser }) {
         clienteDireccion: clienteDireccion || '',
       });
 
-      // Guardar en activeComprobante
-      const fecha = new Date().toLocaleDateString('es-PE');
-      const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-      
-      let serie = response.serie || (tipoComprobante === 'Factura' ? 'F001' : 'B001');
-      let correlativoStr = String(response.numero || 1).padStart(4, '0');
-      let subtotal = total / 1.18;
-      let igv = total - subtotal;
-      let totalLetras = numeroALetras(total);
-      let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
-      const rucEmpresa = "R.U.C. N° 20496009259";
-      let qrData = `${rucEmpresa}|${tipoComprobante === 'Factura' ? '01' : '03'}|${serie}|${correlativoStr}|${igv.toFixed(2)}|${total.toFixed(2)}|${fecha}|${tipoComprobante === 'Factura' ? '6' : (numDocumento?.length === 8 ? '1' : '0')}|${numDocumento || '00000000'}`;
-      let enlacePdf = null;
-
-      let contingencia = response.contingencia || false;
-
-      // Extraer datos oficiales devueltos por la API de Nubefact
-      if (response.estadoNubefact && response.estadoNubefact.startsWith('ACEPTADO:')) {
-        try {
-          const responseData = JSON.parse(response.estadoNubefact.substring(9));
-          serie = responseData.serie || serie;
-          correlativoStr = String(responseData.numero || correlativoStr).padStart(4, '0');
-          if (responseData.cadena_para_codigo_qr) {
-            qrData = responseData.cadena_para_codigo_qr;
-          }
-          if (responseData.key) {
-            hashResumen = responseData.key;
-          }
-          enlacePdf = responseData.enlace_del_pdf || null;
-        } catch (err) {
-          console.error("Error parsing Nubefact response:", err);
-        }
-      }
-
-      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(qrData)}`;
-
-      setActiveComprobante({
-        tipo: tipoComprobante,
-        serie,
-        correlativo: correlativoStr,
-        fecha,
-        hora,
-        mesaNum: mesaSeleccionada.num,
-        clienteNombre: clienteNombre || 'Consumidor Final',
-        clienteDoc: numDocumento || 'S/D',
-        clienteDireccion: clienteDireccion || '',
-        items: mesaSeleccionada.pedidoData.items,
-        subtotal,
-        igv,
-        total,
-        totalLetras,
-        hashResumen,
-        metodoPago,
-        qrImageUrl,
-        enlacePdf,
-        contingencia,
-        shouldAutoPrint: true,
-      });
-
       setModalOpen(false);
       setNumDocumento('');
       setClienteNombre('');
       setClienteDireccion('');
-      setSunatModalOpen(true);
+
+      // Desencadenar la visualización e impresión del comprobante
+      abrirTicketImpresionDirecto(
+        total,
+        response,
+        tipoComprobante,
+        numDocumento || null,
+        clienteNombre || 'Consumidor Final',
+        clienteDireccion || '',
+        mesaSeleccionada.pedidoData.items,
+        mesaSeleccionada.num
+      );
 
       await fetchCajaData();
     } catch (err) {
@@ -590,6 +556,15 @@ export default function CajaPage({ currentUser }) {
     setItemsDelivery([]);
     setCodigoPY('');
     setDeliverySearchQuery('');
+    setDeliveryTelefono('');
+    setDeliveryDireccion('');
+    setDeliveryMontoEnvio('');
+    setDeliveryConCuanto('');
+    setDeliveryTipoComprobante('Ticket');
+    setDeliveryMetodoPago('Efectivo');
+    setDeliveryClienteNombre('');
+    setDeliveryNumDocumento('');
+    setTipoDelivery('PedidosYa');
     setDeliveryModal(true);
   };
 
@@ -703,29 +678,175 @@ export default function CajaPage({ currentUser }) {
     setItemsDelivery(nuevo);
   };
 
-  const enviarDeliveryACocina = async () => {
-    if (!codigoPY.trim()) { 
-      alert(tipoDelivery === 'PedidosYa' ? 'El código de PedidosYa es obligatorio.' : 'El nombre de cliente o nro de ticket es obligatorio.'); 
-      return; 
+  const abrirTicketImpresionDirecto = (total, response, tipoComprobante, numDocumento, clienteNombre, clienteDireccion, items, mesaNum = 'Delivery') => {
+    const fecha = new Date().toLocaleDateString('es-PE');
+    const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    
+    let serie = response.serie || (tipoComprobante === 'Factura' ? 'F001' : 'B001');
+    let correlativoStr = String(response.numero || 1).padStart(4, '0');
+    let subtotal = total / 1.18;
+    let igv = total - subtotal;
+    let totalLetras = numeroALetras(total);
+    let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
+    const rucEmpresa = "R.U.C. N° 20496009259";
+    let qrData = `${rucEmpresa}|${tipoComprobante === 'Factura' ? '01' : '03'}|${serie}|${correlativoStr}|${igv.toFixed(2)}|${total.toFixed(2)}|${fecha}|${tipoComprobante === 'Factura' ? '6' : (numDocumento?.length === 8 ? '1' : '0')}|${numDocumento || '00000000'}`;
+    let enlacePdf = null;
+
+    let contingencia = response.contingencia || false;
+
+    // Extraer datos oficiales devueltos por la API de Nubefact
+    if (response.estadoNubefact && response.estadoNubefact.startsWith('ACEPTADO:')) {
+      try {
+        const responseData = JSON.parse(response.estadoNubefact.substring(9));
+        serie = responseData.serie || serie;
+        correlativoStr = String(responseData.numero || correlativoStr).padStart(4, '0');
+        if (responseData.cadena_para_codigo_qr) {
+          qrData = responseData.cadena_para_codigo_qr;
+        }
+        if (responseData.key) {
+          hashResumen = responseData.key;
+        }
+        enlacePdf = responseData.enlace_del_pdf || null;
+      } catch (err) {
+        console.error("Error parsing Nubefact response:", err);
+      }
     }
+
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(qrData)}`;
+
+    setActiveComprobante({
+      tipo: tipoComprobante,
+      serie,
+      correlativo: correlativoStr,
+      fecha,
+      hora,
+      mesaNum,
+      clienteNombre: clienteNombre || 'Consumidor Final',
+      clienteDoc: numDocumento || 'S/D',
+      clienteDireccion: clienteDireccion || '',
+      items: items.map(i => ({ cant: i.cant, nombre: i.nombre, precio: i.precio, notas: i.notas })),
+      subtotal,
+      igv,
+      total,
+      totalLetras,
+      hashResumen,
+      metodoPago: response.metodoPago || metodoPago,
+      qrImageUrl,
+      enlacePdf,
+      contingencia,
+      shouldAutoPrint: true,
+    });
+
+    setSunatModalOpen(true);
+  };
+
+  const enviarDeliveryACocina = async () => {
     if (itemsDelivery.length === 0) { alert('Debes agregar al menos un producto.'); return; }
+    
+    // Validar datos según el canal seleccionado
+    if (tipoDelivery === 'PedidosYa') {
+      if (!codigoPY.trim()) {
+        alert('El código de PedidosYa es obligatorio.');
+        return;
+      }
+    } else if (tipoDelivery === 'ParaLlevar') {
+      if (!codigoPY.trim()) {
+        alert('El nombre del cliente o número de ticket es obligatorio.');
+        return;
+      }
+      if (deliveryTipoComprobante === 'Factura') {
+        if (!deliveryNumDocumento || deliveryNumDocumento.length !== 11) {
+          alert('Para emitir Factura, el RUC debe tener 11 dígitos.');
+          return;
+        }
+        if (!deliveryClienteNombre.trim()) {
+          alert('Para emitir Factura, la Razón Social del cliente es obligatoria.');
+          return;
+        }
+      }
+    } else if (tipoDelivery === 'DeliveryPropio') {
+      if (!deliveryClienteNombre.trim()) {
+        alert('El nombre del cliente es obligatorio.');
+        return;
+      }
+      if (!deliveryDireccion.trim()) {
+        alert('La dirección del cliente es obligatoria.');
+        return;
+      }
+      if (!deliveryTelefono.trim()) {
+        alert('El teléfono del cliente es obligatorio.');
+        return;
+      }
+      if (deliveryTipoComprobante === 'Factura') {
+        if (!deliveryNumDocumento || deliveryNumDocumento.length !== 11) {
+          alert('Para emitir Factura, el RUC debe tener 11 dígitos.');
+          return;
+        }
+      }
+    }
+
     setEnviandoDelivery(true);
     try {
-      const total = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
-      const codigoFormateado = tipoDelivery === 'PedidosYa' 
-        ? codigoPY.trim().toUpperCase() 
-        : `LLEVAR - ${codigoPY.trim().toUpperCase()}`;
+      const itemsTotal = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
+      const shippingFee = parseFloat(deliveryMontoEnvio || 0);
+      const grandTotal = itemsTotal + shippingFee;
+
+      let codigoFormateado = '';
+      if (tipoDelivery === 'PedidosYa') {
+        codigoFormateado = codigoPY.trim().toUpperCase();
+      } else if (tipoDelivery === 'ParaLlevar') {
+        codigoFormateado = `LLEVAR - ${codigoPY.trim().toUpperCase()}`;
+      } else if (tipoDelivery === 'DeliveryPropio') {
+        codigoFormateado = `DELIVERY - ${deliveryClienteNombre.trim().toUpperCase()}`;
+      }
 
       const result = await api.crearPedidoLlevar({
         codigoPedidosYa: codigoFormateado,
         cajero: cajeroNombre,
         items: itemsDelivery,
-        total,
+        total: itemsTotal,
+        tipoDelivery,
+        tipoComprobante: tipoDelivery === 'PedidosYa' ? 'Ticket' : deliveryTipoComprobante,
+        metodoPago: tipoDelivery === 'PedidosYa' ? 'PedidosYa' : deliveryMetodoPago,
+        numDocumento: tipoDelivery === 'PedidosYa' ? codigoFormateado : (deliveryNumDocumento || 'S/D'),
+        nombreCliente: tipoDelivery === 'PedidosYa' ? 'PEDIDOS YA' : (deliveryClienteNombre || 'Consumidor Final'),
+        clienteDireccion: tipoDelivery === 'DeliveryPropio' ? deliveryDireccion : (deliveryDireccion || ''),
+        montoDelivery: shippingFee,
+        telefono: deliveryTelefono || null,
       });
+
       if (result.error) throw new Error(result.error);
+
+      // Cerrar modal y recargar datos de Caja
       setDeliveryModal(false);
       await fetchCajaData();
-      alert(`✅ Pedido ${codigoPY.toUpperCase()} enviado a Cocina. Venta registrada.`);
+      
+      // Si es Para Llevar o Delivery Propio con comprobante Boleta o Factura (o Ticket), activamos el ticket de impresión
+      if (tipoDelivery !== 'PedidosYa') {
+        // Para que en la impresión figuren los items reales del ticket
+        const itemsImpresion = [...itemsDelivery];
+        if (shippingFee > 0) {
+          itemsImpresion.push({
+            id: '9999',
+            nombre: 'Servicio de Delivery',
+            precio: shippingFee,
+            cant: 1
+          });
+        }
+        
+        abrirTicketImpresionDirecto(
+          grandTotal, 
+          result.venta, 
+          tipoDelivery === 'PedidosYa' ? 'Ticket' : deliveryTipoComprobante, 
+          tipoDelivery === 'PedidosYa' ? null : (deliveryNumDocumento || null), 
+          tipoDelivery === 'PedidosYa' ? 'PEDIDOS YA' : (deliveryClienteNombre || 'Consumidor Final'), 
+          tipoDelivery === 'DeliveryPropio' ? deliveryDireccion : '', 
+          itemsImpresion, 
+          tipoDelivery === 'DeliveryPropio' ? 'Delivery' : 'Llevar'
+        );
+      } else {
+        alert(`✅ Pedido ${codigoPY.toUpperCase()} enviado a Cocina. Venta registrada.`);
+      }
     } catch (err) {
       alert('Error: ' + err.message);
     } finally {
@@ -757,7 +878,7 @@ export default function CajaPage({ currentUser }) {
         >
           <Plus className="w-4 h-4" />
           <Truck className="w-4 h-4" />
-          Pedido PedidosYa
+          Pedidos
         </button>
       </div>
 
@@ -859,7 +980,12 @@ export default function CajaPage({ currentUser }) {
                       <tr key={p.pedidoId} className="hover:bg-blue-50/50 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            {p.codigoPedidosYa?.startsWith('LLEVAR -') ? (
+                            {p.codigoPedidosYa?.startsWith('DELIVERY -') ? (
+                              <>
+                                <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0">DEL</div>
+                                <span className="font-black text-indigo-900 tracking-tight">{p.codigoPedidosYa}</span>
+                              </>
+                            ) : p.codigoPedidosYa?.startsWith('LLEVAR -') ? (
                               <>
                                 <div className="w-10 h-10 bg-amber-500 text-slate-900 rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0">POS</div>
                                 <span className="font-black text-slate-800 tracking-tight">{p.codigoPedidosYa}</span>
@@ -1273,51 +1399,103 @@ export default function CajaPage({ currentUser }) {
                   {/* Selector de Tipo */}
                   <div>
                     <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1.5">Origen / Tipo de Pedido:</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button 
                         type="button" 
                         onClick={() => { setTipoDelivery('PedidosYa'); setCodigoPY(''); }}
-                        className={`py-2 px-3 text-xs font-black uppercase rounded-xl border-2 transition-all ${tipoDelivery === 'PedidosYa' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                        className={`py-2 px-1 text-[10px] md:text-xs font-black uppercase rounded-xl border-2 transition-all text-center ${tipoDelivery === 'PedidosYa' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}
                       >
-                        🛵 PedidosYa (Delivery)
+                        🛵 PedidosYa
                       </button>
                       <button 
                         type="button" 
                         onClick={() => { setTipoDelivery('ParaLlevar'); setCodigoPY(''); }}
-                        className={`py-2 px-3 text-xs font-black uppercase rounded-xl border-2 transition-all ${tipoDelivery === 'ParaLlevar' ? 'bg-amber-50 border-amber-500 text-amber-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                        className={`py-2 px-1 text-[10px] md:text-xs font-black uppercase rounded-xl border-2 transition-all text-center ${tipoDelivery === 'ParaLlevar' ? 'bg-amber-50 border-amber-500 text-amber-700' : 'bg-white border-slate-200 text-slate-500'}`}
                       >
-                        🛍️ Para Llevar (Caja)
+                        🛍️ Para Llevar
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => { setTipoDelivery('DeliveryPropio'); setCodigoPY(''); }}
+                        className={`py-2 px-1 text-[10px] md:text-xs font-black uppercase rounded-xl border-2 transition-all text-center ${tipoDelivery === 'DeliveryPropio' ? 'bg-indigo-50 border-indigo-500 text-indigo-750' : 'bg-white border-slate-200 text-slate-500'}`}
+                      >
+                        📞 Delivery Fogon
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">
-                        {tipoDelivery === 'PedidosYa' ? 'Código PedidosYa:' : 'Nombre del Cliente / Ticket:'}
-                      </label>
-                      <input
-                        type="text"
-                        value={codigoPY}
-                        onChange={(e) => setCodigoPY(e.target.value)}
-                        placeholder={tipoDelivery === 'PedidosYa' ? 'Ej: FG-4821' : 'Ej: PEDRO o T-12'}
-                        className="w-full bg-slate-50 border-2 border-blue-300 focus:border-blue-500 rounded-xl px-3 py-2 font-mono font-black text-slate-900 text-sm focus:outline-none uppercase"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">Cajero:</label>
-                      <div className="w-full bg-slate-150 border border-slate-200 rounded-xl px-3 py-2 font-black text-slate-800 text-sm uppercase">
-                        {cajeroNombre}
+                  {tipoDelivery !== 'DeliveryPropio' ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">
+                          {tipoDelivery === 'PedidosYa' ? 'Código PedidosYa:' : 'Nombre del Cliente / Ticket:'}
+                        </label>
+                        <input
+                          type="text"
+                          value={codigoPY}
+                          onChange={(e) => setCodigoPY(e.target.value)}
+                          placeholder={tipoDelivery === 'PedidosYa' ? 'Ej: FG-4821' : 'Ej: PEDRO o T-12'}
+                          className="w-full bg-slate-50 border-2 border-blue-300 focus:border-blue-500 rounded-xl px-3 py-2 font-mono font-black text-slate-900 text-sm focus:outline-none uppercase"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">Cajero:</label>
+                        <div className="w-full bg-slate-150 border border-slate-200 rounded-xl px-3 py-2 font-black text-slate-800 text-sm uppercase">
+                          {cajeroNombre}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 p-3 rounded-2xl">
+                      <div className="col-span-2">
+                        <label className="block text-slate-550 font-bold text-[9px] tracking-widest uppercase mb-1">Nombre Cliente:</label>
+                        <input 
+                          type="text" 
+                          value={deliveryClienteNombre} 
+                          onChange={(e) => setDeliveryClienteNombre(e.target.value)} 
+                          placeholder="Ej: Juan Pérez"
+                          className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-550 font-bold text-[9px] tracking-widest uppercase mb-1">Teléfono:</label>
+                        <input 
+                          type="text" 
+                          value={deliveryTelefono} 
+                          onChange={(e) => setDeliveryTelefono(e.target.value)} 
+                          placeholder="Ej: 999888777"
+                          className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-550 font-bold text-[9px] tracking-widest uppercase mb-1">Envío (S/):</label>
+                        <input 
+                          type="number" 
+                          value={deliveryMontoEnvio} 
+                          onChange={(e) => setDeliveryMontoEnvio(e.target.value)} 
+                          placeholder="0.00"
+                          className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <label className="block text-slate-550 font-bold text-[9px] tracking-widest uppercase mb-1">Dirección de Entrega:</label>
+                        <input 
+                          type="text" 
+                          value={deliveryDireccion} 
+                          onChange={(e) => setDeliveryDireccion(e.target.value)} 
+                          placeholder="Ej: Av. Hoyos Rubio Nro. 338"
+                          className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Buscador inteligente */}
                   <div className="relative w-full">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input 
                       type="text" 
-                      placeholder="Buscar plato (ej: 'poyo papas', 'parri', 'gaseosa')..." 
+                      placeholder="Buscar plato (ej: 'cuarto de pollo', 'octavo', 'medio', 'chela')..." 
                       value={deliverySearchQuery}
                       onChange={(e) => setDeliverySearchQuery(e.target.value)}
                       className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl text-sm focus:outline-none focus:bg-white font-bold text-slate-800"
@@ -1440,19 +1618,137 @@ export default function CajaPage({ currentUser }) {
                       })
                   }
                 </div>
+                {/* Formulario de Facturación / Pago para Para Llevar y Delivery Propio */}
+                {(tipoDelivery === 'ParaLlevar' || tipoDelivery === 'DeliveryPropio') && (
+                  <div className="p-4 bg-slate-50 border-t border-b border-slate-200 space-y-4 shrink-0">
+                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Banknote className="w-4 h-4 text-emerald-600" />
+                      Facturación y Cobro
+                    </h4>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Comprobante:</label>
+                        <select 
+                          value={deliveryTipoComprobante} 
+                          onChange={(e) => {
+                            setDeliveryTipoComprobante(e.target.value);
+                            setDeliveryNumDocumento('');
+                            setDeliveryClienteNombre('');
+                          }} 
+                          className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none"
+                        >
+                          <option value="Ticket">Ticket Interno</option>
+                          <option value="Boleta">Boleta (DNI)</option>
+                          <option value="Factura">Factura (RUC)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Método Pago:</label>
+                        <select 
+                          value={deliveryMetodoPago} 
+                          onChange={(e) => setDeliveryMetodoPago(e.target.value)} 
+                          className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none"
+                        >
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Tarjeta">Tarjeta (Visa/MC)</option>
+                          <option value="Yape">Yape / Plin</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* DNI o RUC si es Boleta o Factura */}
+                    {(deliveryTipoComprobante === 'Boleta' || deliveryTipoComprobante === 'Factura') && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">
+                            {deliveryTipoComprobante === 'Factura' ? 'RUC del Cliente:' : 'DNI del Cliente:'}
+                          </label>
+                          <input 
+                            type="text" 
+                            value={deliveryNumDocumento} 
+                            onChange={(e) => setDeliveryNumDocumento(e.target.value)} 
+                            placeholder={deliveryTipoComprobante === 'Factura' ? '11 dígitos' : '8 dígitos'}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">
+                            {deliveryTipoComprobante === 'Factura' ? 'Razón Social:' : 'Nombre Cliente:'}
+                          </label>
+                          <input 
+                            type="text" 
+                            value={deliveryClienteNombre} 
+                            onChange={(e) => setDeliveryClienteNombre(e.target.value)} 
+                            placeholder="Nombre/Razón Social"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Vuelto / Cancelación en Efectivo */}
+                    {deliveryMetodoPago === 'Efectivo' && (
+                      <div className="grid grid-cols-2 gap-3 bg-white p-3 border border-slate-200 rounded-xl shadow-inner">
+                        <div>
+                          <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Paga Con (S/):</label>
+                          <input 
+                            type="number" 
+                            value={deliveryConCuanto} 
+                            onChange={(e) => setDeliveryConCuanto(e.target.value)} 
+                            placeholder="0.00"
+                            className="w-full bg-slate-50 border border-slate-250 focus:border-blue-500 rounded-xl px-3 py-1.5 text-xs font-mono font-black text-slate-800 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex flex-col justify-end">
+                          <span className="text-slate-400 font-bold text-[9px] uppercase tracking-widest leading-none">Vuelto:</span>
+                          <span className="font-mono font-black text-sm text-emerald-600 mt-1">
+                            S/ {(() => {
+                              const conC = parseFloat(deliveryConCuanto);
+                              const tot = totalDelivery + parseFloat(deliveryMontoEnvio || 0);
+                              return (!isNaN(conC) && conC >= tot) ? (conC - tot).toFixed(2) : '0.00';
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="p-4 bg-white border-t border-slate-200 shrink-0">
-                  <div className="flex justify-between items-end mb-4 px-1">
-                    <span className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">Total Pedido</span>
-                    <span className="font-black font-mono text-2xl text-slate-900">S/ {totalDelivery.toFixed(2)}</span>
+                  <div className="space-y-1.5 mb-4 border-b border-dashed border-slate-100 pb-3 px-1">
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Productos</span>
+                      <span className="font-mono">S/ {totalDelivery.toFixed(2)}</span>
+                    </div>
+                    {tipoDelivery === 'DeliveryPropio' && (
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Costo de Envío</span>
+                        <span className="font-mono">S/ {parseFloat(deliveryMontoEnvio || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-end pt-1">
+                      <span className="font-black text-slate-500 uppercase text-[10px] tracking-widest">Total a Pagar</span>
+                      <span className="font-black font-mono text-2xl text-blue-700">
+                        S/ {(totalDelivery + parseFloat(deliveryMontoEnvio || 0)).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                   <button
                     onClick={enviarDeliveryACocina}
                     disabled={enviandoDelivery}
-                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest rounded-2xl text-sm transition-all shadow-lg flex justify-center items-center gap-2 disabled:opacity-50"
+                    className={`w-full py-4 text-white font-black uppercase tracking-widest rounded-2xl text-sm transition-all shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 ${
+                      tipoDelivery === 'ParaLlevar' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
+                    }`}
                   >
-                    {enviandoDelivery
-                      ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                      : <><Truck className="w-5 h-5" /> Registrar y Enviar a Cocina</>}
+                    {enviandoDelivery ? (
+                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    ) : (
+                      <>
+                        {tipoDelivery === 'ParaLlevar' ? <Banknote className="w-5 h-5" /> : <Truck className="w-5 h-5" />}
+                        {tipoDelivery === 'ParaLlevar' ? 'Cobrar y Enviar a Cocina' : 'Registrar y Enviar a Cocina'}
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
