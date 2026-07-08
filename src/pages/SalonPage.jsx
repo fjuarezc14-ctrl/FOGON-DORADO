@@ -1216,8 +1216,8 @@ export default function SalonPage({ currentUser }) {
         };
         
         return (
-          <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[250] flex items-center justify-center md:p-4">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-lg md:rounded-3xl shadow-2xl overflow-hidden flex flex-col h-full max-h-[100vh] md:h-auto md:max-h-[90vh] animate-slide-up">
               <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
                 <div>
                   <h3 className="text-white font-black text-base uppercase tracking-tight leading-none">
@@ -1232,7 +1232,7 @@ export default function SalonPage({ currentUser }) {
                     setOptionsModalOpen(false);
                     setSelectedProduct(null);
                   }}
-                  className="text-slate-400 hover:text-white bg-slate-850 p-2 rounded-xl transition-colors"
+                  className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-2 rounded-xl transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1243,9 +1243,9 @@ export default function SalonPage({ currentUser }) {
                   <div className="space-y-2">
                     <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
                       <span>Paso {currentStepIdx + 1} de {steps.length}</span>
-                      <span className="text-amber-500">{currentStep.name}</span>
+                      <span className="text-amber-400">{currentStep.name}</span>
                     </div>
-                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
+                    <div className="h-1.5 bg-slate-850 rounded-full overflow-hidden flex border border-slate-800">
                       {steps.map((_, idx) => (
                         <div 
                           key={idx} 
@@ -1259,7 +1259,7 @@ export default function SalonPage({ currentUser }) {
                 )}
                 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
                     {currentStep.name}:
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -1272,15 +1272,15 @@ export default function SalonPage({ currentUser }) {
                         <button
                           key={oIdx}
                           onClick={() => handleSelectOption(opt.value)}
-                          className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all group relative overflow-hidden min-h-[70px] ${
+                          className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all group relative overflow-hidden min-h-[75px] ${
                             isSelected
-                              ? 'bg-amber-500/10 border-amber-500 text-white shadow-lg shadow-amber-500/5'
-                              : 'bg-slate-800/40 border-slate-800 text-slate-350 hover:bg-slate-800/80 hover:border-slate-700'
+                              ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 scale-[0.98]'
+                              : 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-750 hover:border-slate-600'
                           }`}
                         >
-                          <span className="font-bold text-xs leading-snug pr-6 uppercase">{opt.label}</span>
+                          <span className="font-black text-xs leading-snug pr-6 uppercase">{opt.label}</span>
                           {isSelected && (
-                            <Check className="w-4 h-4 text-amber-500 absolute top-4 right-4" />
+                            <Check className="w-4 h-4 text-slate-950 absolute top-4 right-4 stroke-[3px]" />
                           )}
                         </button>
                       );
@@ -1297,20 +1297,20 @@ export default function SalonPage({ currentUser }) {
                       placeholder="Ejemplo: sin cebolla, papas bien doradas, etc."
                       value={additionalNotes}
                       onChange={(e) => setAdditionalNotes(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-850 rounded-2xl p-4 text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500 focus:bg-slate-950 custom-scrollbar h-20 resize-none"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-2xl p-4 text-xs font-bold text-slate-100 focus:outline-none focus:bg-slate-950 custom-scrollbar h-20 resize-none"
                     ></textarea>
                   </div>
                 )}
               </div>
               
-              <div className="p-5 border-t border-slate-800 bg-slate-950/20 flex justify-between gap-3">
+              <div className="p-5 border-t border-slate-800 bg-slate-950/40 flex justify-between gap-3 shrink-0">
                 <button
                   onClick={() => setCurrentStepIdx(prev => Math.max(0, prev - 1))}
                   disabled={currentStepIdx === 0}
                   className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                     currentStepIdx === 0
-                      ? 'bg-slate-800 text-slate-600 opacity-40 cursor-not-allowed'
-                      : 'bg-slate-850 hover:bg-slate-800 text-slate-300'
+                      ? 'bg-slate-850 text-slate-600 border border-slate-850 opacity-40 cursor-not-allowed shadow-none'
+                      : 'bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-750 hover:text-white'
                   }`}
                 >
                   Atrás
@@ -1322,8 +1322,8 @@ export default function SalonPage({ currentUser }) {
                     disabled={!seleccionActual}
                     className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg ${
                       seleccionActual
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 shadow-amber-500/10'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 shadow-emerald-500/20'
+                        : 'bg-slate-850 text-slate-600 border border-slate-800 cursor-not-allowed shadow-none'
                     }`}
                   >
                     Agregar Pedido
@@ -1332,10 +1332,10 @@ export default function SalonPage({ currentUser }) {
                   <button
                     onClick={() => setCurrentStepIdx(prev => prev + 1)}
                     disabled={!seleccionActual}
-                    className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all ${
+                    className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg ${
                       seleccionActual
-                        ? 'bg-slate-800 hover:bg-slate-750 text-amber-500'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+                        : 'bg-slate-850 text-slate-600 border border-slate-800 cursor-not-allowed shadow-none'
                     }`}
                   >
                     Siguiente
