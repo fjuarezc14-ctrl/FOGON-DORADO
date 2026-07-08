@@ -57,10 +57,11 @@ const matchProductSemantic = (prod, query) => {
     const phoneticToken = normalizePhonetic(qToken);
     if (phoneticName.includes(phoneticToken) || phoneticCat.includes(phoneticToken)) return true;
     
-    // 3. Coincidencia por sinónimos
     for (const [key, syns] of Object.entries(SINONIMOS)) {
-      if (key.includes(qToken) || qToken.includes(key)) {
-        if (syns.some(syn => cleanProdName.includes(syn) || normalizePhonetic(syn) === phoneticToken)) {
+      const tokenMatchesSyn = (key === qToken) || syns.some(syn => syn === qToken || normalizePhonetic(syn) === phoneticToken);
+      if (tokenMatchesSyn) {
+        const prodHasKeyOrSyn = cleanProdName.includes(key) || syns.some(syn => cleanProdName.includes(syn));
+        if (prodHasKeyOrSyn) {
           return true;
         }
       }
