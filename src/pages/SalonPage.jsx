@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2, Bell, Settings, Plus, Utensils, Save, Trash2, Search } from 'lucide-react';
+import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2, Bell, Settings, Plus, Utensils, Save, Trash2, Search, Check } from 'lucide-react';
 import { api } from '../api';
 
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000;
@@ -104,6 +104,41 @@ function playChimeNotification() {
   }
 }
 
+const PRODUCT_OPTIONS_CONFIG = {
+  "Combo Criollo (Almuerzo)": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["Saltado de Carne", "Saltado de Pollo", "Tallarín Saltado Pollo", "Tallarín Saltado Carne", "Chaufa de Pollo", "Chaufa de Carne", "Trucha Frita", "Alitas Fritas", "Milanesa de Pollo", "Chicharrón de Pollo"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    ]
+  },
+  "Combo Parrillero (Almuerzo)": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["Chuleta de cerdo", "Filete de pollo", "Churrasco", "Pechuga"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    ]
+  },
+  "Combo Tallarines Verdes (Almuerzo)": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["Con Pollo Frito", "Con Bisteck", "Con Pechuga", "Con Chuleta", "Con Pollo Deshuesado"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    ]
+  },
+  "Combo Junior": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["3 unds. de chicharrones de pollo", "1/8 pollo a la brasa", "3 alitas fritas (+ ensalada fruta)"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Ninguno"] }
+    ]
+  }
+};
+
 export default function SalonPage({ currentUser }) {
   const [mesas, setMesas] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -137,6 +172,13 @@ export default function SalonPage({ currentUser }) {
   const [nuevaMesaNum, setNuevaMesaNum] = useState('');
   const [editandoMesas, setEditandoMesas] = useState({}); // { [mesaNum]: nuevoMesaNum }
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Estados para el Modal de Opciones y Combos
+  const [optionsModalOpen, setOptionsModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [selections, setSelections] = useState({});
+  const [additionalNotes, setAdditionalNotes] = useState('');
 
   // Cargar mesas desde el API real
   const fetchMesas = useCallback(async () => {
@@ -257,14 +299,77 @@ export default function SalonPage({ currentUser }) {
     setModalOpen(true);
   };
 
-  const agregarAlTicket = (prod) => {
-    let nuevosItems = [...ticketActual];
-    const index = nuevosItems.findIndex(t => String(t.id) === String(prod.id) && !t.yaEnviado);
+  const getProductSteps = (prod) => {
+    if (!prod) return [];
     
-    // Calcular cuántos ya hay en el ticket activo
+    // 1. Variantes de Tallarines Verdes
+    if (prod.esAgrupado) {
+      const todasLasVariantes = productos.filter(p => p.categoria === 'Tallarines Verdes' && p.activo);
+      return [{
+        name: "Elige la Variante de Carne",
+        key: "producto_variante",
+        options: todasLasVariantes.map(v => ({
+          label: `${v.nombre.replace('Tallarines Verdes con ', 'Con ').replace('Tallarines Verdes Con ', 'Con ')} (S/ ${v.precio.toFixed(2)})`,
+          value: v
+        }))
+      }];
+    }
+    
+    // 2. Combos configurados
+    if (PRODUCT_OPTIONS_CONFIG[prod.nombre]) {
+      return PRODUCT_OPTIONS_CONFIG[prod.nombre].steps.map(step => ({
+        ...step,
+        options: step.options.map(opt => ({ label: opt, value: opt }))
+      }));
+    }
+    
+    // 3. Guarniciones genéricas para carnes y pollos
+    const requiereGuarnicion = 
+      ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
+      !prod.nombre.toLowerCase().includes('solo');
+      
+    if (requiereGuarnicion) {
+      return [{
+        name: "Elige la Guarnición",
+        key: "guarnicion",
+        options: [
+          { label: "Papas Fritas", value: "Papas Fritas" },
+          { label: "Arroz Chaufa", value: "Arroz Chaufa" },
+          { label: "Papa Sancochada", value: "Papa Sancochada" },
+          { label: "Choclo Sancochado", value: "Choclo Sancochado" },
+          { label: "Sin Guarnición", value: "Sin Guarnición" }
+        ]
+      }];
+    }
+    
+    return [];
+  };
+
+  const agregarAlTicket = (prod) => {
+    const hasComboConfig = PRODUCT_OPTIONS_CONFIG[prod.nombre];
+    const isVirtualGroup = prod.esAgrupado;
+    const requiereGuarnicion = 
+      ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
+      !prod.nombre.toLowerCase().includes('solo');
+
+    if (hasComboConfig || isVirtualGroup || requiereGuarnicion) {
+      setSelectedProduct(prod);
+      setCurrentStepIdx(0);
+      setSelections({});
+      setAdditionalNotes('');
+      setOptionsModalOpen(true);
+      return;
+    }
+    
+    agregarAlTicketDirecto(prod);
+  };
+
+  const agregarAlTicketDirecto = (prod, notas = '') => {
+    let nuevosItems = [...ticketActual];
+    const index = nuevosItems.findIndex(t => String(t.id) === String(prod.id) && !t.yaEnviado && t.notas === notas);
+    
     const cantEnTicket = index >= 0 ? nuevosItems[index].cant : 0;
     
-    // Si el stock es limitado y ya no queda disponible
     if (prod.tipoStock === 'limitado' && cantEnTicket >= prod.stock) {
       alert(`⚠️ Stock agotado. Solo quedan ${prod.stock} unidades de "${prod.nombre}".`);
       return;
@@ -282,7 +387,7 @@ export default function SalonPage({ currentUser }) {
         cant: 1, 
         yaEnviado: false, 
         historial: false, 
-        notas: '',
+        notas: notas,
         ofertaNombre: prod.ofertaNombre || null,
         precioOriginal: prod.precio
       });
@@ -536,10 +641,36 @@ export default function SalonPage({ currentUser }) {
     }
   };
 
-  const menuFiltrado = productos.filter(p => {
+  const menuFiltradoPre = productos.filter(p => {
     if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
     return matchProductSemantic(p, searchQuery);
   });
+
+  const agruparProductos = (items) => {
+    const list = [];
+    const tallarines = items.filter(p => p.categoria === 'Tallarines Verdes');
+    const otros = items.filter(p => p.categoria !== 'Tallarines Verdes');
+    
+    if (tallarines.length > 0) {
+      const ordenados = [...tallarines].sort((a, b) => a.precio - b.precio);
+      list.push({
+        id: 'group_tallarines_verdes',
+        nombre: 'Tallarines Verdes',
+        categoria: 'Tallarines Verdes',
+        precioMin: ordenados[0].precio,
+        precioMax: ordenados[ordenados.length - 1].precio,
+        esAgrupado: true,
+        variantes: tallarines,
+        tipoStock: 'ilimitado',
+        stock: 0,
+        activo: true
+      });
+    }
+    
+    return [...list, ...otros];
+  };
+
+  const menuFiltrado = agruparProductos(menuFiltradoPre);
   const totalTicket = ticketActual.reduce((acc, item) => acc + (item.cant * item.precio), 0);
   const badgeEstado = mesaActual?.estado === 'Servido' && ticketActual.length > 0
     ? 'text-blue-700 bg-blue-100' : (ticketActual.length > 0 ? 'text-amber-700 bg-amber-100' : 'text-emerald-700 bg-emerald-100');
@@ -748,7 +879,10 @@ export default function SalonPage({ currentUser }) {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
                   {menuFiltrado.map(prod => {
-                    const cantEnTicket = ticketActual.filter(t => String(t.id) === String(prod.id) && !t.yaEnviado).reduce((sum, item) => sum + item.cant, 0);
+                    const isGroup = prod.esAgrupado;
+                    const cantEnTicket = isGroup 
+                      ? 0 
+                      : ticketActual.filter(t => String(t.id) === String(prod.id) && !t.yaEnviado).reduce((sum, item) => sum + item.cant, 0);
                     const stockDisponible = prod.tipoStock === 'limitado' ? prod.stock - cantEnTicket : Infinity;
                     const agotado = prod.tipoStock === 'limitado' && stockDisponible <= 0;
                     
@@ -771,7 +905,12 @@ export default function SalonPage({ currentUser }) {
                         <div className="z-10 flex flex-col justify-between h-full w-full">
                           <div>
                             <p className="font-bold text-slate-800 text-[10px] md:text-xs uppercase leading-tight pr-4">{prod.nombre}</p>
-                            {prod.tipoStock === 'limitado' && (
+                            {isGroup && (
+                              <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 bg-amber-100 text-amber-700">
+                                OPCIONES DE CARNE
+                              </span>
+                            )}
+                            {prod.tipoStock === 'limitado' && !isGroup && (
                               <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 ${
                                 agotado ? 'bg-red-100 text-red-650' : 'bg-amber-100 text-amber-700'
                               }`}>
@@ -779,7 +918,11 @@ export default function SalonPage({ currentUser }) {
                               </span>
                             )}
                           </div>
-                          {prod.precioOferta !== null && prod.precioOferta !== undefined ? (
+                          {isGroup ? (
+                            <p className="font-black font-mono text-emerald-600 text-xs md:text-sm">
+                              Desde S/ {prod.precioMin.toFixed(2)}
+                            </p>
+                          ) : prod.precioOferta !== null && prod.precioOferta !== undefined ? (
                             <div className="flex flex-col items-start leading-none -mt-1">
                               <span className="font-black font-mono text-emerald-600 text-sm md:text-base">S/ {prod.precioOferta.toFixed(2)}</span>
                               <span className="line-through text-slate-400 font-semibold text-[10px] md:text-xs mt-0.5">S/ {prod.precio.toFixed(2)}</span>
@@ -1026,6 +1169,184 @@ export default function SalonPage({ currentUser }) {
           </div>
         </div>
       )}
+      {/* MODAL DE SELECCIÓN DE OPCIONES Y COMBOS (INTERACTIVO) */}
+      {optionsModalOpen && selectedProduct && (() => {
+        const steps = getProductSteps(selectedProduct);
+        if (steps.length === 0) return null;
+        
+        const currentStep = steps[currentStepIdx];
+        const esUltimoPaso = currentStepIdx === steps.length - 1;
+        const seleccionActual = selections[currentStep.key];
+        
+        const handleSelectOption = (val) => {
+          setSelections(prev => ({ ...prev, [currentStep.key]: val }));
+          
+          if (!esUltimoPaso) {
+            setTimeout(() => {
+              setCurrentStepIdx(prev => prev + 1);
+            }, 150);
+          }
+        };
+        
+        const handleConfirm = () => {
+          if (selectedProduct.esAgrupado) {
+            const prodVariante = selections["producto_variante"];
+            if (!prodVariante) {
+              alert("Por favor, selecciona una opción.");
+              return;
+            }
+            agregarAlTicketDirecto(prodVariante, additionalNotes);
+          } else {
+            const notesArray = [];
+            steps.forEach(step => {
+              const val = selections[step.key];
+              if (val) {
+                notesArray.push(`[${step.name}: ${val}]`);
+              }
+            });
+            if (additionalNotes.trim()) {
+              notesArray.push(`(Nota: ${additionalNotes.trim()})`);
+            }
+            const finalNotes = notesArray.join(' · ');
+            agregarAlTicketDirecto(selectedProduct, finalNotes);
+          }
+          
+          setOptionsModalOpen(false);
+          setSelectedProduct(null);
+        };
+        
+        return (
+          <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+              <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
+                <div>
+                  <h3 className="text-white font-black text-base uppercase tracking-tight leading-none">
+                    {selectedProduct.esAgrupado ? "Seleccionar Variante" : "Personalizar Plato"}
+                  </h3>
+                  <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1">
+                    {selectedProduct.nombre}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setOptionsModalOpen(false);
+                    setSelectedProduct(null);
+                  }}
+                  className="text-slate-400 hover:text-white bg-slate-850 p-2 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+                {steps.length > 1 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      <span>Paso {currentStepIdx + 1} de {steps.length}</span>
+                      <span className="text-amber-500">{currentStep.name}</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
+                      {steps.map((_, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`h-full flex-1 border-r border-slate-900 last:border-0 transition-all ${
+                            idx <= currentStepIdx ? 'bg-amber-500' : 'bg-slate-800'
+                          }`}
+                        ></div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    {currentStep.name}:
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {currentStep.options.map((opt, oIdx) => {
+                      const isSelected = selectedProduct.esAgrupado 
+                        ? (seleccionActual && seleccionActual.id === opt.value.id)
+                        : (seleccionActual === opt.value);
+                        
+                      return (
+                        <button
+                          key={oIdx}
+                          onClick={() => handleSelectOption(opt.value)}
+                          className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all group relative overflow-hidden min-h-[70px] ${
+                            isSelected
+                              ? 'bg-amber-500/10 border-amber-500 text-white shadow-lg shadow-amber-500/5'
+                              : 'bg-slate-800/40 border-slate-800 text-slate-350 hover:bg-slate-800/80 hover:border-slate-700'
+                          }`}
+                        >
+                          <span className="font-bold text-xs leading-snug pr-6 uppercase">{opt.label}</span>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-amber-500 absolute top-4 right-4" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {esUltimoPaso && (
+                  <div className="border-t border-slate-800 pt-5 space-y-3">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                      Especificaciones Especiales / Notas
+                    </label>
+                    <textarea
+                      placeholder="Ejemplo: sin cebolla, papas bien doradas, etc."
+                      value={additionalNotes}
+                      onChange={(e) => setAdditionalNotes(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-850 rounded-2xl p-4 text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500 focus:bg-slate-950 custom-scrollbar h-20 resize-none"
+                    ></textarea>
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-5 border-t border-slate-800 bg-slate-950/20 flex justify-between gap-3">
+                <button
+                  onClick={() => setCurrentStepIdx(prev => Math.max(0, prev - 1))}
+                  disabled={currentStepIdx === 0}
+                  className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                    currentStepIdx === 0
+                      ? 'bg-slate-800 text-slate-600 opacity-40 cursor-not-allowed'
+                      : 'bg-slate-850 hover:bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  Atrás
+                </button>
+                
+                {esUltimoPaso ? (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={!seleccionActual}
+                    className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg ${
+                      seleccionActual
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 shadow-amber-500/10'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    Agregar Pedido
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setCurrentStepIdx(prev => prev + 1)}
+                    disabled={!seleccionActual}
+                    className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all ${
+                      seleccionActual
+                        ? 'bg-slate-800 hover:bg-slate-750 text-amber-500'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    Siguiente
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* MODAL DE AUTORIZACIÓN POR PIN (SUPERVISOR) */}
       {authModal.open && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[250] flex items-center justify-center p-4">

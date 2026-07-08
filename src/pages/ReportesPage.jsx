@@ -709,11 +709,18 @@ export default function ReportesPage() {
               {activeComprobante.items.map((item, idx) => {
                 const subTotalItem = item.cant * item.precio;
                 return (
-                  <div key={idx} className="flex items-start mb-1">
-                    <span className="w-16 shrink-0">{item.cant.toFixed(2)} NIU</span>
-                    <span className="flex-1 uppercase">{item.nombre}</span>
-                    <span className="w-16 text-right shrink-0">{item.precio.toFixed(2)}</span>
-                    <span className="w-20 text-right shrink-0">{subTotalItem.toFixed(2)}</span>
+                  <div key={idx} className="flex flex-col mb-1.5">
+                    <div className="flex items-start">
+                      <span className="w-16 shrink-0">{item.cant.toFixed(2)} NIU</span>
+                      <span className="flex-1 uppercase">{item.nombre}</span>
+                      <span className="w-16 text-right shrink-0">{item.precio.toFixed(2)}</span>
+                      <span className="w-20 text-right shrink-0">{subTotalItem.toFixed(2)}</span>
+                    </div>
+                    {item.notas && (
+                      <div className="pl-16 text-[9px] text-slate-500 font-bold leading-tight uppercase text-left break-all">
+                        {item.notas}
+                      </div>
+                    )}
                   </div>
                 );
               })}
