@@ -120,7 +120,9 @@ export default function BarraPage() {
                         <div className="flex items-center justify-center gap-1.5 mb-0.5">
                           <Truck className="w-4 h-4 text-indigo-200" />
                           <span className="font-bold text-[10px] uppercase tracking-widest text-indigo-100">
-                            {p.codigoPedidosYa?.startsWith('DELIVERY -') ? 'Delivery' : 'Para Llevar'}
+                            {p.codigoPedidosYa?.startsWith('DELIVERY -') ? '📞 Delivery Fogón'
+                              : p.codigoPedidosYa?.startsWith('LLEVAR -') ? '🛍️ Para Llevar / Retiro'
+                              : '🛵 PedidosYa'}
                           </span>
                         </div>
                         <h2 className="font-black text-2xl uppercase tracking-tighter leading-none">

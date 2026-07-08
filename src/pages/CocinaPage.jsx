@@ -124,7 +124,9 @@ export default function CocinaPage() {
                         <div className="flex items-center justify-center gap-2 mb-1">
                           <Truck className="w-5 h-5" />
                           <span className="font-black text-sm uppercase tracking-widest">
-                            {p.codigoPedidosYa?.startsWith('DELIVERY -') ? 'Delivery' : 'Para Llevar'}
+                            {p.codigoPedidosYa?.startsWith('DELIVERY -') ? '📞 Delivery Fogón'
+                              : p.codigoPedidosYa?.startsWith('LLEVAR -') ? '🛍️ Para Llevar / Retiro'
+                              : '🛵 PedidosYa'}
                           </span>
                         </div>
                         <h2 className="font-black text-2xl uppercase tracking-tight leading-none">
