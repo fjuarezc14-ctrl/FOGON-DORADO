@@ -445,7 +445,7 @@ export default function ReportesPage() {
             );
           })()}
         </div>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-left min-w-[500px]">
             <thead className="bg-white text-slate-450 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
               <tr>
@@ -502,7 +502,7 @@ export default function ReportesPage() {
           </h2>
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{mozos.length} mozo{mozos.length !== 1 ? 's' : ''} con comanda</span>
         </div>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-left min-w-[400px]">
             <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
               <tr>
@@ -549,7 +549,7 @@ export default function ReportesPage() {
             {cancelaciones.length} cancelación{cancelaciones.length !== 1 ? 'es' : ''}
           </span>
         </div>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-left min-w-[700px]">
             <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
               <tr>
@@ -607,7 +607,7 @@ export default function ReportesPage() {
             {ventas.length} Comprobante{ventas.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <div className="overflow-x-auto">
+        <div className="table-scroll">
           <table className="w-full text-left min-w-[750px]">
             <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
               <tr>

@@ -105,6 +105,9 @@ export default function CartaPage({ currentUser }) {
   });
 
   const isAdmin = currentUser?.rol === 'Administrador';
+  // Un Mozo con permiso Caja otorgado por el admin también ve la cat. PedidosYa
+  const hasCajaAccess = currentUser?.rol === 'Administrador' || currentUser?.rol === 'Cajero' ||
+    (currentUser?.permisos || []).includes('Caja');
 
   const fetchProductos = useCallback(async () => {
     try {
@@ -133,14 +136,12 @@ export default function CartaPage({ currentUser }) {
 
   // Categorías dinámicas desde los productos en BD
   const categoriasEnBD = ['Todos', ...new Set(productos.map(p => p.categoria))].filter(cat => {
-    if (cat === 'PedidosYa / Ofertas') {
-      return currentUser?.rol === 'Administrador' || currentUser?.rol === 'Cajero';
-    }
+    if (cat === 'PedidosYa / Ofertas') return hasCajaAccess;
     return true;
   });
   const productosFiltrados = productos.filter(p => {
     if (p.categoria === 'PedidosYa / Ofertas') {
-      return currentUser?.rol === 'Administrador' || currentUser?.rol === 'Cajero';
+      if (!hasCajaAccess) return false;
     }
     if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
     return matchProductSemantic(p, searchQuery);
@@ -488,9 +489,7 @@ export default function CartaPage({ currentUser }) {
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Categoría</label>
                   <select value={editProd.categoria} onChange={e => setEditProd({ ...editProd, categoria: e.target.value })} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 bg-white">
                     {TODAS_CATEGORIAS.filter(c => {
-                       if (c === 'PedidosYa / Ofertas') {
-                         return currentUser?.rol === 'Administrador' || currentUser?.rol === 'Cajero';
-                       }
+                       if (c === 'PedidosYa / Ofertas') return hasCajaAccess;
                        return true;
                      }).map(c => (
                       <option key={c} value={c}>{c} {BARRA_CATEGORIAS.includes(c) ? '🍹' : '🔥'}</option>

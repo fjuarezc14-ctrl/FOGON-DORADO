@@ -923,7 +923,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
         mesaId: null,
         mesero: String(cajero),
         total: grandTotal,
-        estado: isTakeout ? 'Cobrado' : 'Cocina', // Para Llevar ya pagado inmediatamente
+        estado: 'Cocina', // Todos van a Cocina primero para que la cocina/barra los prepare
         tipoEntrega: isOwnDelivery ? 'delivery' : 'llevar',
         codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null,
         items: {

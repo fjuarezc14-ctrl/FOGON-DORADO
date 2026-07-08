@@ -1159,7 +1159,7 @@ export default function CajaPage({ currentUser }) {
                     {ventasFiltradas.length} Venta{ventasFiltradas.length !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="table-scroll">
                   <table className="w-full text-left min-w-[650px]">
                     <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                       <tr>
