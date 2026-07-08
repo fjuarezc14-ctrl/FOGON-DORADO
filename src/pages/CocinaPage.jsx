@@ -2,6 +2,24 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, CheckCheck, CheckCircle2, User, Truck } from 'lucide-react';
 import { api } from '../api';
 
+const parseDeliveryInfo = (code) => {
+  if (!code || !code.startsWith('DELIVERY -')) return null;
+  const parts = code.split(' | ');
+  const namePart = parts[0] ? parts[0].replace('DELIVERY - ', '') : '';
+  const telPart = parts[1] ? parts[1].replace('TEL: ', '') : '';
+  const dirPart = parts[2] ? parts[2].replace('DIR: ', '') : '';
+  const pagaPart = parts[3] ? parts[3].replace('PAGA: ', '') : '';
+  const vueltoPart = parts[4] ? parts[4].replace('VUELTO: ', '') : '';
+  
+  return {
+    nombre: namePart,
+    telefono: telPart,
+    direccion: dirPart,
+    conCuanto: pagaPart,
+    vuelto: vueltoPart,
+  };
+};
+
 export default function CocinaPage() {
   const [pedidos, setPedidos] = useState([]);
   const [horaLocal, setHoraLocal] = useState('');
@@ -87,7 +105,7 @@ export default function CocinaPage() {
               </div>
             )
             : pedidos.map((p) => {
-              const esDelivery = p.tipoEntrega === 'llevar';
+              const esDelivery = p.tipoEntrega === 'llevar' || p.tipoEntrega === 'delivery' || !!p.codigoPedidosYa;
               return (
                 <div
                   key={p.pedidoId}
@@ -105,10 +123,20 @@ export default function CocinaPage() {
                       <>
                         <div className="flex items-center justify-center gap-2 mb-1">
                           <Truck className="w-5 h-5" />
-                          <span className="font-black text-sm uppercase tracking-widest">Para Llevar</span>
+                          <span className="font-black text-sm uppercase tracking-widest">
+                            {p.codigoPedidosYa?.startsWith('DELIVERY -') ? 'Delivery' : 'Para Llevar'}
+                          </span>
                         </div>
-                        <h2 className="font-black text-3xl uppercase tracking-tighter leading-none">
-                          {p.codigoPedidosYa || 'DELIVERY'}
+                        <h2 className="font-black text-2xl uppercase tracking-tight leading-none">
+                          {(() => {
+                            if (p.codigoPedidosYa?.startsWith('DELIVERY -')) {
+                              const parsed = parseDeliveryInfo(p.codigoPedidosYa);
+                              return parsed ? parsed.nombre : p.codigoPedidosYa.replace('DELIVERY - ', '');
+                            } else if (p.codigoPedidosYa?.startsWith('LLEVAR -')) {
+                              return p.codigoPedidosYa.replace('LLEVAR - ', '');
+                            }
+                            return p.codigoPedidosYa || 'DELIVERY';
+                          })()}
                         </h2>
                       </>
                     ) : (
@@ -129,6 +157,18 @@ export default function CocinaPage() {
                       {p.hora}
                     </span>
                   </div>
+
+                  {/* Detalles de entrega para Delivery */}
+                  {(() => {
+                    const parsed = parseDeliveryInfo(p.codigoPedidosYa);
+                    if (!parsed) return null;
+                    return (
+                      <div className="p-2.5 bg-blue-50 border-b border-blue-200 text-[10px] font-bold text-blue-900 uppercase leading-snug shrink-0 text-left">
+                        <div className="truncate">📞 {parsed.telefono}</div>
+                        <div className="truncate mt-0.5">📍 {parsed.direccion}</div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Items (solo cocina, sin bebidas) */}
                   <div className="p-4 flex-1 bg-white min-h-[150px]">

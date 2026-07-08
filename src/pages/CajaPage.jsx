@@ -1057,13 +1057,29 @@ export default function CajaPage({ currentUser }) {
                           <div className="flex items-center gap-3">
                             {p.codigoPedidosYa?.startsWith('DELIVERY -') ? (
                               <>
-                                <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0">DEL</div>
-                                <span className="font-black text-indigo-900 tracking-tight">{p.codigoPedidosYa}</span>
+                                <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0 font-bold">DEL</div>
+                                <div className="flex flex-col">
+                                  <span className="font-black text-slate-800 tracking-tight">
+                                    {(() => {
+                                      const parsed = parseDeliveryInfo(p.codigoPedidosYa);
+                                      return parsed ? parsed.nombre : p.codigoPedidosYa.replace('DELIVERY - ', '');
+                                    })()}
+                                  </span>
+                                  {(() => {
+                                    const parsed = parseDeliveryInfo(p.codigoPedidosYa);
+                                    if (!parsed) return null;
+                                    return (
+                                      <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 leading-none block">
+                                        📞 {parsed.telefono} · 📍 {parsed.direccion.substring(0, 25)}{parsed.direccion.length > 25 ? '...' : ''}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                               </>
                             ) : p.codigoPedidosYa?.startsWith('LLEVAR -') ? (
                               <>
-                                <div className="w-10 h-10 bg-amber-500 text-slate-900 rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0">POS</div>
-                                <span className="font-black text-slate-800 tracking-tight">{p.codigoPedidosYa}</span>
+                                <div className="w-10 h-10 bg-amber-500 text-slate-900 rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0 font-bold">POS</div>
+                                <span className="font-black text-slate-800 tracking-tight">{p.codigoPedidosYa.replace('LLEVAR - ', '')}</span>
                               </>
                             ) : (
                               <>
@@ -1149,47 +1165,81 @@ export default function CajaPage({ currentUser }) {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                             <div className="flex flex-col">
-                               <div className="flex items-center gap-2 flex-wrap">
-                                 <span className="font-bold text-slate-800 text-xs">{v.tipoComprobante} ({v.numDocumento || 'S/D'})</span>
-                                 {v.estadoNubefact === 'PENDIENTE_REINTENTO' && (
-                                   <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
-                                     <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
-                                   </span>
-                                 )}
-                                 {v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:') && (
-                                   <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> ✅ ENVIADO
-                                   </span>
-                                 )}
-                               </div>
-                               <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">{v.nombreCliente}</span>
-                             </div>
-                          </td>
-                          <td className="px-6 py-4">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-slate-800 text-xs">
+                                    {v.tipoComprobante} ({(() => {
+                                      if (v.numDocumento && v.numDocumento.startsWith('DELIVERY -')) {
+                                        return 'S/D';
+                                      }
+                                      return v.numDocumento || 'S/D';
+                                    })()})
+                                  </span>
+                                  {v.estadoNubefact === 'PENDIENTE_REINTENTO' && (
+                                    <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
+                                    </span>
+                                  )}
+                                  {v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:') && (
+                                    <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> ✅ ENVIADO
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
+                                  {(() => {
+                                    if (v.codigoPedidosYa?.startsWith('DELIVERY -')) {
+                                      const parsed = parseDeliveryInfo(v.codigoPedidosYa);
+                                      return parsed ? parsed.nombre : v.nombreCliente;
+                                    }
+                                    if (v.nombreCliente && v.nombreCliente.startsWith('DELIVERY -')) {
+                                      const parsed = parseDeliveryInfo(v.nombreCliente);
+                                      return parsed ? parsed.nombre : v.nombreCliente.replace('DELIVERY - ', '');
+                                    }
+                                    return v.nombreCliente || 'Consumidor Final';
+                                  })()}
+                                </span>
+                                {(() => {
+                                  const parsed = parseDeliveryInfo(v.codigoPedidosYa) || parseDeliveryInfo(v.nombreCliente);
+                                  if (!parsed) return null;
+                                  return (
+                                    <span className="text-[9px] text-slate-400 font-mono mt-0.5 block leading-none">
+                                      📞 {parsed.telefono} · 📍 {parsed.direccion.substring(0, 20)}{parsed.direccion.length > 20 ? '...' : ''}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                           </td>
+                           <td className="px-6 py-4">
                             {v.codigoPedidosYa ? (
                               v.codigoPedidosYa.startsWith('DELIVERY -') ? (
-                                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
                                   🛵 DEL: {(() => {
                                     const parsed = parseDeliveryInfo(v.codigoPedidosYa);
-                                    return parsed ? parsed.nombre : v.codigoPedidosYa.replace('DELIVERY - ', '');
+                                    const name = parsed ? parsed.nombre : v.codigoPedidosYa.replace('DELIVERY - ', '');
+                                    const first = name.split(/\s+/)[0] || '';
+                                    return first.substring(0, 10);
                                   })()}
                                 </span>
                               ) : v.codigoPedidosYa.startsWith('LLEVAR -') ? (
-                                <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
-                                  🛍️ LLEVAR: {v.codigoPedidosYa.replace('LLEVAR - ', '')}
+                                <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                                  🛍️ LLEVAR: {(() => {
+                                    const name = v.codigoPedidosYa.replace('LLEVAR - ', '');
+                                    const first = name.split(/\s+/)[0] || '';
+                                    return first.substring(0, 10);
+                                  })()}
                                 </span>
                               ) : (
-                                <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono">
+                                <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono whitespace-nowrap">
                                   🛵 PY: {v.codigoPedidosYa}
                                 </span>
                               )
                             ) : (
-                              <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                              <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
                                 🍽️ Mesa {v.mesaNum}
                               </span>
                             )}
-                          </td>
+                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
                               v.metodoPago === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :

@@ -2,6 +2,24 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, CheckCheck, CheckCircle2, User, Truck, GlassWater } from 'lucide-react';
 import { api } from '../api';
 
+const parseDeliveryInfo = (code) => {
+  if (!code || !code.startsWith('DELIVERY -')) return null;
+  const parts = code.split(' | ');
+  const namePart = parts[0] ? parts[0].replace('DELIVERY - ', '') : '';
+  const telPart = parts[1] ? parts[1].replace('TEL: ', '') : '';
+  const dirPart = parts[2] ? parts[2].replace('DIR: ', '') : '';
+  const pagaPart = parts[3] ? parts[3].replace('PAGA: ', '') : '';
+  const vueltoPart = parts[4] ? parts[4].replace('VUELTO: ', '') : '';
+  
+  return {
+    nombre: namePart,
+    telefono: telPart,
+    direccion: dirPart,
+    conCuanto: pagaPart,
+    vuelto: vueltoPart,
+  };
+};
+
 export default function BarraPage() {
   const [pedidos, setPedidos] = useState([]);
   const [horaLocal, setHoraLocal] = useState('');
@@ -83,7 +101,7 @@ export default function BarraPage() {
             </div>
           ) : (
             pedidos.map((p) => {
-              const esDelivery = p.tipoEntrega === 'llevar';
+              const esDelivery = p.tipoEntrega === 'llevar' || p.tipoEntrega === 'delivery' || !!p.codigoPedidosYa;
               return (
                 <div
                   key={p.pedidoId}
@@ -101,10 +119,20 @@ export default function BarraPage() {
                       <>
                         <div className="flex items-center justify-center gap-1.5 mb-0.5">
                           <Truck className="w-4 h-4 text-indigo-200" />
-                          <span className="font-bold text-[10px] uppercase tracking-widest text-indigo-100">Delivery</span>
+                          <span className="font-bold text-[10px] uppercase tracking-widest text-indigo-100">
+                            {p.codigoPedidosYa?.startsWith('DELIVERY -') ? 'Delivery' : 'Para Llevar'}
+                          </span>
                         </div>
                         <h2 className="font-black text-2xl uppercase tracking-tighter leading-none">
-                          {p.codigoPedidosYa || 'DELIVERY'}
+                          {(() => {
+                            if (p.codigoPedidosYa?.startsWith('DELIVERY -')) {
+                              const parsed = parseDeliveryInfo(p.codigoPedidosYa);
+                              return parsed ? parsed.nombre : p.codigoPedidosYa.replace('DELIVERY - ', '');
+                            } else if (p.codigoPedidosYa?.startsWith('LLEVAR -')) {
+                              return p.codigoPedidosYa.replace('LLEVAR - ', '');
+                            }
+                            return p.codigoPedidosYa || 'DELIVERY';
+                          })()}
                         </h2>
                       </>
                     ) : (
@@ -125,6 +153,18 @@ export default function BarraPage() {
                       {p.hora}
                     </span>
                   </div>
+
+                  {/* Detalles de entrega para Delivery */}
+                  {(() => {
+                    const parsed = parseDeliveryInfo(p.codigoPedidosYa);
+                    if (!parsed) return null;
+                    return (
+                      <div className="px-4 py-2 bg-indigo-950/45 border-b border-indigo-950/60 text-[10px] font-bold text-indigo-200 uppercase leading-snug shrink-0 text-left">
+                        <div className="truncate">📞 {parsed.telefono}</div>
+                        <div className="truncate mt-0.5">📍 {parsed.direccion}</div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Detalle de Bebidas */}
                   <div className="p-4 flex-1 bg-slate-900/40 min-h-[120px]">
