@@ -913,6 +913,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
             precio: parseFloat(i.precio),
             cantidad: parseInt(i.cant),
             historial: false,
+            notas: i.notas ? String(i.notas) : null,
           })),
         },
       },

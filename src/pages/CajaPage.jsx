@@ -1,7 +1,121 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent } from 'lucide-react';
+import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check } from 'lucide-react';
 
 import { api } from '../api';
+
+const PRODUCT_OPTIONS_CONFIG = {
+  "Combo Criollo (Almuerzo)": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["Saltado de Carne", "Saltado de Pollo", "Tallarín Saltado Pollo", "Tallarín Saltado Carne", "Chaufa de Pollo", "Chaufa de Carne", "Trucha Frita", "Alitas Fritas", "Milanesa de Pollo", "Chicharrón de Pollo"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    ]
+  },
+  "Combo Parrillero (Almuerzo)": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["Chuleta de cerdo", "Filete de pollo", "Churrasco", "Pechuga"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    ]
+  },
+  "Combo Tallarines Verdes (Almuerzo)": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["Con Pollo Frito", "Con Bisteck", "Con Pechuga", "Con Chuleta", "Con Pollo Deshuesado"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    ]
+  },
+  "Combo Junior": {
+    steps: [
+      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína"] },
+      { name: "Plato de Fondo", key: "fondo", options: ["3 unds. de chicharrones de pollo", "1/8 pollo a la brasa", "3 alitas fritas (+ ensalada fruta)"] },
+      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
+      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Ninguno"] }
+    ]
+  }
+};
+
+const SINONIMOS = {
+  gaseosa: ['cola', 'inca', 'coca', 'refresco', 'sprite', 'fanta', 'gaseosa'],
+  bebida: ['chicha', 'limonada', 'gaseosa', 'cerveza', 'pisco', 'trago', 'coctel', 'jugo', 'agua'],
+  chela: ['cerveza', 'cristal', 'pilsen', 'cusquena'],
+  papas: ['papa', 'patata', 'fritas'],
+  carne: ['lomo', 'bife', 'parrilla', 'anticucho', 'res', 'corte'],
+  pollo: ['brasa', 'broaster', 'alitas', 'pechuga'],
+  piqueo: ['entrada', 'porcion', 'tequenos', 'salchipapa']
+};
+
+const normalizePhonetic = (text) => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // eliminar acentos
+    .replace(/[^a-z0-9]/g, " ")      // remover caracteres especiales
+    .replace(/ch/g, "x")            // ch -> x
+    .replace(/ll/g, "y")            // ll -> y
+    .replace(/z/g, "s")             // z -> s
+    .replace(/c([ei])/g, "s$1")      // ce, ci -> se, si
+    .replace(/h/g, "")              // h muda
+    .replace(/b/g, "v")              // b -> v equivalencia
+    .replace(/k/g, "c")              // k -> c
+    .replace(/q/g, "c")              // q -> c
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const matchProductSemantic = (prod, query) => {
+  if (!query) return true;
+  const cleanQuery = query.toLowerCase().trim();
+  const queryTokens = cleanQuery.split(/\s+/);
+  
+  const cleanProdName = (prod.nombre || '').toLowerCase();
+  const cleanProdCat = (prod.categoria || '').toLowerCase();
+  
+  const phoneticName = normalizePhonetic(prod.nombre);
+  const phoneticCat = normalizePhonetic(prod.categoria);
+  
+  return queryTokens.every(qToken => {
+    if (cleanProdName.includes(qToken) || cleanProdCat.includes(qToken)) return true;
+    const phoneticToken = normalizePhonetic(qToken);
+    if (phoneticName.includes(phoneticToken) || phoneticCat.includes(phoneticToken)) return true;
+    for (const [key, syns] of Object.entries(SINONIMOS)) {
+      if (key.includes(qToken) || qToken.includes(key)) {
+        if (syns.some(syn => cleanProdName.includes(syn) || normalizePhonetic(syn) === phoneticToken)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  });
+};
+
+const agruparProductos = (items) => {
+  const list = [];
+  const tallarines = items.filter(p => p.categoria === 'Tallarines Verdes');
+  const otros = items.filter(p => p.categoria !== 'Tallarines Verdes');
+  
+  if (tallarines.length > 0) {
+    const ordenados = [...tallarines].sort((a, b) => a.precio - b.precio);
+    list.push({
+      id: 'group_tallarines_verdes',
+      nombre: 'Tallarines Verdes',
+      categoria: 'Tallarines Verdes',
+      precioMin: ordenados[0].precio,
+      precioMax: ordenados[ordenados.length - 1].precio,
+      esAgrupado: true,
+      variantes: tallarines,
+      tipoStock: 'ilimitado',
+      stock: 0,
+      activo: true
+    });
+  }
+  
+  return [...list, ...otros];
+};
 
 export default function CajaPage({ currentUser }) {
   const [mesas, setMesas] = useState([]);
@@ -36,6 +150,14 @@ export default function CajaPage({ currentUser }) {
       setCajeroNombre(currentUser.nombre);
     }
   }, [currentUser]);
+
+  const [deliverySearchQuery, setDeliverySearchQuery] = useState('');
+  const [optionsModalOpen, setOptionsModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selections, setSelections] = useState({});
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [additionalNotes, setAdditionalNotes] = useState('');
+
   const [productosMenu, setProductosMenu] = useState([]);
   const [itemsDelivery, setItemsDelivery] = useState([]);
   const [enviandoDelivery, setEnviandoDelivery] = useState(false);
@@ -467,11 +589,77 @@ export default function CajaPage({ currentUser }) {
     }
     setItemsDelivery([]);
     setCodigoPY('');
+    setDeliverySearchQuery('');
     setDeliveryModal(true);
   };
 
+  const getProductSteps = (prod) => {
+    if (!prod) return [];
+    
+    // 1. Variantes de Tallarines Verdes
+    if (prod.esAgrupado) {
+      const todasLasVariantes = productosMenu.filter(p => p.categoria === 'Tallarines Verdes' && p.activo);
+      return [{
+        name: "Elige la Variante de Carne",
+        key: "producto_variante",
+        options: todasLasVariantes.map(v => ({
+          label: `${v.nombre.replace('Tallarines Verdes con ', 'Con ').replace('Tallarines Verdes Con ', 'Con ')} (S/ ${v.precio.toFixed(2)})`,
+          value: v
+        }))
+      }];
+    }
+    
+    // 2. Combos configurados
+    if (PRODUCT_OPTIONS_CONFIG[prod.nombre]) {
+      return PRODUCT_OPTIONS_CONFIG[prod.nombre].steps.map(step => ({
+        ...step,
+        options: step.options.map(opt => ({ label: opt, value: opt }))
+      }));
+    }
+    
+    // 3. Guarniciones genéricas para carnes y pollos
+    const requiereGuarnicion = 
+      ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
+      !prod.nombre.toLowerCase().includes('solo');
+      
+    if (requiereGuarnicion) {
+      return [{
+        name: "Elige la Guarnición",
+        key: "guarnicion",
+        options: [
+          { label: "Papas Fritas", value: "Papas Fritas" },
+          { label: "Arroz Chaufa", value: "Arroz Chaufa" },
+          { label: "Papa Sancochada", value: "Papa Sancochada" },
+          { label: "Choclo Sancochado", value: "Choclo Sancochado" },
+          { label: "Sin Guarnición", value: "Sin Guarnición" }
+        ]
+      }];
+    }
+    
+    return [];
+  };
+
   const agregarItemDelivery = (prod) => {
-    const idx = itemsDelivery.findIndex(i => i.id === String(prod.id));
+    const steps = getProductSteps(prod);
+    
+    // Si requiere opciones, abrir modal
+    if (steps.length > 0) {
+      setSelectedProduct(prod);
+      const initialSelections = {};
+      steps.forEach(step => {
+        initialSelections[step.key] = step.options[0]?.value; // pre-select first option
+      });
+      setSelections(initialSelections);
+      setCurrentStepIdx(0);
+      setAdditionalNotes('');
+      setOptionsModalOpen(true);
+    } else {
+      agregarItemDeliveryDirecto(prod);
+    }
+  };
+
+  const agregarItemDeliveryDirecto = (prod, notas = null) => {
+    const idx = itemsDelivery.findIndex(i => i.id === String(prod.id) && i.notas === notas);
     const cantEnTicket = idx >= 0 ? itemsDelivery[idx].cant : 0;
     
     // Validar stock si es limitado
@@ -493,7 +681,8 @@ export default function CajaPage({ currentUser }) {
         precio: precioFinal, 
         cant: 1,
         ofertaNombre: prod.ofertaNombre,
-        precioOriginal: prod.precio
+        precioOriginal: prod.precio,
+        notas: notas
       }]);
     }
   };
@@ -1122,51 +1311,97 @@ export default function CajaPage({ currentUser }) {
                       </div>
                     </div>
                   </div>
+
+                  {/* Buscador inteligente */}
+                  <div className="relative w-full">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar plato (ej: 'poyo papas', 'parri', 'gaseosa')..." 
+                      value={deliverySearchQuery}
+                      onChange={(e) => setDeliverySearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-9 py-2 bg-slate-50 border border-slate-200 focus:border-blue-500 rounded-xl text-sm focus:outline-none focus:bg-white font-bold text-slate-800"
+                    />
+                    {deliverySearchQuery && (
+                      <button 
+                        type="button"
+                        onClick={() => setDeliverySearchQuery('')} 
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
-                  {productosMenu.map(prod => {
-                    const cantEnTicket = itemsDelivery.filter(i => String(i.id) === String(prod.id)).reduce((sum, item) => sum + item.cant, 0);
-                    const stockDisponible = prod.tipoStock === 'limitado' ? prod.stock - cantEnTicket : Infinity;
-                    const agotado = prod.tipoStock === 'limitado' && stockDisponible <= 0;
+                  {(() => {
+                    const menuFiltradoPre = productosMenu.filter(p => matchProductSemantic(p, deliverySearchQuery) && p.activo);
+                    const menuFiltrado = agruparProductos(menuFiltradoPre);
+                    
+                    if (menuFiltrado.length === 0) {
+                      return <div className="col-span-full text-center text-slate-400 font-medium py-12 text-sm">No se encontraron productos coincidentes.</div>;
+                    }
+                    
+                    return menuFiltrado.map(prod => {
+                      const isGroup = prod.esAgrupado;
+                      const cantEnTicket = isGroup 
+                        ? 0 
+                        : itemsDelivery.filter(i => String(i.id) === String(prod.id)).reduce((sum, item) => sum + item.cant, 0);
+                      const stockDisponible = prod.tipoStock === 'limitado' ? prod.stock - cantEnTicket : Infinity;
+                      const agotado = prod.tipoStock === 'limitado' && stockDisponible <= 0;
 
-                    return (
-                      <div 
-                        key={prod.id} 
-                        onClick={() => !agotado && agregarItemDelivery(prod)} 
-                        className={`bg-white border rounded-xl p-3 flex flex-col justify-between shadow-sm h-24 transition-all relative overflow-hidden ${
-                          agotado 
-                            ? 'opacity-50 grayscale border-slate-200 cursor-not-allowed bg-slate-50' 
-                            : 'cursor-pointer hover:border-blue-400 hover:-translate-y-0.5 active:bg-slate-50'
-                        }`}
-                      >
-                        {prod.precioOferta !== null && prod.precioOferta !== undefined && !agotado && (
-                          <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg shadow-sm flex items-center gap-0.5 animate-pulse z-15">
-                            <Tag className="w-2 h-2" />
-                            {prod.ofertaValor}% OFF
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-bold text-slate-800 text-[10px] uppercase leading-tight pr-4">{prod.nombre}</p>
-                          {prod.tipoStock === 'limitado' && (
-                            <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1.5 ${
-                              agotado ? 'bg-red-100 text-red-650' : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {agotado ? 'AGOTADO' : `STOCK: ${stockDisponible}`}
-                            </span>
+                      return (
+                        <div 
+                          key={prod.id} 
+                          onClick={() => !agotado && agregarItemDelivery(prod)} 
+                          className={`bg-white border rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden h-24 transition-all ${
+                            agotado 
+                              ? 'opacity-50 grayscale border-slate-200 cursor-not-allowed bg-slate-50' 
+                              : 'cursor-pointer hover:border-blue-400 hover:-translate-y-0.5 active:bg-slate-50'
+                          }`}
+                        >
+                          {prod.precioOferta !== null && prod.precioOferta !== undefined && !agotado && !isGroup && (
+                            <div className="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg shadow-sm flex items-center gap-0.5 animate-pulse z-15">
+                              <Tag className="w-2 h-2" />
+                              {prod.ofertaValor}% OFF
+                            </div>
                           )}
-                        </div>
-                        {prod.precioOferta !== null && prod.precioOferta !== undefined ? (
-                          <div className="flex flex-col items-start leading-none -mt-1">
-                            <span className="font-black font-mono text-blue-600 text-sm">S/ {prod.precioOferta.toFixed(2)}</span>
-                            <span className="line-through text-slate-400 font-semibold text-[10px] mt-0.5">S/ {prod.precio.toFixed(2)}</span>
+                          <div className="z-10 flex flex-col justify-between h-full w-full">
+                            <div>
+                              <p className="font-bold text-slate-800 text-[10px] uppercase leading-tight pr-4">{prod.nombre}</p>
+                              {isGroup && (
+                                <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 bg-blue-100 text-blue-700">
+                                  OPCIONES DE CARNE
+                                </span>
+                              )}
+                              {prod.tipoStock === 'limitado' && !isGroup && (
+                                <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1.5 ${
+                                  agotado ? 'bg-red-100 text-red-650' : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {agotado ? 'AGOTADO' : `STOCK: ${stockDisponible}`}
+                                </span>
+                              )}
+                            </div>
+                            {isGroup ? (
+                              <p className="font-black font-mono text-blue-600 text-xs md:text-sm">
+                                Desde S/ {prod.precioMin.toFixed(2)}
+                              </p>
+                            ) : (
+                              prod.precioOferta !== null && prod.precioOferta !== undefined ? (
+                                <div className="flex flex-col items-start leading-none">
+                                  <span className="font-black font-mono text-blue-600 text-sm">S/ {prod.precioOferta.toFixed(2)}</span>
+                                  <span className="line-through text-slate-400 font-semibold text-[10px] mt-0.5">S/ {prod.precio.toFixed(2)}</span>
+                                </div>
+                              ) : (
+                                <p className="font-black font-mono text-blue-600 text-sm">S/ {prod.precio.toFixed(2)}</p>
+                              )
+                            )}
                           </div>
-                        ) : (
-                          <p className="font-black font-mono text-blue-600 text-sm">S/ {prod.precio.toFixed(2)}</p>
-                        )}
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
@@ -1183,8 +1418,11 @@ export default function CajaPage({ currentUser }) {
                         const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
                         return (
                           <div key={idx} className="flex items-center justify-between py-2 border-b border-dashed border-slate-100 last:border-0">
-                            <div>
-                              <p className="font-bold text-slate-800 text-xs uppercase">{item.nombre}</p>
+                            <div className="flex-1 pr-2">
+                              <p className="font-bold text-slate-800 text-xs uppercase leading-tight">{item.nombre}</p>
+                              {item.notas && (
+                                <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 leading-snug break-all">{item.notas}</p>
+                              )}
                               <div className="flex items-baseline gap-1.5 mt-0.5">
                                 {tieneDescuento && (
                                   <span className="line-through text-slate-400 font-semibold text-xs">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
@@ -1192,10 +1430,10 @@ export default function CajaPage({ currentUser }) {
                                 <span className="font-mono text-blue-600 font-bold text-sm">S/ {(item.cant * item.precio).toFixed(2)}</span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200">
-                              <button onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
+                            <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200 shrink-0">
+                              <button type="button" onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
                               <span className="font-bold text-slate-900 w-5 text-center text-sm">{item.cant}</span>
-                              <button onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
+                              <button type="button" onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
                             </div>
                           </div>
                         );
@@ -1222,6 +1460,184 @@ export default function CajaPage({ currentUser }) {
           </div>
         </div>
       )}
+
+      {/* MODAL DE SELECCIÓN DE OPCIONES Y COMBOS (INTERACTIVO PARA DELIVERY) */}
+      {optionsModalOpen && selectedProduct && (() => {
+        const steps = getProductSteps(selectedProduct);
+        if (steps.length === 0) return null;
+        
+        const currentStep = steps[currentStepIdx];
+        const esUltimoPaso = currentStepIdx === steps.length - 1;
+        const seleccionActual = selections[currentStep.key];
+        
+        const handleSelectOption = (val) => {
+          setSelections(prev => ({ ...prev, [currentStep.key]: val }));
+          
+          if (!esUltimoPaso) {
+            setTimeout(() => {
+              setCurrentStepIdx(prev => prev + 1);
+            }, 150);
+          }
+        };
+        
+        const handleConfirm = () => {
+          if (selectedProduct.esAgrupado) {
+            const prodVariante = selections["producto_variante"];
+            if (!prodVariante) {
+              alert("Por favor, selecciona una opción.");
+              return;
+            }
+            agregarItemDeliveryDirecto(prodVariante, additionalNotes);
+          } else {
+            const notesArray = [];
+            steps.forEach(step => {
+              const val = selections[step.key];
+              if (val) {
+                notesArray.push(`[${step.name}: ${val}]`);
+              }
+            });
+            if (additionalNotes.trim()) {
+              notesArray.push(`(Nota: ${additionalNotes.trim()})`);
+            }
+            const finalNotes = notesArray.join(' · ');
+            agregarItemDeliveryDirecto(selectedProduct, finalNotes);
+          }
+          
+          setOptionsModalOpen(false);
+          setSelectedProduct(null);
+        };
+        
+        return (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[250] flex items-center justify-center md:p-4">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-lg md:rounded-3xl shadow-2xl overflow-hidden flex flex-col h-full max-h-[100vh] md:h-auto md:max-h-[90vh] animate-slide-up">
+              <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
+                <div>
+                  <h3 className="text-white font-black text-base uppercase tracking-tight leading-none">
+                    {selectedProduct.esAgrupado ? "Seleccionar Variante" : "Personalizar Plato"}
+                  </h3>
+                  <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-1">
+                    {selectedProduct.nombre}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setOptionsModalOpen(false);
+                    setSelectedProduct(null);
+                  }}
+                  className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-2 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+                {steps.length > 1 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      <span>Paso {currentStepIdx + 1} de {steps.length}</span>
+                      <span className="text-amber-400">{currentStep.name}</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-850 rounded-full overflow-hidden flex border border-slate-800">
+                      {steps.map((_, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`h-full flex-1 border-r border-slate-900 last:border-0 transition-all ${
+                            idx <= currentStepIdx ? 'bg-amber-500' : 'bg-slate-800'
+                          }`}
+                        ></div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
+                    {currentStep.name}:
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {currentStep.options.map((opt, oIdx) => {
+                      const isSelected = selectedProduct.esAgrupado 
+                        ? (seleccionActual && seleccionActual.id === opt.value.id)
+                        : (seleccionActual === opt.value);
+                        
+                      return (
+                        <button
+                          key={oIdx}
+                          onClick={() => handleSelectOption(opt.value)}
+                          className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all group relative overflow-hidden min-h-[75px] ${
+                            isSelected
+                              ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 scale-[0.98]'
+                              : 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-750 hover:border-slate-600'
+                          }`}
+                        >
+                          <span className="font-black text-xs leading-snug pr-6 uppercase">{opt.label}</span>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-slate-950 absolute top-4 right-4 stroke-[3px]" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {esUltimoPaso && (
+                  <div className="border-t border-slate-800 pt-5 space-y-3">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                      Especificaciones Especiales / Notas
+                    </label>
+                    <textarea
+                      placeholder="Ejemplo: sin cebolla, papas bien doradas, etc."
+                      value={additionalNotes}
+                      onChange={(e) => setAdditionalNotes(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-2xl p-4 text-xs font-bold text-slate-100 focus:outline-none focus:bg-slate-950 custom-scrollbar h-20 resize-none"
+                    ></textarea>
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-5 border-t border-slate-800 bg-slate-950/40 flex justify-between gap-3 shrink-0">
+                <button
+                  onClick={() => setCurrentStepIdx(prev => Math.max(0, prev - 1))}
+                  disabled={currentStepIdx === 0}
+                  className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                    currentStepIdx === 0
+                      ? 'bg-slate-850 text-slate-600 border border-slate-850 opacity-40 cursor-not-allowed shadow-none'
+                      : 'bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-750 hover:text-white'
+                  }`}
+                >
+                  Atrás
+                </button>
+                
+                {esUltimoPaso ? (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={!seleccionActual}
+                    className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg ${
+                      seleccionActual
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 shadow-emerald-500/20'
+                        : 'bg-slate-850 text-slate-600 border border-slate-800 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    Agregar Pedido
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setCurrentStepIdx(prev => prev + 1)}
+                    disabled={!seleccionActual}
+                    className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg ${
+                      seleccionActual
+                        ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+                        : 'bg-slate-850 text-slate-600 border border-slate-800 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    Siguiente
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL DE CIERRE DE CAJA (ARQUEO DE TURNO) */}
       {cierreModalOpen && (() => {
