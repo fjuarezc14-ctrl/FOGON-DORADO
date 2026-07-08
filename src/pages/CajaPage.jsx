@@ -1096,7 +1096,7 @@ export default function CajaPage({ currentUser }) {
                               </>
                             ) : p.codigoPedidosYa?.startsWith('LLEVAR -') ? (
                               <>
-                                <div className="w-10 h-10 bg-amber-500 text-slate-900 rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0 font-bold">POS</div>
+                                <div className="w-10 h-10 bg-amber-500 text-slate-900 rounded-xl flex items-center justify-center font-black shadow-sm text-xs shrink-0 font-bold">RET</div>
                                 <span className="font-black text-slate-800 tracking-tight">{p.codigoPedidosYa.replace('LLEVAR - ', '')}</span>
                               </>
                             ) : (
@@ -1150,7 +1150,7 @@ export default function CajaPage({ currentUser }) {
               : ventas;
 
             return (
-              <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm" style={{ overflow: 'clip' }}>
                 <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                   <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
                     <Receipt className="w-4 h-4 text-emerald-500" /> Historial de Ventas del Día
@@ -1159,7 +1159,7 @@ export default function CajaPage({ currentUser }) {
                     {ventasFiltradas.length} Venta{ventasFiltradas.length !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <div className="table-scroll">
+                <div className="table-scroll pb-1">
                   <table className="w-full text-left min-w-[650px]">
                     <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                       <tr>
