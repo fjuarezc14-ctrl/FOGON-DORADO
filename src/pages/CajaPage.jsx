@@ -197,6 +197,8 @@ export default function CajaPage({ currentUser }) {
   const [tipoDelivery, setTipoDelivery] = useState('PedidosYa'); // 'PedidosYa' | 'ParaLlevar'
   const [toasts, setToasts] = useState([]);
   const prevPedidosLlevarRef = useRef([]);
+  const historialScrollRef = useRef(null);
+
 
   // Campana de Restaurante Premium (G5 -> C6)
   const playChimeNotification = () => {
@@ -1159,7 +1161,20 @@ export default function CajaPage({ currentUser }) {
                     {ventasFiltradas.length} Venta{ventasFiltradas.length !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <div className="table-scroll pb-1">
+                {/* Botones de navegación horizontal */}
+                <div className="flex justify-end gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100">
+                  <button
+                    onClick={() => historialScrollRef.current && (historialScrollRef.current.scrollLeft -= 200)}
+                    className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all flex items-center justify-center text-sm font-black shadow-sm active:scale-95"
+                    title="Desplazar izquierda"
+                  >◀</button>
+                  <button
+                    onClick={() => historialScrollRef.current && (historialScrollRef.current.scrollLeft += 200)}
+                    className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all flex items-center justify-center text-sm font-black shadow-sm active:scale-95"
+                    title="Desplazar derecha"
+                  >▶</button>
+                </div>
+                <div ref={historialScrollRef} className="table-scroll pb-1">
                   <table className="w-full text-left min-w-[650px]">
                     <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                       <tr>
