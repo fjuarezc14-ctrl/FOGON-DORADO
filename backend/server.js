@@ -1564,9 +1564,10 @@ app.get('/api/ventas', async (req, res) => {
       filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
     } else {
       const ahora = new Date();
-      const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
-      hoyPeru.setHours(0, 0, 0, 0);
-      const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+      const ayerPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+      ayerPeru.setDate(ayerPeru.getDate() - 1);
+      ayerPeru.setHours(0, 0, 0, 0);
+      const inicioUTC = new Date(ayerPeru.getTime() + 5 * 60 * 60 * 1000);
       filtroFecha = { gte: inicioUTC };
     }
 

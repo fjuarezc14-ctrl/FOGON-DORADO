@@ -632,12 +632,7 @@ export default function ReportesPage() {
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-slate-800 text-xs">
-                        {v.tipoComprobante} ({(() => {
-                          if (v.numDocumento && v.numDocumento.startsWith('DELIVERY -')) {
-                            return 'S/D';
-                          }
-                          return v.numDocumento || 'S/D';
-                        })()})
+                        {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
                       </span>
                       <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
                         {(() => {
@@ -756,7 +751,7 @@ export default function ReportesPage() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
             <div className="bg-slate-950 p-4 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-xs uppercase tracking-wider flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}
+                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : (activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA')}
               </h3>
               <button onClick={() => setSunatModalOpen(false)} className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
@@ -770,7 +765,7 @@ export default function ReportesPage() {
                 R.U.C. N° 20496009259
               </div>
               
-              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA'}</div>
+              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : (activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA')}</div>
               <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{activeComprobante.serie}-{activeComprobante.correlativo}</div>
               
               <div className="flex justify-between border-t border-b border-dashed border-slate-300 py-1.5 mb-2 font-bold">

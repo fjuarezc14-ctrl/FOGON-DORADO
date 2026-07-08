@@ -410,7 +410,7 @@ export default function CajaPage({ currentUser }) {
     if (!v) return;
     const rucEmpresa = "R.U.C. N° 20496009259";
     
-    let serie = v.serie || (v.tipoComprobante === 'Factura' ? 'F001' : 'B001');
+    let serie = v.serie || (v.tipoComprobante === 'Factura' ? 'F001' : (v.tipoComprobante === 'Ticket' ? 'T001' : 'B001'));
     let correlativoStr = String(v.numero || (v.id % 10000)).padStart(4, '0');
     let qrData = `${rucEmpresa}|${v.tipoComprobante === 'Factura' ? '01' : '03'}|${serie}|${correlativoStr}|${v.igv.toFixed(2)}|${v.total.toFixed(2)}|${v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}|${v.tipoComprobante === 'Factura'?'6':(v.numDocumento?.length === 8 ? '1' : '0')}|${v.numDocumento || '00000000'}`;
     let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
@@ -453,7 +453,25 @@ export default function CajaPage({ currentUser }) {
       });
     }
 
-    const parsedDelivery = parseDeliveryInfo(v.codigoPedidosYa);
+    const parsedDelivery = parseDeliveryInfo(v.codigoPedidosYa) || parseDeliveryInfo(v.nombreCliente);
+    const cleanDoc = (() => {
+      if (v.numDocumento && v.numDocumento.startsWith('DELIVERY -')) return 'S/D';
+      return v.numDocumento || 'S/D';
+    })();
+    const cleanNombre = (() => {
+      if (parsedDelivery) return parsedDelivery.nombre;
+      if (v.nombreCliente && v.nombreCliente.startsWith('DELIVERY -')) {
+        return v.nombreCliente.replace('DELIVERY - ', '');
+      }
+      return v.nombreCliente || 'Consumidor Final';
+    })();
+
+    // Sumar items y agregar servicio de delivery si hay descuadre
+    const sumItems = items.reduce((s, i) => s + (i.cant * i.precio), 0);
+    const diff = v.total - sumItems;
+    if (diff > 0.05 && (v.codigoPedidosYa?.startsWith('DELIVERY -') || v.nombreCliente?.startsWith('DELIVERY -'))) {
+      items = [...items, { cant: 1, nombre: 'Servicio de Delivery', precio: diff }];
+    }
 
     setActiveComprobante({
       tipo: v.tipoComprobante,
@@ -462,9 +480,9 @@ export default function CajaPage({ currentUser }) {
       fecha: v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE'),
       hora: v.hora,
       mesaNum: v.mesaNum || (parsedDelivery ? 'Delivery' : 'Llevar'),
-      clienteNombre: v.nombreCliente || 'Consumidor Final',
-      clienteDoc: v.numDocumento || 'S/D',
-      clienteDireccion: v.clienteDireccion || '',
+      clienteNombre: cleanNombre,
+      clienteDoc: cleanDoc,
+      clienteDireccion: parsedDelivery ? parsedDelivery.direccion : (v.clienteDireccion || ''),
       items,
       subtotal: v.subtotal,
       igv: v.igv,
@@ -740,7 +758,7 @@ export default function CajaPage({ currentUser }) {
     const fecha = new Date().toLocaleDateString('es-PE');
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     
-    let serie = response.serie || (tipoComprobante === 'Factura' ? 'F001' : 'B001');
+    let serie = response.serie || (tipoComprobante === 'Factura' ? 'F001' : (tipoComprobante === 'Ticket' ? 'T001' : 'B001'));
     let correlativoStr = String(response.numero || 1).padStart(4, '0');
     let subtotal = total / 1.18;
     let igv = total - subtotal;
@@ -1168,12 +1186,7 @@ export default function CajaPage({ currentUser }) {
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-bold text-slate-800 text-xs">
-                                    {v.tipoComprobante} ({(() => {
-                                      if (v.numDocumento && v.numDocumento.startsWith('DELIVERY -')) {
-                                        return 'S/D';
-                                      }
-                                      return v.numDocumento || 'S/D';
-                                    })()})
+                                    {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
                                   </span>
                                   {v.estadoNubefact === 'PENDIENTE_REINTENTO' && (
                                     <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
@@ -2213,7 +2226,7 @@ export default function CajaPage({ currentUser }) {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
             <div className="bg-slate-950 p-4 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-xs uppercase tracking-wider flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.metodoPago === 'Cortesía' ? '🎁 TICKET DE CORTESÍA 🎁' : (activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA')}
+                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.metodoPago === 'Cortesía' ? '🎁 TICKET DE CORTESÍA 🎁' : (activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : (activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA'))}
               </h3>
               <button onClick={() => setSunatModalOpen(false)} className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
@@ -2236,7 +2249,7 @@ export default function CajaPage({ currentUser }) {
 
 
               
-              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.metodoPago === 'Cortesía' ? '🎁 CORTESÍA / CONSUMO INTERNO 🎁' : (activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA ELECTRÓNICA')}</div>
+              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.metodoPago === 'Cortesía' ? '🎁 CORTESÍA / CONSUMO INTERNO 🎁' : (activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : (activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA'))}</div>
               <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{activeComprobante.metodoPago === 'Cortesía' ? `COR-00${activeComprobante.mesaNum}` : `${activeComprobante.serie}-${activeComprobante.correlativo}`}</div>
               
               <div className="flex justify-between border-t border-b border-dashed border-slate-300 py-1.5 mb-2 font-bold">
