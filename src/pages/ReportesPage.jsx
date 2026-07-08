@@ -694,12 +694,22 @@ export default function ReportesPage() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
-                      v.metodoPago === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                      v.metodoPago === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                      v.metodoPago === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
-                      'bg-indigo-50 border-indigo-200 text-indigo-700'
-                    }`}>{v.metodoPago}</span>
+                    {(() => {
+                      let method = v.metodoPago;
+                      if (method === 'PedidosYa' && v.codigoPedidosYa) {
+                        if (v.codigoPedidosYa.startsWith('DELIVERY -') || v.codigoPedidosYa.startsWith('LLEVAR -')) {
+                          method = 'Efectivo';
+                        }
+                      }
+                      return (
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                          method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                          method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                          method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                          'bg-indigo-50 border-indigo-200 text-indigo-700'
+                        }`}>{method}</span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 max-w-xs truncate text-xs font-bold text-slate-500 uppercase" title={v.itemsResumen}>
                     {v.itemsResumen}
