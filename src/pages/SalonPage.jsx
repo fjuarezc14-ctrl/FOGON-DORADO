@@ -647,6 +647,7 @@ export default function SalonPage({ currentUser }) {
   };
 
   const menuFiltradoPre = productos.filter(p => {
+    if (p.categoria === 'PedidosYa / Ofertas') return false;
     if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
     return matchProductSemantic(p, searchQuery);
   });
@@ -853,7 +854,7 @@ export default function SalonPage({ currentUser }) {
                   </div>
                   {/* Categorías */}
                   <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-0.5 whitespace-nowrap">
-                    {['Todos', ...new Set(productos.map(p => p.categoria))].map(cat => (
+                    {['Todos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))].map(cat => (
                       <button key={cat} onClick={() => setCategoriaActiva(cat)} className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-sm transition-colors ${categoriaActiva === cat ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-amber-50'}`}>{cat}</button>
                     ))}
                   </div>
