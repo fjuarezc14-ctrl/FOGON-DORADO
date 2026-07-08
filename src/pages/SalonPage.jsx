@@ -816,33 +816,9 @@ export default function SalonPage({ currentUser }) {
                   <Link2 className="w-3.5 h-3.5" />
                   Unir Mesa
                 </button>
-                <div className="hidden md:flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5">
-                  <User className="w-3 h-3 text-slate-400" />
-                  <select 
-                    disabled={currentUser?.rol === 'Mozo'} 
-                    value={meseroGlobal} 
-                    onChange={(e) => setMeseroGlobal(e.target.value)} 
-                    className="bg-slate-800 text-white text-xs font-bold focus:outline-none disabled:opacity-80 border-0"
-                  >
-                    {/* Mostrar los usuarios del sistema que tengan roles de atención (Mozo, Cajero, Admin) */}
-                    {usuarios.filter(u => u.activo).length === 0 ? (
-                      <option value={meseroGlobal} className="bg-slate-800 text-white">{meseroGlobal}</option>
-                    ) : (
-                      <>
-                        {!usuarios.some(u => u.activo && u.nombre === meseroGlobal) && (
-                          <option value={meseroGlobal} className="bg-slate-800 text-white">{meseroGlobal}</option>
-                        )}
-                        {usuarios
-                          .filter(u => u.activo && ['Mozo', 'Cajero', 'Administrador'].includes(u.rol))
-                          .map(u => (
-                            <option key={u.id} value={u.nombre} className="bg-slate-800 text-white">
-                              {u.nombre} ({u.rol})
-                            </option>
-                          ))
-                        }
-                      </>
-                    )}
-                  </select>
+                <div className="hidden md:flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-slate-350 text-xs font-bold font-mono">
+                  <User className="w-3.5 h-3.5 text-amber-500" />
+                  <span>MOZO: <strong className="text-white uppercase">{currentUser?.nombre || meseroGlobal}</strong></span>
                 </div>
                 <button onClick={() => setModalOpen(false)} className="bg-slate-800 hover:bg-red-500 text-slate-300 hover:text-white p-2 md:p-2.5 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
               </div>

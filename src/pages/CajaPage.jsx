@@ -3,7 +3,7 @@ import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard,
 
 import { api } from '../api';
 
-export default function CajaPage() {
+export default function CajaPage({ currentUser }) {
   const [mesas, setMesas] = useState([]);
   const [pedidosLlevar, setPedidosLlevar] = useState([]);
   const [stats, setStats] = useState({ atendidas: 0, ingresos: 0 });
@@ -29,7 +29,13 @@ export default function CajaPage() {
   // Modal PedidosYa y Para Llevar
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [codigoPY, setCodigoPY] = useState('');
-  const [cajeroNombre, setCajeroNombre] = useState('María');
+  const [cajeroNombre, setCajeroNombre] = useState(currentUser?.nombre || 'María');
+
+  useEffect(() => {
+    if (currentUser?.nombre) {
+      setCajeroNombre(currentUser.nombre);
+    }
+  }, [currentUser]);
   const [productosMenu, setProductosMenu] = useState([]);
   const [itemsDelivery, setItemsDelivery] = useState([]);
   const [enviandoDelivery, setEnviandoDelivery] = useState(false);
@@ -1111,9 +1117,9 @@ export default function CajaPage() {
                     </div>
                     <div>
                       <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase mb-1">Cajero:</label>
-                      <select value={cajeroNombre} onChange={(e) => setCajeroNombre(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 text-sm focus:outline-none">
-                        <option>María</option><option>Carlos</option><option>Luis</option>
-                      </select>
+                      <div className="w-full bg-slate-150 border border-slate-200 rounded-xl px-3 py-2 font-black text-slate-800 text-sm uppercase">
+                        {cajeroNombre}
+                      </div>
                     </div>
                   </div>
                 </div>
