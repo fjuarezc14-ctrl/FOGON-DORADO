@@ -3,6 +3,24 @@ import { Download, TrendingUp, TrendingDown, DollarSign, XCircle, Users, Truck, 
 import { api } from '../api';
 
 
+const parseDeliveryInfo = (code) => {
+  if (!code || !code.startsWith('DELIVERY -')) return null;
+  const parts = code.split(' | ');
+  const namePart = parts[0] ? parts[0].replace('DELIVERY - ', '') : '';
+  const telPart = parts[1] ? parts[1].replace('TEL: ', '') : '';
+  const dirPart = parts[2] ? parts[2].replace('DIR: ', '') : '';
+  const pagaPart = parts[3] ? parts[3].replace('PAGA: ', '') : '';
+  const vueltoPart = parts[4] ? parts[4].replace('VUELTO: ', '') : '';
+  
+  return {
+    nombre: namePart,
+    telefono: telPart,
+    direccion: dirPart,
+    conCuanto: pagaPart,
+    vuelto: vueltoPart,
+  };
+};
+
 export default function ReportesPage() {
   const getPrimerDiaMes = () => {
     const ahora = new Date();
@@ -122,24 +140,38 @@ export default function ReportesPage() {
       });
     }
 
+    const parsedDelivery = parseDeliveryInfo(v.codigoPedidosYa) || parseDeliveryInfo(v.nombreCliente);
+    const cleanDoc = (() => {
+      if (v.numDocumento && v.numDocumento.startsWith('DELIVERY -')) return 'S/D';
+      return v.numDocumento || 'S/D';
+    })();
+    const cleanNombre = (() => {
+      if (parsedDelivery) return parsedDelivery.nombre;
+      if (v.nombreCliente && v.nombreCliente.startsWith('DELIVERY -')) {
+        return v.nombreCliente.replace('DELIVERY - ', '');
+      }
+      return v.nombreCliente || 'Consumidor Final';
+    })();
+
     setActiveComprobante({
       tipo: v.tipoComprobante,
       serie,
       correlativo: correlativoStr,
       fecha: v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE'),
       hora: v.hora,
-      mesaNum: v.mesaNum || 'Delivery',
-      clienteNombre: v.nombreCliente || 'Consumidor Final',
-      clienteDoc: v.numDocumento || 'S/D',
-      clienteDireccion: v.clienteDireccion || 'Av. Principal 123, Lima',
+      mesaNum: v.mesaNum || (parsedDelivery ? 'Delivery' : 'Llevar'),
+      clienteNombre: cleanNombre,
+      clienteDoc: cleanDoc,
+      clienteDireccion: parsedDelivery ? parsedDelivery.direccion : (v.clienteDireccion || ''),
       items,
       subtotal: v.subtotal,
       igv: v.igv,
       total: v.total,
       totalLetras,
-      hashResumen,
+      hashResumen: "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=",
       metodoPago: v.metodoPago,
       qrImageUrl,
+      deliveryInfo: parsedDelivery,
     });
 
     setSunatModalOpen(true);
@@ -599,18 +631,65 @@ export default function ReportesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-800 text-xs">{v.tipoComprobante} ({v.numDocumento || 'S/D'})</span>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">{v.nombreCliente}</span>
+                      <span className="font-bold text-slate-800 text-xs">
+                        {v.tipoComprobante} ({(() => {
+                          if (v.numDocumento && v.numDocumento.startsWith('DELIVERY -')) {
+                            return 'S/D';
+                          }
+                          return v.numDocumento || 'S/D';
+                        })()})
+                      </span>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
+                        {(() => {
+                          if (v.codigoPedidosYa?.startsWith('DELIVERY -')) {
+                            const parsed = parseDeliveryInfo(v.codigoPedidosYa);
+                            return parsed ? parsed.nombre : v.nombreCliente;
+                          }
+                          if (v.nombreCliente && v.nombreCliente.startsWith('DELIVERY -')) {
+                            const parsed = parseDeliveryInfo(v.nombreCliente);
+                            return parsed ? parsed.nombre : v.nombreCliente.replace('DELIVERY - ', '');
+                          }
+                          return v.nombreCliente || 'Consumidor Final';
+                        })()}
+                      </span>
+                      {(() => {
+                        const parsed = parseDeliveryInfo(v.codigoPedidosYa) || parseDeliveryInfo(v.nombreCliente);
+                        if (!parsed) return null;
+                        return (
+                          <span className="text-[9px] text-slate-400 font-mono mt-0.5 block leading-none">
+                            📞 {parsed.telefono} · 📍 {parsed.direccion.substring(0, 20)}{parsed.direccion.length > 20 ? '...' : ''}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    {v.tipoEntrega === 'llevar' ? (
-                      <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono">
-                        🛵 PY: {v.codigoPedidosYa}
-                      </span>
+                    {v.codigoPedidosYa ? (
+                      v.codigoPedidosYa.startsWith('DELIVERY -') ? (
+                        <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                          🛵 DEL: {(() => {
+                            const parsed = parseDeliveryInfo(v.codigoPedidosYa);
+                            const name = parsed ? parsed.nombre : v.codigoPedidosYa.replace('DELIVERY - ', '');
+                            const first = name.split(/\s+/)[0] || '';
+                            return first.substring(0, 10);
+                          })()}
+                        </span>
+                      ) : v.codigoPedidosYa.startsWith('LLEVAR -') ? (
+                        <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                          🛍️ LLEVAR: {(() => {
+                            const name = v.codigoPedidosYa.replace('LLEVAR - ', '');
+                            const first = name.split(/\s+/)[0] || '';
+                            return first.substring(0, 10);
+                          })()}
+                        </span>
+                      ) : (
+                        <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono whitespace-nowrap">
+                          🛵 PY: {v.codigoPedidosYa}
+                        </span>
+                      )
                     ) : (
-                      <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
-                        🍽️ Mesa {v.mesaNum}
+                      <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                        🍽️ Mesa {v.mesaNum || 'S/M'}
                       </span>
                     )}
                   </td>
@@ -695,6 +774,24 @@ export default function ReportesPage() {
                 <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
                 <div><strong>Items:</strong> <span>{activeComprobante.items.length}</span></div>
               </div>
+
+              {/* Box de Datos de Despacho para Delivery */}
+              {activeComprobante.deliveryInfo && (
+                <div style={{ border: '1px dashed black', padding: '6px', margin: '8px 0', fontSize: '10px', lineHeight: '1.3' }} className="space-y-1 bg-slate-50 rounded-lg">
+                  <div className="text-center font-bold uppercase mb-1" style={{ fontSize: '11px' }}>🛵 DATOS DE DESPACHO / DELIVERY 🛵</div>
+                  <div><strong>DIRECCIÓN:</strong> <span className="uppercase font-bold">{activeComprobante.deliveryInfo.direccion}</span></div>
+                  <div className="flex justify-between">
+                    <div><strong>TELÉFONO:</strong> <span>{activeComprobante.deliveryInfo.telefono}</span></div>
+                    <div><strong>ENVÍO:</strong> <span>S/ {parseFloat(activeComprobante.deliveryInfo.montoDelivery || 0).toFixed(2)}</span></div>
+                  </div>
+                  {activeComprobante.deliveryInfo.conCuanto && parseFloat(activeComprobante.deliveryInfo.conCuanto) > 0 && (
+                    <div className="border-t border-slate-300 pt-1 mt-1 flex justify-between font-bold">
+                      <div><strong>PAGA CON:</strong> <span>S/ {parseFloat(activeComprobante.deliveryInfo.conCuanto).toFixed(2)}</span></div>
+                      <div><strong>VUELTO:</strong> <span className="text-emerald-700">S/ {parseFloat(activeComprobante.deliveryInfo.vuelto).toFixed(2)}</span></div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
               

@@ -154,17 +154,7 @@ export default function BarraPage() {
                     </span>
                   </div>
 
-                  {/* Detalles de entrega para Delivery */}
-                  {(() => {
-                    const parsed = parseDeliveryInfo(p.codigoPedidosYa);
-                    if (!parsed) return null;
-                    return (
-                      <div className="px-4 py-2 bg-indigo-950/45 border-b border-indigo-950/60 text-[10px] font-bold text-indigo-200 uppercase leading-snug shrink-0 text-left">
-                        <div className="truncate">📞 {parsed.telefono}</div>
-                        <div className="truncate mt-0.5">📍 {parsed.direccion}</div>
-                      </div>
-                    );
-                  })()}
+
 
                   {/* Detalle de Bebidas */}
                   <div className="p-4 flex-1 bg-slate-900/40 min-h-[120px]">

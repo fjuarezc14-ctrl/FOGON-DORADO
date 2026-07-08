@@ -158,17 +158,7 @@ export default function CocinaPage() {
                     </span>
                   </div>
 
-                  {/* Detalles de entrega para Delivery */}
-                  {(() => {
-                    const parsed = parseDeliveryInfo(p.codigoPedidosYa);
-                    if (!parsed) return null;
-                    return (
-                      <div className="p-2.5 bg-blue-50 border-b border-blue-200 text-[10px] font-bold text-blue-900 uppercase leading-snug shrink-0 text-left">
-                        <div className="truncate">📞 {parsed.telefono}</div>
-                        <div className="truncate mt-0.5">📍 {parsed.direccion}</div>
-                      </div>
-                    );
-                  })()}
+
 
                   {/* Items (solo cocina, sin bebidas) */}
                   <div className="p-4 flex-1 bg-white min-h-[150px]">
