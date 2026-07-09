@@ -712,7 +712,8 @@ export default function CajaPage({ currentUser }) {
           options: [
             { label: "Papa Frita", value: "Papa Frita" },
             { label: "Papa Sancochada", value: "Papa Sancochada" },
-            { label: "Menestra", value: "Menestra" }
+            { label: "Menestra", value: "Menestra" },
+            { label: "Omitir (Sin Guarnición)", value: "Sin Guarnición" }
           ]
         },
         {
@@ -720,7 +721,8 @@ export default function CajaPage({ currentUser }) {
           key: "entrada_menu",
           options: [
             { label: "Sopa", value: "Sopa" },
-            { label: "Ensalada", value: "Ensalada" }
+            { label: "Ensalada", value: "Ensalada" },
+            { label: "Omitir (Sin Entrada)", value: "Sin Entrada" }
           ]
         }
       ];
