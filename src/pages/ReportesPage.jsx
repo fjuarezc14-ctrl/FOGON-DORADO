@@ -365,6 +365,7 @@ export default function ReportesPage() {
             <Printer className="w-4 h-4" /> Reporte Gerencial (PDF)
           </button>
         </div>
+      </div>
        {/* PESTAÑAS DE NAVEGACIÓN */}
       <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-3">
         {[
@@ -960,7 +961,7 @@ export default function ReportesPage() {
             )}
           </div>
         </div>
-      )}</div>
+      )}
 
       {/* SUNAT Comprobante Susii Style Modal */}
       {sunatModalOpen && activeComprobante && (
