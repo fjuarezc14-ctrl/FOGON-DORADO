@@ -57,6 +57,7 @@ export default function ReportesPage() {
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
   const [rotacion, setRotacion] = useState([]);
   const [gerencialModalOpen, setGerencialModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('resumen');
 
   const getChickenEquivalency = (name) => {
     const normalized = name.toLowerCase();
@@ -364,386 +365,602 @@ export default function ReportesPage() {
             <Printer className="w-4 h-4" /> Reporte Gerencial (PDF)
           </button>
         </div>
+       {/* PESTAÑAS DE NAVEGACIÓN */}
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-3">
+        {[
+          { id: 'resumen', label: '📊 Resumen Financiero y RCE' },
+          { id: 'rotacion', label: '🍽️ Rotación y Pollos' },
+          { id: 'pedidosya', label: '🛵 Control PedidosYa' },
+          { id: 'consumo', label: '👤 Consumo de Personal (Planilla)' },
+          { id: 'mozos', label: '👥 Mozos y Cancelaciones' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center gap-1.5 ${
+              activeTab === tab.id
+                ? 'bg-slate-900 text-white shadow-md'
+                : 'bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100/50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* METRICAS DE BALANCE COMERCIAL */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* TARJETA VENTAS */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all hover:scale-[1.01]">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shadow-sm"><TrendingUp className="w-5 h-5"/></div>
-              <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Ventas en Periodo</h2>
-            </div>
-            <p className="text-3xl font-black font-mono text-slate-900 mb-1">S/ {resumen.ventasTotal.toFixed(2)}</p>
-            <p className="text-xs text-slate-400">Impuestos y base imponible acumulados.</p>
-          </div>
-          <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-4 mt-6">
-            <span>Base Imp: S/ {resumen.ventasBase.toFixed(2)}</span>
-            <span className="font-bold text-blue-600">IGV (18%): S/ {resumen.ventasIGV.toFixed(2)}</span>
-          </div>
-        </div>
+      {/* CONTENIDO DE PESTAÑAS */}
 
-        {/* TARJETA COMPRAS */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all hover:scale-[1.01]">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shadow-sm"><TrendingDown className="w-5 h-5"/></div>
-              <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Compras en Periodo</h2>
+      {/* 1. RESUMEN FINANCIERO Y COMPROBANTES (RCE) */}
+      {activeTab === 'resumen' && (
+        <>
+          {/* METRICAS DE BALANCE COMERCIAL */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* TARJETA VENTAS */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all hover:scale-[1.01]">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shadow-sm"><TrendingUp className="w-5 h-5"/></div>
+                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Ventas en Periodo</h2>
+                </div>
+                <p className="text-3xl font-black font-mono text-slate-900 mb-1">S/ {resumen.ventasTotal.toFixed(2)}</p>
+                <p className="text-xs text-slate-400">Impuestos y base imponible acumulados.</p>
+              </div>
+              <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-4 mt-6">
+                <span>Base Imp: S/ {resumen.ventasBase.toFixed(2)}</span>
+                <span className="font-bold text-blue-600">IGV (18%): S/ {resumen.ventasIGV.toFixed(2)}</span>
+              </div>
             </div>
-            <p className="text-3xl font-black font-mono text-slate-900 mb-1">S/ {resumen.comprasTotal.toFixed(2)}</p>
-            <p className="text-xs text-slate-400">Gastos comerciales y crédito fiscal acumulado.</p>
-          </div>
-          <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-4 mt-6">
-            <span>Base Imp: S/ {resumen.comprasBase.toFixed(2)}</span>
-            <span className="font-bold text-rose-600">IGV (18%): S/ {resumen.comprasIGV.toFixed(2)}</span>
-          </div>
-        </div>
 
-        {/* TARJETA IGV ESTIMADO */}
-        <div className="bg-slate-900 p-6 rounded-3xl shadow-xl text-white relative overflow-hidden flex flex-col justify-between transition-all hover:scale-[1.01]">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-500 rounded-full opacity-10 blur-xl"></div>
-          <div>
-            <div className="flex items-center gap-3 mb-4 relative z-10">
-              <div className="w-10 h-10 bg-slate-800 text-amber-400 rounded-xl flex items-center justify-center shadow-sm border border-slate-800"><DollarSign className="w-5 h-5"/></div>
-              <h2 className="font-black text-amber-400 uppercase text-xs tracking-wider">IGV Neto Estimado</h2>
+            {/* TARJETA COMPRAS */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all hover:scale-[1.01]">
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shadow-sm"><TrendingDown className="w-5 h-5"/></div>
+                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Compras en Periodo</h2>
+                </div>
+                <p className="text-3xl font-black font-mono text-slate-900 mb-1">S/ {resumen.comprasTotal.toFixed(2)}</p>
+                <p className="text-xs text-slate-400">Gastos comerciales y crédito fiscal acumulado.</p>
+              </div>
+              <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-4 mt-6">
+                <span>Base Imp: S/ {resumen.comprasBase.toFixed(2)}</span>
+                <span className="font-bold text-rose-600">IGV (18%): S/ {resumen.comprasIGV.toFixed(2)}</span>
+              </div>
             </div>
-            <p className="text-4xl font-black font-mono text-white mb-1 relative z-10">
-              S/ {resumen.igvAPagar.toFixed(2)}
-            </p>
-            <p className="text-xs text-slate-400">Impuestos netos a liquidar (Débito - Crédito).</p>
-          </div>
-          <div className="flex justify-between text-xs text-slate-400 border-t border-slate-800 pt-4 mt-6 relative z-10">
-            <span>Periodo Auditoría</span>
-            <span className="font-bold text-amber-400 uppercase tracking-widest text-[10px]">Rango Activo</span>
-          </div>
-        </div>
-      </div>
 
-      {/* ROTACIÓN DE PRODUCTOS Y EQUIVALENCIA DE POLLOS */}
-      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
-        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-amber-500" /> Rotación de Productos y Consumo de Pollos
-            </h2>
-            <p className="text-[10px] text-slate-450 mt-0.5">Productos vendidos ordenados por cantidad. Incluye cálculo de equivalencias en pollos enteros.</p>
+            {/* TARJETA IGV ESTIMADO */}
+            <div className="bg-slate-900 p-6 rounded-3xl shadow-xl text-white relative overflow-hidden flex flex-col justify-between transition-all hover:scale-[1.01]">
+              <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-500 rounded-full opacity-10 blur-xl"></div>
+              <div>
+                <div className="flex items-center gap-3 mb-4 relative z-10">
+                  <div className="w-10 h-10 bg-slate-800 text-amber-400 rounded-xl flex items-center justify-center shadow-sm border border-slate-800"><DollarSign className="w-5 h-5"/></div>
+                  <h2 className="font-black text-amber-400 uppercase text-xs tracking-wider">IGV Neto Estimado</h2>
+                </div>
+                <p className="text-4xl font-black font-mono text-white mb-1 relative z-10">
+                  S/ {resumen.igvAPagar.toFixed(2)}
+                </p>
+                <p className="text-xs text-slate-400">Impuestos netos a liquidar (Débito - Crédito).</p>
+              </div>
+              <div className="flex justify-between text-xs text-slate-400 border-t border-slate-800 pt-4 mt-6 relative z-10">
+                <span>Periodo Auditoría</span>
+                <span className="font-bold text-amber-400 uppercase tracking-widest text-[10px]">Rango Activo</span>
+              </div>
+            </div>
           </div>
-          {(() => {
-            const calculateChickenTotal = () => {
-              let total = 0;
-              rotacion.forEach(item => {
-                const equiv = getChickenEquivalency(item.nombre);
-                total += item.cantidad * equiv;
-              });
-              return total;
-            };
-            return (
-              <span className="bg-amber-100 text-amber-900 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider">
-                Total Pollos Enteros: {calculateChickenTotal().toFixed(2)}
-              </span>
-            );
-          })()}
-        </div>
-        <div className="table-scroll">
-          <table className="w-full text-left min-w-[500px]">
-            <thead className="bg-white text-slate-450 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4">Producto</th>
-                <th className="px-6 py-4">Categoría</th>
-                <th className="px-6 py-4 text-center">Cantidad Vendida</th>
-                <th className="px-6 py-4 text-center">Equivalencia (Pollo Entero)</th>
-                <th className="px-6 py-4 text-right">Total (S/)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
-              {rotacion.length > 0 ? rotacion.map((r, i) => {
-                const equiv = getChickenEquivalency(r.nombre);
+
+          {/* HISTORIAL Y AUDITORÍA DE COMPROBANTES EMITIDOS */}
+          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
+            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-indigo-500" /> Registro de Comprobantes Emitidos (RCE)
+                </h2>
+                <p className="text-[10px] text-slate-400 mt-0.5">Listado oficial de comprobantes emitidos. Excluye consumos internos de personal.</p>
+              </div>
+              {(() => {
+                const ventasComerciales = ventas.filter(v => v.metodoPago !== 'Consumo');
                 return (
-                  <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-slate-800">{r.nombre}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-[10px] text-slate-400 uppercase font-medium">{r.categoria}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700">
-                        {r.cantidad}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {equiv > 0 ? (
-                        <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-700 font-mono">
-                          {(equiv * r.cantidad).toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 font-mono">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900">
-                      S/ {r.total.toFixed(2)}
-                    </td>
-                  </tr>
+                  <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    {ventasComerciales.length} Comprobante{ventasComerciales.length !== 1 ? 's' : ''}
+                  </span>
                 );
-              }) : (
-                <tr><td colSpan="5" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">Sin registros de rotación en este rango de fechas.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* RENDIMIENTO POR MOZOS */}
-      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
-        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-          <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
-            <Users className="w-4 h-4 text-purple-500" /> Rendimiento de Mozos en el Periodo
-          </h2>
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{mozos.length} mozo{mozos.length !== 1 ? 's' : ''} con comanda</span>
-        </div>
-        <div className="table-scroll">
-          <table className="w-full text-left min-w-[400px]">
-            <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4">Mozo / Mesero</th>
-                <th className="px-6 py-4 text-center">Mesas Activas Ahora</th>
-                <th className="px-6 py-4 text-center">Mesas Atendidas y Cobradas</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
-              {mozos.length > 0 ? mozos.map((m, i) => (
-                <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-slate-900 text-amber-400 rounded-xl flex items-center justify-center font-black text-xs shrink-0">{m.nombre[0]}</div>
-                      <span className="font-bold text-slate-800">{m.nombre}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`px-3 py-1 rounded-full text-xs font-black ${m.mesasActivas > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>
-                      {m.mesasActivas} mesa{m.mesasActivas !== 1 ? 's' : ''}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-700">
-                      {m.mesasAtendidas} atendida{m.mesasAtendidas !== 1 ? 's' : ''}
-                    </span>
-                  </td>
-                </tr>
-              )) : (
-                <tr><td colSpan="3" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">Sin actividad de mozos en este rango de fechas.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* PEDIDOS CANCELADOS DEL DÍA */}
-      <div className="bg-white rounded-3xl border border-red-200/60 shadow-sm overflow-hidden">
-        <div className="p-4 md:p-5 border-b border-red-100 bg-red-50 flex justify-between items-center">
-          <h2 className="font-black text-red-700 uppercase text-xs tracking-wider flex items-center gap-2">
-            <XCircle className="w-4 h-4 text-red-500" /> Pedidos Cancelados e Incidencias en el Periodo
-          </h2>
-          <span className="bg-red-100 text-red-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-            {cancelaciones.length} cancelación{cancelaciones.length !== 1 ? 'es' : ''}
-          </span>
-        </div>
-        <div className="table-scroll">
-          <table className="w-full text-left min-w-[700px]">
-            <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-4">Fecha / Hora</th>
-                <th className="px-5 py-4">Mesa / Delivery</th>
-                <th className="px-5 py-4">Cancelado por</th>
-                <th className="px-5 py-4">Motivo / Explicación</th>
-                <th className="px-5 py-4">Detalle Consumo</th>
-                <th className="px-5 py-4 text-right">Pérdida Estimada</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
-              {cancelaciones.length > 0 ? cancelaciones.map((c, i) => (
-                <tr key={i} className="hover:bg-red-50/30 transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-slate-800 text-xs">{c.fecha || 'Hoy'}</span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 font-mono">{c.hora}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    {c.mesa
-                      ? <span className="bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-black">Mesa {c.mesa}</span>
-                      : <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 w-max"><Truck className="w-3.5 h-3.5" />{c.codigoPedidosYa || 'Delivery'}</span>
-                    }
-                  </td>
-                  <td className="px-5 py-4 text-slate-800">{c.canceladoPor}</td>
-                  <td className="px-5 py-4 text-slate-500 text-xs italic max-w-[200px] truncate" title={c.motivoCancela}>{c.motivoCancela}</td>
-                  <td className="px-5 py-4 text-slate-500 text-xs max-w-[220px] truncate" title={c.resumenItems}>{c.resumenItems}</td>
-                  <td className="px-5 py-4 text-right font-mono font-black text-red-600">- S/ {c.total.toFixed(2)}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">No hay cancelaciones registradas en este rango de fechas.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {cancelaciones.length > 0 && (
-          <div className="p-5 border-t border-red-100 bg-red-50/50 flex justify-end">
-            <span className="font-black text-red-700 text-sm">
-              Total Pérdida en Periodo: <span className="font-mono text-xl ml-2">S/ {cancelaciones.reduce((s, c) => s + c.total, 0).toFixed(2)}</span>
-            </span>
+              })()}
+            </div>
+            <div className="table-scroll">
+              <table className="w-full text-left min-w-[750px]">
+                <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4">ID / Hora</th>
+                    <th className="px-6 py-4">Comprobante / Cliente</th>
+                    <th className="px-6 py-4">Mesa / Delivery</th>
+                    <th className="px-6 py-4">Método de Pago</th>
+                    <th className="px-6 py-4">Detalle Items</th>
+                    <th className="px-6 py-4 text-right">Total</th>
+                    <th className="px-6 py-4 text-center">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                  {(() => {
+                    const filtradas = ventas.filter(v => v.metodoPago !== 'Consumo');
+                    return filtradas.length > 0 ? filtradas.map(v => (
+                      <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-mono text-xs font-black text-slate-900">#VT-{v.id}</span>
+                            <span className="text-[10px] text-slate-400 font-mono mt-0.5">{v.hora}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-800 text-xs">
+                              {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
+                            </span>
+                            <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
+                              {(() => {
+                                if (v.codigoPedidosYa?.startsWith('DELIVERY -')) {
+                                  const parsed = parseDeliveryInfo(v.codigoPedidosYa);
+                                  return parsed ? parsed.nombre : v.nombreCliente;
+                                }
+                                if (v.nombreCliente && v.nombreCliente.startsWith('DELIVERY -')) {
+                                  const parsed = parseDeliveryInfo(v.nombreCliente);
+                                  return parsed ? parsed.nombre : v.nombreCliente.replace('DELIVERY - ', '');
+                                }
+                                return v.nombreCliente || 'Consumidor Final';
+                              })()}
+                            </span>
+                            {(() => {
+                              const parsed = parseDeliveryInfo(v.codigoPedidosYa) || parseDeliveryInfo(v.nombreCliente);
+                              if (!parsed) return null;
+                              return (
+                                <span className="text-[9px] text-slate-400 font-mono mt-0.5 block leading-none">
+                                  📞 {parsed.telefono} · 📍 {parsed.direccion.substring(0, 20)}{parsed.direccion.length > 20 ? '...' : ''}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {v.codigoPedidosYa ? (
+                            v.codigoPedidosYa.startsWith('DELIVERY -') ? (
+                              <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                                🛵 DEL: {(() => {
+                                  const parsed = parseDeliveryInfo(v.codigoPedidosYa);
+                                  const name = parsed ? parsed.nombre : v.codigoPedidosYa.replace('DELIVERY - ', '');
+                                  const first = name.split(/\s+/)[0] || '';
+                                  return first.substring(0, 10);
+                                })()}
+                              </span>
+                            ) : v.codigoPedidosYa.startsWith('LLEVAR -') ? (
+                              <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                                🛍️ LLEVAR: {(() => {
+                                  const name = v.codigoPedidosYa.replace('LLEVAR - ', '');
+                                  const first = name.split(/\s+/)[0] || '';
+                                  return first.substring(0, 10);
+                                })()}
+                              </span>
+                            ) : (
+                              <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono whitespace-nowrap">
+                                🛵 PY: {v.codigoPedidosYa}
+                              </span>
+                            )
+                          ) : (
+                            <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                              🍽️ Mesa {v.mesaNum || 'S/M'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {(() => {
+                            let method = v.metodoPago;
+                            if (method === 'PedidosYa' && v.codigoPedidosYa) {
+                              if (v.codigoPedidosYa.startsWith('DELIVERY -') || v.codigoPedidosYa.startsWith('LLEVAR -')) {
+                                method = 'Efectivo';
+                              }
+                            }
+                            return (
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                                method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                                method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                                method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
+                                'bg-indigo-50 border-indigo-200 text-indigo-700'
+                              }`}>{method}</span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-6 py-4 max-w-xs truncate text-xs font-bold text-slate-500 uppercase" title={v.itemsResumen}>
+                          {v.itemsResumen}
+                        </td>
+                        <td className="px-6 py-4 text-right font-mono font-black text-slate-900 text-base">
+                          S/ {v.total.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => reimprimirComprobante(v)}
+                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                              title="Reimprimir Comprobante Susii 80mm"
+                            >
+                              <Printer className="w-3.5 h-3.5" /> Reimprimir
+                            </button>
+                            <button
+                              onClick={() => enviarPorWhatsApp(v)}
+                              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                              title="Enviar Comprobante por WhatsApp"
+                            >
+                              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.161.001 6.136 1.23 8.375 3.466 2.238 2.237 3.467 5.21 3.466 8.373-.003 6.535-5.328 11.86-11.859 11.86-2.007-.001-3.98-.51-5.753-1.48L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.269 0 9.557-4.287 9.559-9.556.001-2.553-.99-4.955-2.792-6.758-1.802-1.802-4.199-2.793-6.753-2.794-5.27 0-9.559 4.287-9.56 9.559-.001 1.625.434 3.208 1.262 4.622L1.51 21.054l4.137-1.9zm12.135-6.843c-.268-.134-1.583-.78-1.828-.87-.247-.09-.427-.134-.607.134-.18.267-.697.87-.852 1.047-.156.178-.311.201-.579.067-.268-.134-1.132-.418-2.156-1.332-.796-.71-1.335-1.586-1.492-1.853-.156-.268-.017-.413.117-.547.12-.12.268-.312.401-.468.134-.156.179-.268.268-.446.09-.178.045-.335-.022-.469-.067-.134-.607-1.462-.832-2.002-.22-.53-.442-.457-.607-.466-.156-.008-.337-.008-.518-.008-.18 0-.473.067-.72.337-.247.268-.943.922-.943 2.248s.965 2.604 1.1 2.784c.134.18 1.9 2.901 4.6 4.068.643.277 1.143.443 1.534.568.646.205 1.233.176 1.697.107.518-.077 1.583-.647 1.807-1.272.223-.624.223-1.159.156-1.272-.069-.112-.249-.18-.517-.313z" />
+                              </svg> WhatsApp
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="7" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
+                          No se encontraron comprobantes emitidos en este rango de fechas.
+                        </td>
+                      </tr>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-
-      {/* HISTORIAL Y AUDITORÍA DE COMPROBANTES EMITIDOS */}
-      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mt-8 mb-12">
-        <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-          <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
-            <Receipt className="w-4 h-4 text-indigo-500" /> Registro de Comprobantes Emitidos (RCE)
-          </h2>
-          <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-            {ventas.length} Comprobante{ventas.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        <div className="table-scroll">
-          <table className="w-full text-left min-w-[750px]">
-            <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4">ID / Hora</th>
-                <th className="px-6 py-4">Comprobante / Cliente</th>
-                <th className="px-6 py-4">Mesa / Delivery</th>
-                <th className="px-6 py-4">Método de Pago</th>
-                <th className="px-6 py-4">Detalle Items</th>
-                <th className="px-6 py-4 text-right">Total</th>
-                <th className="px-6 py-4 text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
-              {ventas.length > 0 ? ventas.map(v => (
-                <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs font-black text-slate-900">#VT-{v.id}</span>
-                      <span className="text-[10px] text-slate-400 font-mono mt-0.5">{v.hora}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-800 text-xs">
-                        {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
-                      </span>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
-                        {(() => {
-                          if (v.codigoPedidosYa?.startsWith('DELIVERY -')) {
-                            const parsed = parseDeliveryInfo(v.codigoPedidosYa);
-                            return parsed ? parsed.nombre : v.nombreCliente;
-                          }
-                          if (v.nombreCliente && v.nombreCliente.startsWith('DELIVERY -')) {
-                            const parsed = parseDeliveryInfo(v.nombreCliente);
-                            return parsed ? parsed.nombre : v.nombreCliente.replace('DELIVERY - ', '');
-                          }
-                          return v.nombreCliente || 'Consumidor Final';
-                        })()}
-                      </span>
-                      {(() => {
-                        const parsed = parseDeliveryInfo(v.codigoPedidosYa) || parseDeliveryInfo(v.nombreCliente);
-                        if (!parsed) return null;
-                        return (
-                          <span className="text-[9px] text-slate-400 font-mono mt-0.5 block leading-none">
-                            📞 {parsed.telefono} · 📍 {parsed.direccion.substring(0, 20)}{parsed.direccion.length > 20 ? '...' : ''}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {v.codigoPedidosYa ? (
-                      v.codigoPedidosYa.startsWith('DELIVERY -') ? (
-                        <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
-                          🛵 DEL: {(() => {
-                            const parsed = parseDeliveryInfo(v.codigoPedidosYa);
-                            const name = parsed ? parsed.nombre : v.codigoPedidosYa.replace('DELIVERY - ', '');
-                            const first = name.split(/\s+/)[0] || '';
-                            return first.substring(0, 10);
-                          })()}
-                        </span>
-                      ) : v.codigoPedidosYa.startsWith('LLEVAR -') ? (
-                        <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
-                          🛍️ LLEVAR: {(() => {
-                            const name = v.codigoPedidosYa.replace('LLEVAR - ', '');
-                            const first = name.split(/\s+/)[0] || '';
-                            return first.substring(0, 10);
-                          })()}
-                        </span>
-                      ) : (
-                        <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono whitespace-nowrap">
-                          🛵 PY: {v.codigoPedidosYa}
-                        </span>
-                      )
-                    ) : (
-                      <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
-                        🍽️ Mesa {v.mesaNum || 'S/M'}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {(() => {
-                      let method = v.metodoPago;
-                      if (method === 'PedidosYa' && v.codigoPedidosYa) {
-                        if (v.codigoPedidosYa.startsWith('DELIVERY -') || v.codigoPedidosYa.startsWith('LLEVAR -')) {
-                          method = 'Efectivo';
-                        }
-                      }
-                      return (
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
-                          method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                          method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                          method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
-                          'bg-indigo-50 border-indigo-200 text-indigo-700'
-                        }`}>{method}</span>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-6 py-4 max-w-xs truncate text-xs font-bold text-slate-500 uppercase" title={v.itemsResumen}>
-                    {v.itemsResumen}
-                  </td>
-                  <td className="px-6 py-4 text-right font-mono font-black text-slate-900 text-base">
-                    S/ {v.total.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => reimprimirComprobante(v)}
-                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                        title="Reimprimir Comprobante Susii 80mm"
-                      >
-                        <Printer className="w-3.5 h-3.5" /> Reimprimir
-                      </button>
-                      <button
-                        onClick={() => enviarPorWhatsApp(v)}
-                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                        title="Enviar Comprobante por WhatsApp"
-                      >
-                        <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.161.001 6.136 1.23 8.375 3.466 2.238 2.237 3.467 5.21 3.466 8.373-.003 6.535-5.328 11.86-11.859 11.86-2.007-.001-3.98-.51-5.753-1.48L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.269 0 9.557-4.287 9.559-9.556.001-2.553-.99-4.955-2.792-6.758-1.802-1.802-4.199-2.793-6.753-2.794-5.27 0-9.559 4.287-9.56 9.559-.001 1.625.434 3.208 1.262 4.622L1.51 21.054l4.137-1.9zm12.135-6.843c-.268-.134-1.583-.78-1.828-.87-.247-.09-.427-.134-.607.134-.18.267-.697.87-.852 1.047-.156.178-.311.201-.579.067-.268-.134-1.132-.418-2.156-1.332-.796-.71-1.335-1.586-1.492-1.853-.156-.268-.017-.413.117-.547.12-.12.268-.312.401-.468.134-.156.179-.268.268-.446.09-.178.045-.335-.022-.469-.067-.134-.607-1.462-.832-2.002-.22-.53-.442-.457-.607-.466-.156-.008-.337-.008-.518-.008-.18 0-.473.067-.72.337-.247.268-.943.922-.943 2.248s.965 2.604 1.1 2.784c.134.18 1.9 2.901 4.6 4.068.643.277 1.143.443 1.534.568.646.205 1.233.176 1.697.107.518-.077 1.583-.647 1.807-1.272.223-.624.223-1.159.156-1.272-.069-.112-.249-.18-.517-.313z" />
-                        </svg> WhatsApp
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )) : (
+      {/* 2. ROTACIÓN Y EQUIVALENCIA DE POLLOS */}
+      {activeTab === 'rotacion' && (
+        <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
+          <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-amber-500" /> Rotación de Productos y Consumo de Pollos
+              </h2>
+              <p className="text-[10px] text-slate-400 mt-0.5">Productos vendidos ordenados por cantidad. Incluye cálculo de equivalencias en pollos enteros.</p>
+            </div>
+            {(() => {
+              const calculateChickenTotal = () => {
+                let total = 0;
+                rotacion.forEach(item => {
+                  const equiv = getChickenEquivalency(item.nombre);
+                  total += item.cantidad * equiv;
+                });
+                return total;
+              };
+              return (
+                <span className="bg-amber-100 text-amber-900 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+                  Total Pollos Enteros: {calculateChickenTotal().toFixed(2)}
+                </span>
+              );
+            })()}
+          </div>
+          <div className="table-scroll">
+            <table className="w-full text-left min-w-[500px]">
+              <thead className="bg-white text-slate-450 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                 <tr>
-                  <td colSpan="7" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
-                    No se encontraron comprobantes emitidos en este rango de fechas.
-                  </td>
+                  <th className="px-6 py-4">Producto</th>
+                  <th className="px-6 py-4">Categoría</th>
+                  <th className="px-6 py-4 text-center">Cantidad Vendida</th>
+                  <th className="px-6 py-4 text-center">Equivalencia (Pollo Entero)</th>
+                  <th className="px-6 py-4 text-right">Total (S/)</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                {rotacion.length > 0 ? rotacion.map((r, i) => {
+                  const equiv = getChickenEquivalency(r.nombre);
+                  return (
+                    <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-slate-800">{r.nombre}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-[10px] text-slate-400 uppercase font-medium">{r.categoria}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700">
+                          {r.cantidad}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {equiv > 0 ? (
+                          <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-700 font-mono">
+                            {(equiv * r.cantidad).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-mono">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono font-black text-slate-900">
+                        S/ {r.total.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr><td colSpan="5" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">Sin registros de rotación en este rango de fechas.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* 3. CONTROL PEDIDOSYA */}
+      {activeTab === 'pedidosya' && (
+        <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
+          <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                <Truck className="w-4 h-4 text-indigo-500" /> Control de Ventas de PedidosYa
+              </h2>
+              <p className="text-[10px] text-slate-400 mt-0.5">Listado detallado para conciliar la liquidación semanal del portal PedidosYa.</p>
+            </div>
+            {(() => {
+              const totalPY = ventas
+                .filter(v => v.metodoPago === 'PedidosYa')
+                .reduce((s, v) => s + v.total, 0);
+              return (
+                <span className="bg-indigo-100 text-indigo-900 text-xs font-black px-4 py-2 rounded-full uppercase tracking-wider">
+                  Total PedidosYa: S/ {totalPY.toFixed(2)}
+                </span>
+              );
+            })()}
+          </div>
+          <div className="table-scroll">
+            <table className="w-full text-left min-w-[650px]">
+              <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-4">ID Venta</th>
+                  <th className="px-6 py-4">Fecha / Hora</th>
+                  <th className="px-6 py-4">Código PedidosYa</th>
+                  <th className="px-6 py-4">Detalle items</th>
+                  <th className="px-6 py-4 text-right">Total (S/)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                {(() => {
+                  const itemsPY = ventas.filter(v => v.metodoPago === 'PedidosYa');
+                  return itemsPY.length > 0 ? itemsPY.map(v => (
+                    <tr key={v.id} className="hover:bg-indigo-50/20 transition-colors">
+                      <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
+                      <td className="px-6 py-4">
+                        <span className="font-mono">{v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}</span> · <span className="text-slate-400 font-mono text-xs">{v.hora}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-xl text-xs font-black font-mono">
+                          {v.codigoPedidosYa || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
+                      <td className="px-6 py-4 text-right font-mono font-black text-slate-950">S/ {v.total.toFixed(2)}</td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="5" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
+                        No se registraron ventas de PedidosYa en este periodo.
+                      </td>
+                    </tr>
+                  );
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 4. CONSUMO DE PERSONAL (PLANILLA) */}
+      {activeTab === 'consumo' && (
+        <div className="space-y-6">
+          {/* Resumen por Persona */}
+          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm p-6">
+            <h3 className="font-black text-slate-800 uppercase text-xs tracking-wider mb-4 flex items-center gap-2">
+              <Users className="w-4 h-4 text-violet-600" /> Acumulado para Planilla (Descuentos)
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+              {(() => {
+                const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
+                const porMozo = {};
+                consumos.forEach(v => {
+                  const mName = v.mesero || v.nombreCliente || 'Sin Nombre';
+                  porMozo[mName] = (porMozo[mName] || 0) + v.total;
+                });
+                const entries = Object.entries(porMozo);
+                return entries.length > 0 ? entries.map(([mozo, total]) => (
+                  <div key={mozo} className="bg-violet-50/50 border border-violet-100 rounded-2xl p-4 text-center">
+                    <p className="text-[10px] text-slate-450 font-black uppercase truncate" title={mozo}>{mozo}</p>
+                    <p className="text-xl font-black text-violet-700 font-mono mt-1">S/ {total.toFixed(2)}</p>
+                  </div>
+                )) : (
+                  <div className="col-span-full py-4 text-center text-xs text-slate-400 font-bold">No hay acumulados en el periodo.</div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Listado detallado */}
+          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
+            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4 text-violet-600" /> Consumo Interno de Personal
+                </h2>
+                <p className="text-[10px] text-slate-400 mt-0.5">Historial completo de consumos registrados por el personal del restaurante.</p>
+              </div>
+              {(() => {
+                const totalC = ventas
+                  .filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía')
+                  .reduce((s, v) => s + v.total, 0);
+                return (
+                  <span className="bg-violet-100 text-violet-850 text-xs font-black px-4 py-2 rounded-full uppercase tracking-wider">
+                    Total Consumos: S/ {totalC.toFixed(2)}
+                  </span>
+                );
+              })()}
+            </div>
+            <div className="table-scroll">
+              <table className="w-full text-left min-w-[700px]">
+                <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4">ID</th>
+                    <th className="px-6 py-4">Fecha / Hora</th>
+                    <th className="px-6 py-4">Colaborador / Personal</th>
+                    <th className="px-6 py-4">Detalle del Consumo</th>
+                    <th className="px-6 py-4 text-right">Total a Descontar</th>
+                    <th className="px-6 py-4 text-center">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                  {(() => {
+                    const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
+                    return consumos.length > 0 ? consumos.map(v => (
+                      <tr key={v.id} className="hover:bg-violet-50/20 transition-colors">
+                        <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
+                        <td className="px-6 py-4 font-mono">
+                          {v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{v.hora}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-slate-900 font-bold uppercase">{v.mesero || v.nombreCliente || 'Sin Colaborador'}</span>
+                          {v.metodoPago === 'Cortesía' && <span className="ml-2 bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">Cortesía</span>}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
+                        <td className="px-6 py-4 text-right font-mono font-black text-violet-700">S/ {v.total.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => {
+                              // Clonamos la venta pero forzamos el texto de forma de pago interna para el ticket
+                              const printClone = {
+                                ...v,
+                                metodoPago: 'Consumo'
+                              };
+                              reimprimirComprobante(printClone);
+                            }}
+                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 mx-auto"
+                          >
+                            <Printer className="w-3 h-3" /> Ver Ticket
+                          </button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
+                          No se registraron consumos de personal en este periodo.
+                        </td>
+                      </tr>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. RENDIMIENTO MOZOS Y CANCELACIONES */}
+      {activeTab === 'mozos' && (
+        <div className="space-y-8">
+          {/* RENDIMIENTO POR MOZOS */}
+          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                <Users className="w-4 h-4 text-purple-500" /> Rendimiento de Mozos en el Periodo
+              </h2>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{mozos.length} mozo{mozos.length !== 1 ? 's' : ''} con comanda</span>
+            </div>
+            <div className="table-scroll">
+              <table className="w-full text-left min-w-[400px]">
+                <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4">Mozo / Mesero</th>
+                    <th className="px-6 py-4 text-center">Mesas Activas Ahora</th>
+                    <th className="px-6 py-4 text-center">Mesas Atendidas y Cobradas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                  {mozos.length > 0 ? mozos.map((m, i) => (
+                    <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-slate-900 text-amber-400 rounded-xl flex items-center justify-center font-black text-xs shrink-0">{m.nombre[0]}</div>
+                          <span className="font-bold text-slate-800">{m.nombre}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-black ${m.mesasActivas > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>
+                          {m.mesasActivas} mesa{m.mesasActivas !== 1 ? 's' : ''}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-700">
+                          {m.mesasAtendidas} atendida{m.mesasAtendidas !== 1 ? 's' : ''}
+                        </span>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan="3" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">Sin actividad de mozos en este rango de fechas.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* PEDIDOS CANCELADOS DEL DÍA */}
+          <div className="bg-white rounded-3xl border border-red-200/60 shadow-sm overflow-hidden">
+            <div className="p-4 md:p-5 border-b border-red-100 bg-red-50 flex justify-between items-center">
+              <h2 className="font-black text-red-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-red-500" /> Pedidos Cancelados e Incidencias en el Periodo
+              </h2>
+              <span className="bg-red-100 text-red-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                {cancelaciones.length} cancelación{cancelaciones.length !== 1 ? 'es' : ''}
+              </span>
+            </div>
+            <div className="table-scroll">
+              <table className="w-full text-left min-w-[700px]">
+                <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                  <tr>
+                    <th className="px-5 py-4">Fecha / Hora</th>
+                    <th className="px-5 py-4">Mesa / Delivery</th>
+                    <th className="px-5 py-4">Cancelado por</th>
+                    <th className="px-5 py-4">Motivo / Explicación</th>
+                    <th className="px-5 py-4">Detalle Consumo</th>
+                    <th className="px-5 py-4 text-right">Pérdida Estimada</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                  {cancelaciones.length > 0 ? cancelaciones.map((c, i) => (
+                    <tr key={i} className="hover:bg-red-50/30 transition-colors">
+                      <td className="px-5 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-mono text-slate-800 text-xs">{c.fecha || 'Hoy'}</span>
+                          <span className="text-[10px] text-slate-400 mt-0.5 font-mono">{c.hora}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        {c.mesa
+                          ? <span className="bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-black">Mesa {c.mesa}</span>
+                          : <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 w-max"><Truck className="w-3.5 h-3.5" />{c.codigoPedidosYa || 'Delivery'}</span>
+                        }
+                      </td>
+                      <td className="px-5 py-4 text-slate-800">{c.canceladoPor}</td>
+                      <td className="px-5 py-4 text-slate-500 text-xs italic max-w-[200px] truncate" title={c.motivoCancela}>{c.motivoCancela}</td>
+                      <td className="px-5 py-4 text-slate-500 text-xs max-w-[220px] truncate" title={c.resumenItems}>{c.resumenItems}</td>
+                      <td className="px-5 py-4 text-right font-mono font-black text-red-600">- S/ {c.total.toFixed(2)}</td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">No hay cancelaciones registradas en este rango de fechas.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {cancelaciones.length > 0 && (
+              <div className="p-5 border-t border-red-100 bg-red-50/50 flex justify-end">
+                <span className="font-black text-red-700 text-sm">
+                  Total Pérdida en Periodo: <span className="font-mono text-xl ml-2">S/ {cancelaciones.reduce((s, c) => s + c.total, 0).toFixed(2)}</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}</div>
 
       {/* SUNAT Comprobante Susii Style Modal */}
       {sunatModalOpen && activeComprobante && (
@@ -1018,6 +1235,70 @@ export default function ReportesPage() {
                     <p className="text-[10px] text-slate-400 leading-tight">
                       Cálculo en base a las porciones de pollo a la brasa vendidas (1 entero = 1.0, 1/2 = 0.5, 1/4 = 0.25, 1/8 = 0.125).
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nuevas secciones para PedidosYa y Consumos de Personal en PDF */}
+              <div className="grid grid-cols-2 gap-6 mt-8">
+                <div>
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                    5. Conciliación PedidosYa
+                  </h2>
+                  <div className="border rounded-2xl p-4 bg-indigo-50/20 flex flex-col justify-between h-[130px]">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Recaudado PedidosYa</p>
+                      <p className="text-3xl font-black text-indigo-950 mt-2 font-mono">
+                        S/ {(() => {
+                          const totalPY = ventas
+                            .filter(v => v.metodoPago === 'PedidosYa')
+                            .reduce((s, v) => s + v.total, 0);
+                          return totalPY.toFixed(2);
+                        })()}
+                      </p>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      Monto consolidado para conciliar la liquidación semanal del portal PedidosYa.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-violet-600"></span>
+                    6. Consumo de Personal (Planilla)
+                  </h2>
+                  <div className="border rounded-2xl overflow-hidden max-h-[130px] overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2">Colaborador</th>
+                          <th className="px-4 py-2 text-right">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y font-medium text-slate-700">
+                        {(() => {
+                          const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
+                          const porMozo = {};
+                          consumos.forEach(v => {
+                            const mName = v.mesero || v.nombreCliente || 'Sin Nombre';
+                            porMozo[mName] = (porMozo[mName] || 0) + v.total;
+                          });
+                          const entries = Object.entries(porMozo);
+                          return entries.length > 0 ? entries.map(([mozo, total]) => (
+                            <tr key={mozo}>
+                              <td className="px-4 py-2 font-bold text-slate-850 truncate max-w-[120px]">{mozo}</td>
+                              <td className="px-4 py-2 text-right font-mono font-bold text-violet-700">S/ {total.toFixed(2)}</td>
+                            </tr>
+                          )) : (
+                            <tr>
+                              <td colSpan="2" className="px-4 py-4 text-center text-slate-400">Sin consumos en el periodo</td>
+                            </tr>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>

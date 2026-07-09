@@ -1639,6 +1639,7 @@ app.get('/api/ventas', async (req, res) => {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),
       mesaNum: v.pedido?.mesa?.numero || null,
+      mesero: v.pedido?.mesero || null,
       codigoPedidosYa: v.pedido?.codigoPedidosYa || null,
       tipoEntrega: v.pedido?.tipoEntrega || 'salon',
       createdAt: v.createdAt.toISOString(),

@@ -567,16 +567,16 @@ export default function CajaPage({ currentUser }) {
       return;
     }
 
-    // Si es Cortesía, requerir PIN de supervisor/cajero
-    if (metodoPago === 'Cortesía') {
-      const pin = prompt("🔐 AUTORIZACIÓN DE SUPERVISOR:\nIngresa PIN de Administrador o Cajero para autorizar la Cortesía (Costo Cero):");
+    // Si es Consumo, requerir PIN de supervisor/cajero
+    if (metodoPago === 'Consumo') {
+      const pin = prompt("🔐 AUTORIZACIÓN DE SUPERVISOR:\nIngresa PIN de Administrador o Cajero para autorizar el Consumo Personal (Planilla):");
       if (pin === null) return;
       if (!pin.trim()) { alert("El PIN de autorización es obligatorio."); return; }
       
       try {
         const auth = await api.validateAuth(pin);
         if (auth.error) throw new Error(auth.error);
-        alert(`✅ Cortesía autorizada por: ${auth.nombre} (${auth.rol})`);
+        alert(`✅ Consumo Personal autorizado por: ${auth.nombre} (${auth.rol})`);
       } catch (err) {
         alert("Error de Autorización: " + err.message);
         return;
@@ -601,17 +601,21 @@ export default function CajaPage({ currentUser }) {
       setClienteNombre('');
       setClienteDireccion('');
 
-      // Desencadenar la visualización e impresión del comprobante
-      abrirTicketImpresionDirecto(
-        total,
-        response,
-        tipoComprobante,
-        numDocumento || null,
-        clienteNombre || 'Consumidor Final',
-        clienteDireccion || '',
-        mesaSeleccionada.pedidoData.items,
-        mesaSeleccionada.num
-      );
+      // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
+      if (metodoPago !== 'Consumo') {
+        abrirTicketImpresionDirecto(
+          total,
+          response,
+          tipoComprobante,
+          numDocumento || null,
+          clienteNombre || 'Consumidor Final',
+          clienteDireccion || '',
+          mesaSeleccionada.pedidoData.items,
+          mesaSeleccionada.num
+        );
+      } else {
+        alert(`✅ Consumo Personal registrado. Mesa liberada.`);
+      }
 
       await fetchCajaData();
     } catch (err) {
@@ -1550,11 +1554,11 @@ export default function CajaPage({ currentUser }) {
                   <select 
                     value={tipoComprobante} 
                     onChange={(e) => handleComprobanteChange(e.target.value)} 
-                    disabled={metodoPago === 'Cortesía'}
+                    disabled={metodoPago === 'Consumo'}
                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 font-bold text-slate-800 transition-all text-sm disabled:opacity-60"
                   >
-                    {metodoPago === 'Cortesía' ? (
-                      <option value="Ticket">🎁 Ticket de Cortesía (Costo Cero)</option>
+                    {metodoPago === 'Consumo' ? (
+                      <option value="Ticket">👤 Consumo Personal (Descuento Planilla)</option>
                     ) : (
                       <>
                         <option value="Boleta">Boleta Electrónica (DNI)</option>
@@ -1564,7 +1568,7 @@ export default function CajaPage({ currentUser }) {
                     )}
                   </select>
                 </div>
-                {metodoPago !== 'Cortesía' && (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') && (
+                {metodoPago !== 'Consumo' && (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') && (
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm space-y-4">
                     <div>
                       <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">{tipoComprobante === 'Factura' ? 'RUC del Cliente' : 'DNI del Cliente'}:</label>
@@ -1593,7 +1597,7 @@ export default function CajaPage({ currentUser }) {
                       { id: 'Efectivo', icon: Banknote, label: 'Efectivo' }, 
                       { id: 'Tarjeta', icon: CreditCard, label: 'Tarjeta' }, 
                       { id: 'Yape', icon: Wallet, label: 'Yape / Plin' },
-                      { id: 'Cortesía', icon: Gift, label: '🎁 Cortesía' }
+                      { id: 'Consumo', icon: Users, label: '👤 Consumo' }
                     ].map(item => {
                       const IconComp = item.icon;
                       const active = metodoPago === item.id;
@@ -1603,7 +1607,7 @@ export default function CajaPage({ currentUser }) {
                           type="button"
                           onClick={() => {
                             setMetodoPago(item.id);
-                            if (item.id === 'Cortesía') {
+                            if (item.id === 'Consumo') {
                               setTipoComprobante('Ticket');
                             }
                           }} 
@@ -1649,11 +1653,11 @@ export default function CajaPage({ currentUser }) {
                   <div className="space-y-2 mb-4 border-b border-slate-800 pb-4">
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Subtotal (Sin IGV)</span>
-                      <span className="font-mono">S/ {metodoPago === 'Cortesía' ? '0.00' : (mesaSeleccionada.pedidoData.total / 1.18).toFixed(2)}</span>
+                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData.total / 1.18).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>IGV (18%)</span>
-                      <span className="font-mono">S/ {metodoPago === 'Cortesía' ? '0.00' : (mesaSeleccionada.pedidoData.total - (mesaSeleccionada.pedidoData.total / 1.18)).toFixed(2)}</span>
+                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData.total - (mesaSeleccionada.pedidoData.total / 1.18)).toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="flex justify-between items-end">
@@ -1662,14 +1666,8 @@ export default function CajaPage({ currentUser }) {
                       <p className="text-slate-400 text-xs font-medium">Comprobante: {tipoComprobante}</p>
                     </div>
                     <div>
-                      {metodoPago === 'Cortesía' && (
-                        <div className="text-right mb-1">
-                          <span className="text-slate-400 text-[9px] uppercase font-bold">VALOR COMERCIAL: </span>
-                          <span className="text-amber-400 text-xs font-mono font-bold">S/ {mesaSeleccionada.pedidoData.total.toFixed(2)}</span>
-                        </div>
-                      )}
                       <p className="text-3xl font-black text-white font-mono tracking-tighter text-right">
-                        <span className="text-lg text-slate-500 mr-1 font-sans">S/</span>{metodoPago === 'Cortesía' ? '0.00' : mesaSeleccionada.pedidoData.total.toFixed(2)}
+                        <span className="text-lg text-slate-500 mr-1 font-sans">S/</span>{mesaSeleccionada.pedidoData.total.toFixed(2)}
                       </p>
                     </div>
                   </div>
