@@ -79,7 +79,7 @@ function getCatStyle(cat) {
 }
 
 const TODAS_CATEGORIAS = [
-  'Pollos a la Brasa', 'Parrillas y Cortes', 'Porciones y Piqueos', 'Parrilladas Mixtas',
+  'Menú', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Porciones y Piqueos', 'Parrilladas Mixtas',
   'Platos Criollos', 'Tallarines Verdes', 'Ensaladas', 'Guarniciones', 'Combos',
   'Bebidas y Refrescos', 'Cervezas', 'Bar y Cocteles', 'Postres',
   'PedidosYa / Ofertas',

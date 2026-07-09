@@ -111,35 +111,38 @@ function playChimeNotification() {
 
 const PRODUCT_OPTIONS_CONFIG = {
   "Combo Criollo (Almuerzo)": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["Saltado de Carne", "Saltado de Pollo", "Tallarín Saltado Pollo", "Tallarín Saltado Carne", "Chaufa de Pollo", "Chaufa de Carne", "Trucha Frita", "Alitas Fritas", "Milanesa de Pollo", "Chicharrón de Pollo"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    fondoOptions: [
+      "Saltado (pollo o carne)",
+      "Tallarin saltado (pollo o carne)",
+      "Chaufa (pollo o carne)",
+      "Trucha Frita",
+      "Alitas Fritas",
+      "Milanesa de Pollo",
+      "Chicharron de pollo"
     ]
   },
   "Combo Parrillero (Almuerzo)": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["Chuleta de cerdo", "Filete de pollo", "Churrasco", "Pechuga"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    fondoOptions: [
+      "Chuleta de cerdo",
+      "Filete de pollo",
+      "Churrasco",
+      "Pechuga"
     ]
   },
   "Combo Tallarines Verdes (Almuerzo)": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["Con Pollo Frito", "Con Bisteck", "Con Pechuga", "Con Chuleta", "Con Pollo Deshuesado"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    fondoOptions: [
+      "Con Pollo Frito",
+      "Con Bisteck",
+      "Con Pechuga",
+      "Con Chuleta",
+      "Con Pollo Deshuesado"
     ]
   },
   "Combo Junior": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["3 unds. de chicharrones de pollo", "1/8 pollo a la brasa", "3 alitas fritas (+ ensalada fruta)"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Ninguno"] }
+    fondoOptions: [
+      "3 unds. de chicharrones de pollo",
+      "1/8 pollo a la brasa",
+      "3 alitas fritas (+ ensalada fruta)"
     ]
   }
 };
@@ -304,7 +307,7 @@ export default function SalonPage({ currentUser }) {
     setModalOpen(true);
   };
 
-  const getProductSteps = (prod) => {
+  const getProductSteps = (prod, currentSelections = {}) => {
     if (!prod) return [];
     
     // 1. Variantes de Tallarines Verdes
@@ -319,18 +322,79 @@ export default function SalonPage({ currentUser }) {
         }))
       }];
     }
-    
-    // 2. Combos configurados
-    if (PRODUCT_OPTIONS_CONFIG[prod.nombre]) {
-      return PRODUCT_OPTIONS_CONFIG[prod.nombre].steps.map(step => ({
-        ...step,
-        options: step.options.map(opt => ({ label: opt, value: opt }))
-      }));
+
+    // 2. Nueva categoría Menú
+    if (prod.categoria === 'Menú') {
+      const nameNorm = prod.nombre.toLowerCase();
+      const isSpecialMenu = 
+        nameNorm.includes('menú 1') || 
+        nameNorm.includes('menu 1') ||
+        nameNorm.includes('menú 2') || 
+        nameNorm.includes('menu 2') ||
+        nameNorm.includes('pollo frito');
+      
+      const steps = [];
+      if (isSpecialMenu) {
+        steps.push({
+          name: "Elige la Guarnición",
+          key: "guarnicion_menu",
+          options: [
+            { label: "Papa Frita", value: "Papa Frita" },
+            { label: "Papa Sancochada", value: "Papa Sancochada" },
+            { label: "Menestra", value: "Menestra" }
+          ]
+        });
+      }
+      steps.push({
+        name: "Elige la Entrada",
+        key: "entrada_menu",
+        options: [
+          { label: "Sopa", value: "Sopa" },
+          { label: "Ensalada", value: "Ensalada" }
+        ]
+      });
+      return steps;
     }
     
-    // 3. Guarniciones genéricas para carnes y pollos
+    // 3. Combos configurados
+    if (PRODUCT_OPTIONS_CONFIG[prod.nombre]) {
+      const baseSteps = [];
+      const config = PRODUCT_OPTIONS_CONFIG[prod.nombre];
+      const fondoOptions = config.fondoOptions || [];
+      
+      // Paso 1: Plato de Fondo (primero)
+      baseSteps.push({
+        name: "Plato de Fondo",
+        key: "fondo",
+        options: fondoOptions.map(opt => ({ label: opt, value: opt }))
+      });
+      
+      // Si el plato de fondo seleccionado requiere proteína
+      const selectedFondo = currentSelections["fondo"];
+      if (selectedFondo && selectedFondo.toLowerCase().includes("pollo o carne")) {
+        baseSteps.push({
+          name: "Elige Proteína",
+          key: "proteina",
+          options: [
+            { label: "Pollo", value: "Pollo" },
+            { label: "Carne", value: "Carne" }
+          ]
+        });
+      }
+      
+      // Paso 2: Entrada
+      baseSteps.push({
+        name: "Sopa o Entrada",
+        key: "entrada",
+        options: ["Sopa", "Entrada"].map(opt => ({ label: opt, value: opt }))
+      });
+      
+      return baseSteps;
+    }
+    
+    // 4. Guarniciones genéricas para carnes y pollos (SIN Pollos a la Brasa)
     const requiereGuarnicion = 
-      ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
+      ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
       !prod.nombre.toLowerCase().includes('solo');
       
     if (requiereGuarnicion) {
@@ -353,11 +417,12 @@ export default function SalonPage({ currentUser }) {
   const agregarAlTicket = (prod) => {
     const hasComboConfig = PRODUCT_OPTIONS_CONFIG[prod.nombre];
     const isVirtualGroup = prod.esAgrupado;
+    const isMenuCategory = prod.categoria === 'Menú';
     const requiereGuarnicion = 
-      ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
+      ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
       !prod.nombre.toLowerCase().includes('solo');
 
-    if (hasComboConfig || isVirtualGroup || requiereGuarnicion) {
+    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory) {
       setSelectedProduct(prod);
       setCurrentStepIdx(0);
       setSelections({});
@@ -1153,7 +1218,7 @@ export default function SalonPage({ currentUser }) {
       )}
       {/* MODAL DE SELECCIÓN DE OPCIONES Y COMBOS (INTERACTIVO) */}
       {optionsModalOpen && selectedProduct && (() => {
-        const steps = getProductSteps(selectedProduct);
+        const steps = getProductSteps(selectedProduct, selections);
         if (steps.length === 0) return null;
         
         const currentStep = steps[currentStepIdx];
@@ -1178,6 +1243,46 @@ export default function SalonPage({ currentUser }) {
               return;
             }
             agregarAlTicketDirecto(prodVariante, additionalNotes);
+          } else if (selectedProduct.categoria === 'Menú') {
+            const notesArray = [];
+            const guarn = selections["guarnicion_menu"];
+            const entr = selections["entrada_menu"];
+            
+            if (guarn) notesArray.push(`[Guarnición: ${guarn}]`);
+            if (entr) notesArray.push(`[Entrada: ${entr}]`);
+            
+            if (additionalNotes.trim()) {
+              notesArray.push(`(Nota: ${additionalNotes.trim()})`);
+            }
+            const finalNotes = notesArray.join(' · ');
+            agregarAlTicketDirecto(selectedProduct, finalNotes);
+          } else if (PRODUCT_OPTIONS_CONFIG[selectedProduct.nombre]) {
+            const notesArray = [];
+            const fondo = selections["fondo"];
+            const proteina = selections["proteina"];
+            const entrada = selections["entrada"];
+            
+            if (fondo) {
+              if (proteina) {
+                const cleanFondoName = fondo.replace(' (pollo o carne)', '');
+                notesArray.push(`[Fondo: ${cleanFondoName} de ${proteina}]`);
+              } else {
+                notesArray.push(`[Fondo: ${fondo}]`);
+              }
+            }
+            if (entrada) {
+              notesArray.push(`[Entrada: ${entrada}]`);
+            }
+            
+            // Refresco y Postre automáticos del día
+            notesArray.push(`[Refresco: Refresco del Día]`);
+            notesArray.push(`[Postre: Postre del Día]`);
+            
+            if (additionalNotes.trim()) {
+              notesArray.push(`(Nota: ${additionalNotes.trim()})`);
+            }
+            const finalNotes = notesArray.join(' · ');
+            agregarAlTicketDirecto(selectedProduct, finalNotes);
           } else {
             const notesArray = [];
             steps.forEach(step => {
