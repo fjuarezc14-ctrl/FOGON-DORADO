@@ -970,7 +970,12 @@ export default function ReportesPage() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
             <div className="bg-slate-950 p-4 text-white flex justify-between items-center shrink-0">
               <h3 className="font-black text-xs uppercase tracking-wider flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-amber-500" /> {activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : (activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA')}
+                <Receipt className="w-5 h-5 text-amber-500" /> {
+                  activeComprobante.metodoPago === 'Consumo' ? '👤 CONSUMO PERSONAL 👤' :
+                  activeComprobante.metodoPago === 'Cortesía' ? '🎁 TICKET DE CORTESÍA 🎁' :
+                  activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' :
+                  activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA'
+                }
               </h3>
               <button onClick={() => setSunatModalOpen(false)} className="text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
@@ -984,8 +989,17 @@ export default function ReportesPage() {
                 R.U.C. N° 20496009259
               </div>
               
-              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' : (activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA')}</div>
-              <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{activeComprobante.serie}-{activeComprobante.correlativo}</div>
+              <div className="text-center font-bold mb-1" style={{ fontSize: '11px' }}>{
+                activeComprobante.metodoPago === 'Consumo' ? '👤 VALE DE CONSUMO PERSONAL' :
+                activeComprobante.metodoPago === 'Cortesía' ? '🎁 CORTESÍA / CONSUMO INTERNO' :
+                activeComprobante.tipo === 'Factura' ? 'FACTURA ELECTRÓNICA' :
+                activeComprobante.tipo === 'Ticket' ? 'TICKET DE VENTA' : 'BOLETA ELECTRÓNICA'
+              }</div>
+              <div className="text-center font-bold mb-3" style={{ fontSize: '13px' }}>{
+                activeComprobante.metodoPago === 'Consumo' ? `CONS-00${activeComprobante.mesaNum || 'SM'}-${activeComprobante.correlativo}` :
+                activeComprobante.metodoPago === 'Cortesía' ? `COR-00${activeComprobante.mesaNum || 'SM'}` :
+                `${activeComprobante.serie}-${activeComprobante.correlativo}`
+              }</div>
               
               <div className="flex justify-between border-t border-b border-dashed border-slate-300 py-1.5 mb-2 font-bold">
                 <span>{activeComprobante.fecha} {activeComprobante.hora}</span>
@@ -994,8 +1008,12 @@ export default function ReportesPage() {
               
               <div className="space-y-1 mb-3">
                 <div><strong>Cliente:</strong> <span className="uppercase">{activeComprobante.clienteNombre}</span></div>
-                <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
-                <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
+                {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && (
+                  <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
+                )}
+                {activeComprobante.clienteDireccion && (
+                  <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
+                )}
                 <div><strong>Items:</strong> <span>{activeComprobante.items.length}</span></div>
               </div>
 
@@ -1056,27 +1074,69 @@ export default function ReportesPage() {
               
               <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
               
-              <div className="mb-4">
-                <strong className="block text-[10px]">IMPORTE EN LETRAS:</strong>
-                <span className="uppercase text-[10px] leading-tight block">{activeComprobante.totalLetras}</span>
-              </div>
+              {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && (
+                <div className="mb-4">
+                  <strong className="block text-[10px]">IMPORTE EN LETRAS:</strong>
+                  <span className="uppercase text-[10px] leading-tight block">{activeComprobante.totalLetras}</span>
+                </div>
+              )}
               
-              <div className="mb-3">
-                <strong>RESUMEN:</strong> <span className="font-mono text-[10px]">{activeComprobante.hashResumen}</span>
-              </div>
+              {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && (
+                <div className="mb-3">
+                  <strong>RESUMEN:</strong> <span className="font-mono text-[10px]">{activeComprobante.hashResumen}</span>
+                </div>
+              )}
               
               <div>
-                <strong>FORMA DE PAGO:</strong> <span className="uppercase">{activeComprobante.metodoPago === 'Efectivo' ? 'CONTADO' : 'CONTADO (' + activeComprobante.metodoPago + ')'}</span>
+                <strong>FORMA DE PAGO:</strong> <span className="uppercase">{
+                  activeComprobante.metodoPago === 'Consumo' ? 'DESCUENTO PLANILLA (PERSONAL)' :
+                  activeComprobante.metodoPago === 'Cortesía' ? 'CORTESÍA / CONSUMO INTERNO' :
+                  activeComprobante.metodoPago === 'Efectivo' ? 'CONTADO' : 'CONTADO (' + activeComprobante.metodoPago + ')'
+                }</span>
               </div>
               
-              <div className="flex justify-center my-5">
-                <img src={activeComprobante.qrImageUrl} alt="QR Comprobante" style={{ width: '120px', height: '120px' }} className="border p-1 bg-white" />
-              </div>
+              {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' ? (
+                <div className="flex justify-center my-5">
+                  <img 
+                    src={activeComprobante.qrImageUrl} 
+                    alt="QR Comprobante" 
+                    style={{ width: '120px', height: '120px' }} 
+                    className="border p-1 bg-white"
+                  />
+                </div>
+              ) : (
+                <div style={{ display: 'none' }}>
+                  <img 
+                    src={activeComprobante.qrImageUrl} 
+                    alt="QR Comprobante" 
+                  />
+                </div>
+              )}
+
+              {(activeComprobante.metodoPago === 'Consumo' || activeComprobante.metodoPago === 'Cortesía') && (
+                <div className="mt-8 mb-4 border-t border-slate-400 pt-6 text-center">
+                  <p className="border-t border-dashed border-slate-350 mx-auto w-3/4 mb-1"></p>
+                  <p className="text-[10px] font-black uppercase tracking-wider">FIRMA COLABORADOR</p>
+                  <p className="text-[9px] text-slate-500 mt-0.5 font-medium">{activeComprobante.clienteNombre}</p>
+                </div>
+              )}
               
-              <div className="text-center font-bold" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
+              <div className="text-center font-bold mt-4" style={{ fontSize: '10px' }}>¡Gracias por su preferencia!</div>
               <div className="text-center text-[9px] leading-tight text-slate-500 mt-1">
-                Representación impresa de la Factura electrónica. consulte su documento en https://consulta.susii.com
+                {
+                  activeComprobante.metodoPago === 'Consumo' ? 'VALE INTERNO AUTORIZADO DE COLABORADOR' :
+                  activeComprobante.metodoPago === 'Cortesía' ? 'TICKET DE CONSUMO INTERNO AUTORIZADO' :
+                  'Representación impresa del comprobante electrónico. Consulte su validez en el portal de la SUNAT.'
+                }
               </div>
+
+              {activeComprobante.enlacePdf && activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && (
+                <div className="text-center text-[10px] mt-4 font-bold no-print pt-2 border-t border-slate-100">
+                  <a href={activeComprobante.enlacePdf} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800 flex items-center justify-center gap-1.5">
+                    📄 Descargar Comprobante SUNAT (PDF)
+                  </a>
+                </div>
+              )}
             </div>
             
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2 shrink-0">
