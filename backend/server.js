@@ -1409,6 +1409,47 @@ app.delete('/api/usuarios/:id', async (req, res) => {
 // CAJA / VENTAS
 // ============================================================
 
+// PATCH /api/ventas/:ventaId/metodo-pago → Corregir método de pago (requiere PIN Administrador)
+app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
+  const { ventaId } = req.params;
+  const { metodoPago, pin } = req.body;
+
+  const metodosPermitidos = ['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa'];
+  if (!metodoPago || !metodosPermitidos.includes(metodoPago)) {
+    return res.status(400).json({ error: `Método de pago inválido. Opciones: ${metodosPermitidos.join(', ')}` });
+  }
+  if (!pin) {
+    return res.status(400).json({ error: 'Se requiere PIN de Administrador.' });
+  }
+
+  try {
+    // Validar PIN — solo Administrador puede cambiar método de pago
+    const admin = await prisma.usuario.findFirst({ where: { pin, activo: true } });
+    if (!admin) return res.status(401).json({ error: 'PIN incorrecto.' });
+    if (admin.rol !== 'Administrador') {
+      return res.status(403).json({ error: 'Solo el Administrador puede cambiar el método de pago.' });
+    }
+
+    // Obtener la venta
+    const venta = await prisma.venta.findUnique({ where: { id: parseInt(ventaId) } });
+    if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
+
+    const metodoPagoAnterior = venta.metodoPago;
+
+    // Actualizar el método de pago
+    const ventaActualizada = await prisma.venta.update({
+      where: { id: parseInt(ventaId) },
+      data: { metodoPago },
+    });
+
+    console.log(`🔄 Método de pago corregido por ${admin.nombre} (${admin.rol}): Venta #${ventaId} → ${metodoPagoAnterior} → ${metodoPago}`);
+
+    res.json({ ok: true, ventaId: ventaActualizada.id, metodoPago: ventaActualizada.metodoPago, cambiadoPor: admin.nombre });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/ventas → Cobrar mesa (acepta pedidoIds array o pedidoId simple)
 app.post('/api/ventas', async (req, res) => {
   const { pedidoId, pedidoIds, tipoComprobante, numDocumento, nombreCliente, total, metodoPago, clienteDireccion, ofertaDescripcion, descuentoAplicado } = req.body;

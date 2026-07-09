@@ -176,6 +176,14 @@ export default function CajaPage({ currentUser }) {
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState(localStorage.getItem('ultimoCierre') || null);
 
+  // Modal cambiar método de pago
+  const [cambioMetodoModal, setCambioMetodoModal] = useState(false);
+  const [ventaACambiar, setVentaACambiar] = useState(null);
+  const [cambioPin, setCambioPin] = useState('');
+  const [cambioNuevoMetodo, setCambioNuevoMetodo] = useState('Efectivo');
+  const [cambiando, setCambiando] = useState(false);
+  const [cambioError, setCambioError] = useState('');
+
   // Modal PedidosYa y Para Llevar
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [codigoPY, setCodigoPY] = useState('');
@@ -624,6 +632,28 @@ export default function CajaPage({ currentUser }) {
       alert(`✅ Entrega del pedido ${codigo} confirmada.`);
     } catch (err) {
       alert('Error: ' + err.message);
+    }
+  };
+
+  // --- Cambiar método de pago de una venta existente ---
+  const handleCambiarMetodoPago = async () => {
+    if (!cambioPin.trim()) { setCambioError('Ingresa el PIN de Administrador.'); return; }
+    if (!cambioNuevoMetodo) { setCambioError('Selecciona el nuevo método de pago.'); return; }
+    setCambiando(true);
+    setCambioError('');
+    try {
+      const res = await api.cambiarMetodoPago(ventaACambiar.id, cambioNuevoMetodo, cambioPin.trim());
+      if (res.error) { setCambioError(res.error); return; }
+      // Actualizar el estado local de ventas sin recargar
+      setVentas(prev => prev.map(v => v.id === ventaACambiar.id ? { ...v, metodoPago: cambioNuevoMetodo } : v));
+      setCambioMetodoModal(false);
+      setVentaACambiar(null);
+      setCambioPin('');
+      setCambioNuevoMetodo('Efectivo');
+    } catch (err) {
+      setCambioError('Error de conexión: ' + err.message);
+    } finally {
+      setCambiando(false);
     }
   };
 
@@ -1332,14 +1362,33 @@ export default function CajaPage({ currentUser }) {
                                   method = 'Efectivo';
                                 }
                               }
+                              const editable = method !== 'Cortesía' && method !== 'Consumo';
                               return (
-                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
-                                  method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                                  method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                                  method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
-                                  method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
-                                  'bg-indigo-50 border-indigo-200 text-indigo-700'
-                                }`}>{method}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                                    method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                                    method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                    method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                                    method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
+                                    method === 'Consumo' ? 'bg-violet-100 border-violet-300 text-violet-700' :
+                                    'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                  }`}>{method}</span>
+                                  {editable && (
+                                    <button
+                                      title="Corregir método de pago (requiere PIN Administrador)"
+                                      onClick={() => {
+                                        setVentaACambiar(v);
+                                        setCambioNuevoMetodo(v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' ? 'Efectivo' : v.metodoPago);
+                                        setCambioPin('');
+                                        setCambioError('');
+                                        setCambioMetodoModal(true);
+                                      }}
+                                      className="p-1 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-400 hover:text-amber-600 border border-slate-200 hover:border-amber-300 transition-all"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                    </button>
+                                  )}
+                                </div>
                               );
                             })()}
                           </td>
@@ -2331,6 +2380,100 @@ export default function CajaPage({ currentUser }) {
           </div>
         );
       })()}
+
+      {/* Modal: Corregir Método de Pago */}
+      {cambioMetodoModal && ventaACambiar && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[260] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-5 text-slate-950 flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+                  Corregir Método de Pago
+                </h3>
+                <p className="text-xs font-bold opacity-80 mt-0.5">Venta #{ventaACambiar.id} · S/ {ventaACambiar.total.toFixed(2)}</p>
+              </div>
+              <button onClick={() => { setCambioMetodoModal(false); setCambioPin(''); setCambioError(''); }} className="bg-black/20 hover:bg-black/30 p-2 rounded-xl transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4">
+              {/* Método anterior */}
+              <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Método actual</p>
+                <p className="font-black text-slate-800 uppercase text-sm">{ventaACambiar.metodoPago}</p>
+              </div>
+
+              {/* Nuevo método */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Nuevo Método de Pago</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa'].map(mp => (
+                    <button
+                      key={mp}
+                      onClick={() => setCambioNuevoMetodo(mp)}
+                      className={`py-2.5 px-3 rounded-2xl text-xs font-black uppercase border-2 transition-all ${
+                        cambioNuevoMetodo === mp
+                          ? mp === 'Efectivo' ? 'bg-emerald-500 border-emerald-600 text-white' :
+                            mp === 'Tarjeta' ? 'bg-blue-500 border-blue-600 text-white' :
+                            mp === 'Yape' ? 'bg-purple-500 border-purple-600 text-white' :
+                            'bg-indigo-500 border-indigo-600 text-white'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : '🛵'} {mp}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* PIN Admin */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">🔐 PIN de Administrador</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={cambioPin}
+                  onChange={e => { setCambioPin(e.target.value); setCambioError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleCambiarMetodoPago()}
+                  placeholder="Ingresa tu PIN"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:bg-white rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
+                  autoFocus
+                />
+              </div>
+
+              {/* Error */}
+              {cambioError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-black px-4 py-2.5 rounded-2xl uppercase tracking-wide flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {cambioError}
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setCambioMetodoModal(false); setCambioPin(''); setCambioError(''); }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase rounded-2xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCambiarMetodoPago}
+                  disabled={cambiando || !cambioPin.trim()}
+                  className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black text-xs uppercase rounded-2xl transition-all flex items-center justify-center gap-2 shadow-md"
+                >
+                  {cambiando ? <span className="w-4 h-4 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" /> : null}
+                  {cambiando ? 'Guardando...' : 'Confirmar Cambio'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SUNAT Comprobante Susii Style Modal */}
       {sunatModalOpen && activeComprobante && (

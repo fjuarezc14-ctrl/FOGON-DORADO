@@ -85,6 +85,9 @@ export const api = {
   }).then(r => r.json()),
   getResumenVentas: () => fetch(`${API_BASE}/api/ventas/resumen`).then(r => r.json()),
   getHistorialVentas: (desde, hasta) => fetch(`${API_BASE}/api/ventas${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
+  cambiarMetodoPago: (ventaId, metodoPago, pin) => fetch(`${API_BASE}/api/ventas/${ventaId}/metodo-pago`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metodoPago, pin }),
+  }).then(r => r.json()),
 
   // Compras
   getCompras: (desde, hasta) => fetch(`${API_BASE}/api/compras${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
