@@ -384,9 +384,9 @@ export default function SalonPage({ currentUser }) {
       
       // Paso 2: Entrada
       baseSteps.push({
-        name: "Sopa o Entrada",
+        name: "Sopa o Ensalada",
         key: "entrada",
-        options: ["Sopa", "Entrada"].map(opt => ({ label: opt, value: opt }))
+        options: ["Sopa", "Ensalada"].map(opt => ({ label: opt, value: opt }))
       });
       
       return baseSteps;
@@ -1035,8 +1035,8 @@ export default function SalonPage({ currentUser }) {
                                   </div>
                                 </div>
                                 {item.notas && (
-                                  <div>
-                                    <span className="inline-block bg-amber-50 border border-amber-200/50 text-amber-600 text-[10px] px-2 py-0.5 rounded font-black tracking-wide">📋 NOTA: {item.notas}</span>
+                                  <div className="mt-1.5">
+                                    <span className="inline-block bg-amber-500 border border-amber-600 text-slate-950 text-xs px-2.5 py-1 rounded-xl font-black shadow-sm uppercase tracking-wide">📋 NOTA: {item.notas}</span>
                                   </div>
                                 )}
                               </li>
@@ -1274,9 +1274,8 @@ export default function SalonPage({ currentUser }) {
               notesArray.push(`[Entrada: ${entrada}]`);
             }
             
-            // Refresco y Postre automáticos del día
-            notesArray.push(`[Refresco: Refresco del Día]`);
-            notesArray.push(`[Postre: Postre del Día]`);
+            // Refresco y Postre automáticos (más cortos)
+            notesArray.push(`+ refresco + postre`);
             
             if (additionalNotes.trim()) {
               notesArray.push(`(Nota: ${additionalNotes.trim()})`);

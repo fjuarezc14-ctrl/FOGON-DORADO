@@ -184,8 +184,10 @@ export default function CocinaPage() {
                           </button>
                         </div>
                         {item.notas && (
-                          <div className="ml-9 mt-1">
-                            <span className="inline-block bg-slate-900 border border-slate-700/50 text-amber-400 font-mono text-[10px] px-2 py-0.5 rounded font-black tracking-wide uppercase">📋 NOTA: {item.notas}</span>
+                          <div className="ml-9 mt-1.5">
+                            <span className="inline-block bg-amber-500 border border-amber-650 text-slate-950 font-bold text-xs md:text-sm px-2.5 py-1 rounded-xl shadow-sm uppercase tracking-wide">
+                              📋 NOTA: {item.notas}
+                            </span>
                           </div>
                         )}
                       </div>

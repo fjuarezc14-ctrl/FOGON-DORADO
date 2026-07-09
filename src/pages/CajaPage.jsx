@@ -5,35 +5,38 @@ import { api } from '../api';
 
 const PRODUCT_OPTIONS_CONFIG = {
   "Combo Criollo (Almuerzo)": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["Saltado de Carne", "Saltado de Pollo", "Tallarín Saltado Pollo", "Tallarín Saltado Carne", "Chaufa de Pollo", "Chaufa de Carne", "Trucha Frita", "Alitas Fritas", "Milanesa de Pollo", "Chicharrón de Pollo"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    fondoOptions: [
+      "Saltado (pollo o carne)",
+      "Tallarin saltado (pollo o carne)",
+      "Chaufa (pollo o carne)",
+      "Trucha Frita",
+      "Alitas Fritas",
+      "Milanesa de Pollo",
+      "Chicharron de pollo"
     ]
   },
   "Combo Parrillero (Almuerzo)": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["Chuleta de cerdo", "Filete de pollo", "Churrasco", "Pechuga"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    fondoOptions: [
+      "Chuleta de cerdo",
+      "Filete de pollo",
+      "Churrasco",
+      "Pechuga"
     ]
   },
   "Combo Tallarines Verdes (Almuerzo)": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína", "Ensalada Mixta"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["Con Pollo Frito", "Con Bisteck", "Con Pechuga", "Con Chuleta", "Con Pollo Deshuesado"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Porción de helado", "Ninguno"] }
+    fondoOptions: [
+      "Con Pollo Frito",
+      "Con Bisteck",
+      "Con Pechuga",
+      "Con Chuleta",
+      "Con Pollo Deshuesado"
     ]
   },
   "Combo Junior": {
-    steps: [
-      { name: "Sopa o Entrada", key: "entrada", options: ["Sopa de Gallina", "Tequeños (3 unds)", "Papa a la Huancaína"] },
-      { name: "Plato de Fondo", key: "fondo", options: ["3 unds. de chicharrones de pollo", "1/8 pollo a la brasa", "3 alitas fritas (+ ensalada fruta)"] },
-      { name: "Refresco", key: "refresco", options: ["Chicha Morada", "Maracuyá", "Limonada", "Naranjada"] },
-      { name: "Postre", key: "postre", options: ["Gelatina", "Ensalada de frutas", "Ninguno"] }
+    fondoOptions: [
+      "3 unds. de chicharrones de pollo",
+      "1/8 pollo a la brasa",
+      "3 alitas fritas (+ ensalada fruta)"
     ]
   }
 };
@@ -645,7 +648,7 @@ export default function CajaPage({ currentUser }) {
     setDeliveryModal(true);
   };
 
-  const getProductSteps = (prod) => {
+  const getProductSteps = (prod, currentSelections = {}) => {
     if (!prod) return [];
     
     // 1. Variantes de Tallarines Verdes
@@ -660,18 +663,79 @@ export default function CajaPage({ currentUser }) {
         }))
       }];
     }
-    
-    // 2. Combos configurados
-    if (PRODUCT_OPTIONS_CONFIG[prod.nombre]) {
-      return PRODUCT_OPTIONS_CONFIG[prod.nombre].steps.map(step => ({
-        ...step,
-        options: step.options.map(opt => ({ label: opt, value: opt }))
-      }));
+
+    // 2. Nueva categoría Menú
+    if (prod.categoria === 'Menú') {
+      const nameNorm = prod.nombre.toLowerCase();
+      const isSpecialMenu = 
+        nameNorm.includes('menú 1') || 
+        nameNorm.includes('menu 1') ||
+        nameNorm.includes('menú 2') || 
+        nameNorm.includes('menu 2') ||
+        nameNorm.includes('pollo frito');
+      
+      const steps = [];
+      if (isSpecialMenu) {
+        steps.push({
+          name: "Elige la Guarnición",
+          key: "guarnicion_menu",
+          options: [
+            { label: "Papa Frita", value: "Papa Frita" },
+            { label: "Papa Sancochada", value: "Papa Sancochada" },
+            { label: "Menestra", value: "Menestra" }
+          ]
+        });
+      }
+      steps.push({
+        name: "Elige la Entrada",
+        key: "entrada_menu",
+        options: [
+          { label: "Sopa", value: "Sopa" },
+          { label: "Ensalada", value: "Ensalada" }
+        ]
+      });
+      return steps;
     }
     
-    // 3. Guarniciones genéricas para carnes y pollos
+    // 3. Combos configurados
+    if (PRODUCT_OPTIONS_CONFIG[prod.nombre]) {
+      const baseSteps = [];
+      const config = PRODUCT_OPTIONS_CONFIG[prod.nombre];
+      const fondoOptions = config.fondoOptions || [];
+      
+      // Paso 1: Plato de Fondo (primero)
+      baseSteps.push({
+        name: "Plato de Fondo",
+        key: "fondo",
+        options: fondoOptions.map(opt => ({ label: opt, value: opt }))
+      });
+      
+      // Si el plato de fondo seleccionado requiere proteína
+      const selectedFondo = currentSelections["fondo"];
+      if (selectedFondo && selectedFondo.toLowerCase().includes("pollo o carne")) {
+        baseSteps.push({
+          name: "Elige Proteína",
+          key: "proteina",
+          options: [
+            { label: "Pollo", value: "Pollo" },
+            { label: "Carne", value: "Carne" }
+          ]
+        });
+      }
+      
+      // Paso 2: Entrada (Sopa o Ensalada)
+      baseSteps.push({
+        name: "Sopa o Ensalada",
+        key: "entrada",
+        options: ["Sopa", "Ensalada"].map(opt => ({ label: opt, value: opt }))
+      });
+      
+      return baseSteps;
+    }
+    
+    // 4. Guarniciones genéricas para carnes y pollos (SIN Pollos a la Brasa)
     const requiereGuarnicion = 
-      ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
+      ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
       !prod.nombre.toLowerCase().includes('solo');
       
     if (requiereGuarnicion) {
@@ -692,16 +756,18 @@ export default function CajaPage({ currentUser }) {
   };
 
   const agregarItemDelivery = (prod) => {
-    const steps = getProductSteps(prod);
+    const isMenuCategory = prod.categoria === 'Menú';
+    const hasComboConfig = PRODUCT_OPTIONS_CONFIG[prod.nombre];
+    const isVirtualGroup = prod.esAgrupado;
+    const requiereGuarnicion = 
+      ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
+      !prod.nombre.toLowerCase().includes('solo');
     
-    // Si requiere opciones, abrir modal
-    if (steps.length > 0) {
+    const steps = getProductSteps(prod, selections);
+    
+    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory) {
       setSelectedProduct(prod);
-      const initialSelections = {};
-      steps.forEach(step => {
-        initialSelections[step.key] = step.options[0]?.value; // pre-select first option
-      });
-      setSelections(initialSelections);
+      setSelections({});
       setCurrentStepIdx(0);
       setAdditionalNotes('');
       setOptionsModalOpen(true);
@@ -1775,7 +1841,9 @@ export default function CajaPage({ currentUser }) {
                             <div className="flex-1 pr-2">
                               <p className="font-bold text-slate-800 text-xs uppercase leading-tight">{item.nombre}</p>
                               {item.notas && (
-                                <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 leading-snug break-all">{item.notas}</p>
+                                <div className="mt-1">
+                                  <p className="inline-block bg-amber-500 border border-amber-600 text-slate-950 font-black text-[11px] px-2 py-0.5 rounded-lg shadow-sm uppercase tracking-wide break-all">📋 NOTA: {item.notas}</p>
+                                </div>
                               )}
                               <div className="flex items-baseline gap-1.5 mt-0.5">
                                 {tieneDescuento && (
@@ -1950,7 +2018,7 @@ export default function CajaPage({ currentUser }) {
 
       {/* MODAL DE SELECCIÓN DE OPCIONES Y COMBOS (INTERACTIVO PARA DELIVERY) */}
       {optionsModalOpen && selectedProduct && (() => {
-        const steps = getProductSteps(selectedProduct);
+        const steps = getProductSteps(selectedProduct, selections);
         if (steps.length === 0) return null;
         
         const currentStep = steps[currentStepIdx];
@@ -1975,6 +2043,45 @@ export default function CajaPage({ currentUser }) {
               return;
             }
             agregarItemDeliveryDirecto(prodVariante, additionalNotes);
+          } else if (selectedProduct.categoria === 'Menú') {
+            const notesArray = [];
+            const guarn = selections["guarnicion_menu"];
+            const entr = selections["entrada_menu"];
+            
+            if (guarn) notesArray.push(`[Guarnición: ${guarn}]`);
+            if (entr) notesArray.push(`[Entrada: ${entr}]`);
+            
+            if (additionalNotes.trim()) {
+              notesArray.push(`(Nota: ${additionalNotes.trim()})`);
+            }
+            const finalNotes = notesArray.join(' · ');
+            agregarItemDeliveryDirecto(selectedProduct, finalNotes);
+          } else if (PRODUCT_OPTIONS_CONFIG[selectedProduct.nombre]) {
+            const notesArray = [];
+            const fondo = selections["fondo"];
+            const proteina = selections["proteina"];
+            const entrada = selections["entrada"];
+            
+            if (fondo) {
+              if (proteina) {
+                const cleanFondoName = fondo.replace(' (pollo o carne)', '');
+                notesArray.push(`[Fondo: ${cleanFondoName} de ${proteina}]`);
+              } else {
+                notesArray.push(`[Fondo: ${fondo}]`);
+              }
+            }
+            if (entrada) {
+              notesArray.push(`[Entrada: ${entrada}]`);
+            }
+            
+            // Refresco y Postre automáticos (más cortos)
+            notesArray.push(`+ Refresco + Postre`);
+            
+            if (additionalNotes.trim()) {
+              notesArray.push(`(Nota: ${additionalNotes.trim()})`);
+            }
+            const finalNotes = notesArray.join(' · ');
+            agregarItemDeliveryDirecto(selectedProduct, finalNotes);
           } else {
             const notesArray = [];
             steps.forEach(step => {

@@ -171,8 +171,10 @@ export default function BarraPage() {
                           </span>
                         </div>
                         {item.notas && (
-                          <div className="ml-8 mt-1">
-                            <span className="inline-block bg-slate-950 border border-indigo-950/50 text-purple-400 font-mono text-[9px] px-2 py-0.5 rounded font-black tracking-wide uppercase">📋 NOTA: {item.notas}</span>
+                          <div className="ml-8 mt-1.5">
+                            <span className="inline-block bg-purple-600 border border-purple-700 text-white font-bold text-xs md:text-sm px-2.5 py-1 rounded-xl shadow-sm uppercase tracking-wide">
+                              📋 NOTA: {item.notas}
+                            </span>
                           </div>
                         )}
                       </div>
