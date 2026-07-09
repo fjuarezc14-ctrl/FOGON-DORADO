@@ -666,17 +666,8 @@ export default function CajaPage({ currentUser }) {
 
     // 2. Nueva categoría Menú
     if (prod.categoria === 'Menú') {
-      const nameNorm = prod.nombre.toLowerCase();
-      const isSpecialMenu = 
-        nameNorm.includes('menú 1') || 
-        nameNorm.includes('menu 1') ||
-        nameNorm.includes('menú 2') || 
-        nameNorm.includes('menu 2') ||
-        nameNorm.includes('pollo frito');
-      
-      const steps = [];
-      if (isSpecialMenu) {
-        steps.push({
+      return [
+        {
           name: "Elige la Guarnición",
           key: "guarnicion_menu",
           options: [
@@ -684,17 +675,16 @@ export default function CajaPage({ currentUser }) {
             { label: "Papa Sancochada", value: "Papa Sancochada" },
             { label: "Menestra", value: "Menestra" }
           ]
-        });
-      }
-      steps.push({
-        name: "Elige la Entrada",
-        key: "entrada_menu",
-        options: [
-          { label: "Sopa", value: "Sopa" },
-          { label: "Ensalada", value: "Ensalada" }
-        ]
-      });
-      return steps;
+        },
+        {
+          name: "Elige la Entrada",
+          key: "entrada_menu",
+          options: [
+            { label: "Sopa", value: "Sopa" },
+            { label: "Ensalada", value: "Ensalada" }
+          ]
+        }
+      ];
     }
     
     // 3. Combos configurados

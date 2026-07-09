@@ -290,11 +290,9 @@ async function main() {
     { nombre: 'Gelatina',                              categoria: 'Postres',              precio: 2.00,  tipoStock: 'ilimitado', stock: 0 },
 
     // ── MENÚS (→ Cocina) ──────────────────────────────────
-    { nombre: 'Menú 1',                                categoria: 'Menú',                 precio: 15.00, tipoStock: 'ilimitado', stock: 0 },
-    { nombre: 'Menú 2',                                categoria: 'Menú',                 precio: 15.00, tipoStock: 'ilimitado', stock: 0 },
-    { nombre: 'Pollo Frito',                           categoria: 'Menú',                 precio: 15.00, tipoStock: 'ilimitado', stock: 0 },
-    { nombre: 'Alitas Fritas (Menú)',                  categoria: 'Menú',                 precio: 15.00, tipoStock: 'ilimitado', stock: 0 },
-    { nombre: 'Arroz a la cubana',                     categoria: 'Menú',                 precio: 15.00, tipoStock: 'ilimitado', stock: 0 },
+    { nombre: 'Pollo Frito',                           categoria: 'Menú',                 precio: 11.00, tipoStock: 'ilimitado', stock: 0 },
+    { nombre: 'Alitas Fritas (Menú)',                  categoria: 'Menú',                 precio: 11.00, tipoStock: 'ilimitado', stock: 0 },
+    { nombre: 'Arroz a la cubana',                     categoria: 'Menú',                 precio: 11.00, tipoStock: 'ilimitado', stock: 0 },
   ];
 
   // Cargar productos sin duplicar (buscar por nombre + activo)
