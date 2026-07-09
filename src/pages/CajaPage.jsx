@@ -176,6 +176,8 @@ export default function CajaPage({ currentUser }) {
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState(localStorage.getItem('ultimoCierre') || null);
   const [filtroMetodoPago, setFiltroMetodoPago] = useState('Todos');
+  const [consumoPin, setConsumoPin] = useState('');
+  const [consumoPinError, setConsumoPinError] = useState('');
 
   // Modal cambiar método de pago
   const [cambioMetodoModal, setCambioMetodoModal] = useState(false);
@@ -568,18 +570,18 @@ export default function CajaPage({ currentUser }) {
       return;
     }
 
-    // Si es Consumo, requerir PIN de supervisor/cajero
+    // Si es Consumo, requerir PIN de supervisor/cajero en el modal
     if (metodoPago === 'Consumo') {
-      const pin = prompt("🔐 AUTORIZACIÓN DE SUPERVISOR:\nIngresa PIN de Administrador o Cajero para autorizar el Consumo Personal (Planilla):");
-      if (pin === null) return;
-      if (!pin.trim()) { alert("El PIN de autorización es obligatorio."); return; }
+      if (!consumoPin.trim()) {
+        setConsumoPinError("El PIN es requerido para autorizar el Consumo Personal.");
+        return;
+      }
       
       try {
-        const auth = await api.validateAuth(pin);
+        const auth = await api.validateAuth(consumoPin.trim());
         if (auth.error) throw new Error(auth.error);
-        alert(`✅ Consumo Personal autorizado por: ${auth.nombre} (${auth.rol})`);
       } catch (err) {
-        alert("Error de Autorización: " + err.message);
+        setConsumoPinError("PIN de autorización incorrecto o no autorizado.");
         return;
       }
     }
@@ -601,6 +603,8 @@ export default function CajaPage({ currentUser }) {
       setNumDocumento('');
       setClienteNombre('');
       setClienteDireccion('');
+      setConsumoPin('');
+      setConsumoPinError('');
 
       // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
       if (metodoPago !== 'Consumo') {
@@ -1717,6 +1721,30 @@ export default function CajaPage({ currentUser }) {
                     </div>
                   </div>
                 </div>
+
+                {metodoPago === 'Consumo' && (
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm space-y-2 mt-4">
+                    <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase">🔐 PIN DE AUTORIZACIÓN (ADMINISTRADOR):</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={consumoPin}
+                      onChange={(e) => {
+                        setConsumoPin(e.target.value);
+                        setConsumoPinError('');
+                      }}
+                      placeholder="INGRESA PIN DE ADMIN"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-center text-lg font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
+                      style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
+                      autoComplete="off"
+                      name="consumo-pin-auth"
+                    />
+                    {consumoPinError && (
+                      <p className="text-red-600 text-xs font-bold uppercase tracking-wider">{consumoPinError}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2519,7 +2547,7 @@ export default function CajaPage({ currentUser }) {
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">🔐 PIN de Administrador</label>
                 <input
-                  type="password"
+                  type="text"
                   inputMode="numeric"
                   maxLength={6}
                   value={cambioPin}
@@ -2527,6 +2555,9 @@ export default function CajaPage({ currentUser }) {
                   onKeyDown={e => e.key === 'Enter' && handleCambiarMetodoPago()}
                   placeholder="Ingresa tu PIN"
                   className="w-full bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:bg-white rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
+                  style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
+                  autoComplete="off"
+                  name="cambio-pin-auth"
                   autoFocus
                 />
               </div>

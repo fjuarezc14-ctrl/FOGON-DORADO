@@ -455,10 +455,10 @@ export default function ReportesPage() {
                 <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
                   <Receipt className="w-4 h-4 text-indigo-500" /> Registro de Comprobantes Emitidos (RCE)
                 </h2>
-                <p className="text-[10px] text-slate-400 mt-0.5">Listado oficial de comprobantes emitidos. Excluye consumos internos de personal.</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Listado oficial de comprobantes emitidos en el periodo.</p>
               </div>
               {(() => {
-                const ventasComerciales = ventas.filter(v => v.metodoPago !== 'Consumo');
+                const ventasComerciales = ventas;
                 return (
                   <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                     {ventasComerciales.length} Comprobante{ventasComerciales.length !== 1 ? 's' : ''}
@@ -468,7 +468,7 @@ export default function ReportesPage() {
             </div>
             <div className="table-scroll">
               <table className="w-full text-left min-w-[750px]">
-                <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                <thead className="bg-white text-slate-450 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                   <tr>
                     <th className="px-6 py-4">ID / Hora</th>
                     <th className="px-6 py-4">Comprobante / Cliente</th>
@@ -481,7 +481,7 @@ export default function ReportesPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
                   {(() => {
-                    const filtradas = ventas.filter(v => v.metodoPago !== 'Consumo');
+                    const filtradas = ventas;
                     return filtradas.length > 0 ? filtradas.map(v => (
                       <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="px-6 py-4">
@@ -562,7 +562,8 @@ export default function ReportesPage() {
                                 method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
                                 method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
                                 method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
-                                method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
+                                method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                method === 'Consumo' ? 'bg-violet-50 border-violet-200 text-violet-700' :
                                 'bg-indigo-50 border-indigo-200 text-indigo-700'
                               }`}>{method}</span>
                             );
