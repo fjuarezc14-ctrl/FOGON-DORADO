@@ -699,7 +699,7 @@ export default function ReportesPage() {
             </div>
             {(() => {
               const totalPY = ventas
-                .filter(v => v.metodoPago === 'PedidosYa')
+                .filter(v => v.metodoPago === 'PedidosYa' && v.codigoPedidosYa && !v.codigoPedidosYa.startsWith('DELIVERY -') && !v.codigoPedidosYa.startsWith('LLEVAR -'))
                 .reduce((s, v) => s + v.total, 0);
               return (
                 <span className="bg-indigo-100 text-indigo-900 text-xs font-black px-4 py-2 rounded-full uppercase tracking-wider">
@@ -721,7 +721,7 @@ export default function ReportesPage() {
               </thead>
               <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
                 {(() => {
-                  const itemsPY = ventas.filter(v => v.metodoPago === 'PedidosYa');
+                  const itemsPY = ventas.filter(v => v.metodoPago === 'PedidosYa' && v.codigoPedidosYa && !v.codigoPedidosYa.startsWith('DELIVERY -') && !v.codigoPedidosYa.startsWith('LLEVAR -'));
                   return itemsPY.length > 0 ? itemsPY.map(v => (
                     <tr key={v.id} className="hover:bg-indigo-50/20 transition-colors">
                       <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
@@ -1314,7 +1314,7 @@ export default function ReportesPage() {
                       <p className="text-3xl font-black text-indigo-950 mt-2 font-mono">
                         S/ {(() => {
                           const totalPY = ventas
-                            .filter(v => v.metodoPago === 'PedidosYa')
+                            .filter(v => v.metodoPago === 'PedidosYa' && v.codigoPedidosYa && !v.codigoPedidosYa.startsWith('DELIVERY -') && !v.codigoPedidosYa.startsWith('LLEVAR -'))
                             .reduce((s, v) => s + v.total, 0);
                           return totalPY.toFixed(2);
                         })()}
