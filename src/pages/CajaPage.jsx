@@ -175,6 +175,7 @@ export default function CajaPage({ currentUser }) {
   const [ventas, setVentas] = useState([]);
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState(localStorage.getItem('ultimoCierre') || null);
+  const [filtroMetodoPago, setFiltroMetodoPago] = useState('Todos');
 
   // Modal cambiar método de pago
   const [cambioMetodoModal, setCambioMetodoModal] = useState(false);
@@ -1237,19 +1238,50 @@ export default function CajaPage({ currentUser }) {
 
           {/* HISTORIAL DE VENTAS DEL DÍA */}
           {(() => {
-            const ventasFiltradas = ultimoCierre 
+            let ventasFiltradas = ultimoCierre 
               ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
               : ventas;
 
+            if (filtroMetodoPago !== 'Todos') {
+              ventasFiltradas = ventasFiltradas.filter(v => {
+                let method = v.metodoPago;
+                if (method === 'PedidosYa' && v.codigoPedidosYa) {
+                  if (v.codigoPedidosYa.startsWith('DELIVERY -') || v.codigoPedidosYa.startsWith('LLEVAR -')) {
+                    method = 'Efectivo';
+                  }
+                }
+                return method === filtroMetodoPago;
+              });
+            }
+
             return (
               <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm" style={{ overflow: 'clip' }}>
-                <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
-                    <Receipt className="w-4 h-4 text-emerald-500" /> Historial de Ventas del Día
-                  </h2>
-                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    {ventasFiltradas.length} Venta{ventasFiltradas.length !== 1 ? 's' : ''}
-                  </span>
+                <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-emerald-500" />
+                    <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Historial de Ventas del Día</h2>
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-sm">
+                      <span className="text-[9px] font-black uppercase text-slate-400">Filtrar:</span>
+                      <select
+                        value={filtroMetodoPago}
+                        onChange={(e) => setFiltroMetodoPago(e.target.value)}
+                        className="bg-transparent text-xs font-black uppercase text-slate-750 focus:outline-none"
+                      >
+                        <option value="Todos">Todos</option>
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Tarjeta">💳 Tarjeta</option>
+                        <option value="Yape">📱 Yape / Plin</option>
+                        <option value="PedidosYa">🛵 PedidosYa</option>
+                        <option value="Consumo">👤 Consumo Personal</option>
+                        <option value="Cortesía">🎁 Cortesías</option>
+                      </select>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
+                      {ventasFiltradas.length} Venta{ventasFiltradas.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                 </div>
                 {/* Botones de navegación horizontal */}
                 <div className="flex justify-end gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100">
@@ -1465,55 +1497,68 @@ export default function CajaPage({ currentUser }) {
             .reduce((s, v) => s + v.total, 0);
 
           return (
-            <div className="bg-slate-900 rounded-3xl shadow-xl p-6 text-white flex flex-col sticky top-4">
-              <h2 className="font-black uppercase text-xs tracking-widest mb-6 text-amber-400 flex items-center gap-2">
+            <div className="bg-slate-900 rounded-3xl shadow-xl p-5 text-white flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
+              <h2 className="font-black uppercase text-xs tracking-widest mb-4 text-amber-400 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-400" /> Resumen del Turno
               </h2>
-              <div className="space-y-4 flex-1">
-                <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+              <div className="space-y-3 flex-1">
+                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                   <p className="text-xs text-slate-400 font-black uppercase tracking-widest">Mesas Atendidas Hoy</p>
-                  <div className="flex items-center gap-3 mt-2">
-                    <p className="text-3xl font-black">{activeAtendidas}</p>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <p className="text-2xl font-black">{activeAtendidas}</p>
                   </div>
                 </div>
-                <div className="bg-blue-800 p-5 rounded-2xl border border-blue-700">
+                <div className="bg-blue-800/80 p-4 rounded-2xl border border-blue-700">
                   <p className="text-xs text-blue-300 font-black uppercase tracking-widest">Delivery Activos</p>
-                  <p className="text-3xl font-black mt-2">{pedidosLlevar.length}</p>
+                  <p className="text-2xl font-black mt-1.5">{pedidosLlevar.length}</p>
                 </div>
                 {/* Tarjeta: Ingresos Reales en Caja */}
-                <div className="bg-gradient-to-br from-emerald-600 to-green-600 p-5 rounded-2xl relative overflow-hidden text-white shadow-lg shadow-emerald-500/20">
+                <div className="bg-gradient-to-br from-emerald-600 to-green-600 p-4 rounded-2xl relative overflow-hidden text-white shadow-lg shadow-emerald-500/20">
                   <div className="absolute -right-4 -top-4 w-24 h-24 bg-white rounded-full opacity-10" />
-                  <p className="text-xs font-black uppercase tracking-wider opacity-90">💵 Ingresos en Caja</p>
-                  <p className="text-[10px] font-bold opacity-60 mt-0.5">Efectivo · Tarjeta · Yape</p>
-                  <div className="flex items-center gap-3 mt-2 relative z-10">
-                    <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center"><Banknote className="w-5 h-5" /></div>
-                    <p className="text-3xl lg:text-4xl font-black font-mono tracking-tighter">S/ {activeIngresosCaja.toFixed(2)}</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider opacity-90">💵 Ingresos en Caja</p>
+                  <p className="text-[9px] font-bold opacity-60 mt-0.5">Efectivo · Tarjeta · Yape</p>
+                  <div className="flex items-center gap-2.5 mt-1.5 relative z-10">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center"><Banknote className="w-4.5 h-4.5" /></div>
+                    <p className="text-2xl lg:text-3xl font-black font-mono tracking-tighter">S/ {activeIngresosCaja.toFixed(2)}</p>
                   </div>
                 </div>
 
                 {/* Tarjeta: PedidosYa — separado */}
-                <div className={`p-5 rounded-2xl relative overflow-hidden border shadow-md transition-all ${
+                <div className={`p-4 rounded-2xl relative overflow-hidden border shadow-md transition-all ${
                   activeIngresosPedidosYa > 0
                     ? 'bg-gradient-to-br from-blue-900 to-indigo-900 border-blue-700 text-blue-100'
                     : 'bg-slate-800 border-slate-700 text-slate-500'
                 }`}>
                   <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10" />
-                  <p className={`text-xs font-black uppercase tracking-wider ${activeIngresosPedidosYa > 0 ? 'text-blue-300' : 'text-slate-500'}`}>🛵 PedidosYa</p>
-                  <p className={`text-[10px] font-bold mt-0.5 ${activeIngresosPedidosYa > 0 ? 'text-blue-400 opacity-80' : 'text-slate-600'}`}>Cobro semanal · no incluir en cuadre</p>
-                  <div className="flex items-center gap-3 mt-2 relative z-10">
-                    <p className={`text-3xl font-black font-mono tracking-tighter ${activeIngresosPedidosYa > 0 ? 'text-white' : 'text-slate-600'}`}>S/ {activeIngresosPedidosYa.toFixed(2)}</p>
+                  <p className={`text-[10px] font-black uppercase tracking-wider ${activeIngresosPedidosYa > 0 ? 'text-blue-300' : 'text-slate-500'}`}>🛵 PedidosYa</p>
+                  <p className={`text-[9px] font-bold mt-0.5 ${activeIngresosPedidosYa > 0 ? 'text-blue-400 opacity-80' : 'text-slate-600'}`}>Cobro semanal · no incluir en cuadre</p>
+                  <div className="flex items-center gap-3 mt-1.5 relative z-10">
+                    <p className={`text-2xl font-black font-mono tracking-tighter ${activeIngresosPedidosYa > 0 ? 'text-white' : 'text-slate-600'}`}>S/ {activeIngresosPedidosYa.toFixed(2)}</p>
                   </div>
                 </div>
 
-                {/* Tarjeta: Cortesías — solo si hay */}
+                {/* Tarjeta: Consumo Personal — planilla */}
+                {activeConsumos > 0 && (
+                  <div className="bg-gradient-to-br from-violet-900 to-indigo-950 p-4 rounded-2xl relative overflow-hidden text-violet-200 border border-violet-850 shadow-md">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10" />
+                    <p className="text-[10px] font-black uppercase tracking-wider opacity-90 text-violet-300">👤 Consumo Personal</p>
+                    <p className="text-[9px] font-bold opacity-60 mt-0.5">Planilla · descuento a fin de mes</p>
+                    <div className="flex items-center gap-2.5 mt-1.5 relative z-10">
+                      <div className="w-8 h-8 bg-violet-800 rounded-lg flex items-center justify-center"><Users className="w-4 h-4 text-violet-300" /></div>
+                      <p className="text-2xl font-black font-mono tracking-tighter text-white">S/ {activeConsumos.toFixed(2)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tarjeta: Cortesías antiguas — solo si hay */}
                 {activeCortesias > 0 && (
-                  <div className="bg-gradient-to-br from-indigo-900 to-purple-900 p-5 rounded-2xl relative overflow-hidden text-purple-200 border border-purple-800 shadow-md">
-                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10 animate-pulse" />
-                    <p className="text-xs font-black uppercase tracking-wider opacity-90 text-purple-300">🎁 Cortesías</p>
-                    <p className="text-[10px] font-bold opacity-60 mt-0.5">Valor referencial · sin cobro</p>
-                    <div className="flex items-center gap-3 mt-2 relative z-10">
-                      <div className="w-9 h-9 bg-purple-800 rounded-xl flex items-center justify-center"><Gift className="w-5 h-5 text-amber-400" /></div>
-                      <p className="text-3xl font-black font-mono tracking-tighter text-white">S/ {activeCortesias.toFixed(2)}</p>
+                  <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-4 rounded-2xl relative overflow-hidden text-slate-300 border border-slate-700 shadow-md">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-5" />
+                    <p className="text-[10px] font-black uppercase tracking-wider opacity-90 text-slate-400">🎁 Cortesías (Valor)</p>
+                    <p className="text-[9px] font-bold opacity-60 mt-0.5">Valor referencial · sin cobro</p>
+                    <div className="flex items-center gap-3 mt-1.5 relative z-10">
+                      <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center"><Gift className="w-4 h-4 text-slate-400" /></div>
+                      <p className="text-2xl font-black font-mono tracking-tighter text-white">S/ {activeCortesias.toFixed(2)}</p>
                     </div>
                   </div>
                 )}
@@ -1521,7 +1566,7 @@ export default function CajaPage({ currentUser }) {
                 {/* BOTÓN CIERRE DE CAJA TURNO */}
                 <button
                   onClick={() => setCierreModalOpen(true)}
-                  className="w-full py-4 mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl shadow-purple-950/40 transition-all active:scale-95 flex items-center justify-center gap-2 border border-purple-500/20"
+                  className="w-full py-3.5 mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl shadow-purple-950/40 transition-all active:scale-95 flex items-center justify-center gap-2 border border-purple-500/20"
                 >
                   <CheckCircle className="w-4 h-4" />
                   Cierre de Caja (Turno)

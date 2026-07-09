@@ -909,9 +909,31 @@ export default function SalonPage({ currentUser }) {
                   </div>
                   {/* Categorías */}
                   <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-0.5 whitespace-nowrap">
-                    {['Todos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))].map(cat => (
-                      <button key={cat} onClick={() => setCategoriaActiva(cat)} className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-sm transition-colors ${categoriaActiva === cat ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-amber-50'}`}>{cat}</button>
-                    ))}
+                    {(() => {
+                      const ordenPrioridades = [
+                        'Todos',
+                        'Menú',
+                        'Pollos a la Brasa',
+                        'Parrillas y Cortes',
+                        'Parrilladas Mixtas',
+                        'Platos Criollos',
+                        'Combos',
+                        'Ensaladas',
+                        'Bebidas y Refrescos'
+                      ];
+                      const cats = ['Todos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
+                      
+                      return cats.sort((a, b) => {
+                        const idxA = ordenPrioridades.indexOf(a);
+                        const idxB = ordenPrioridades.indexOf(b);
+                        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                        if (idxA !== -1) return -1;
+                        if (idxB !== -1) return 1;
+                        return a.localeCompare(b);
+                      }).map(cat => (
+                        <button key={cat} onClick={() => setCategoriaActiva(cat)} className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-sm transition-colors ${categoriaActiva === cat ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-amber-50'}`}>{cat}</button>
+                      ));
+                    })()}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-4 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
