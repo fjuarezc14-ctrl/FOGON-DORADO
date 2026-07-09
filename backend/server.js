@@ -1677,7 +1677,35 @@ app.get('/api/ventas/resumen', async (req, res) => {
     const totalIGVVentas = ventas.reduce((s, v) => s + v.igv, 0);
     const atendidas = ventas.length;
 
-    res.json({ atendidas, ingresos: totalVentas, igvVentas: totalIGVVentas });
+    // Desglose por tipo
+    const ingresosCaja = ventas
+      .filter(v => v.metodoPago !== 'PedidosYa' && v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo')
+      .reduce((s, v) => s + v.total, 0);
+    const ingresosPedidosYa = ventas
+      .filter(v => v.metodoPago === 'PedidosYa')
+      .reduce((s, v) => s + v.total, 0);
+    const totalConsumos = ventas
+      .filter(v => v.metodoPago === 'Consumo')
+      .reduce((s, v) => s + v.total, 0);
+
+    // Desglose por método (solo ingresos reales de caja)
+    const porMetodoPago = {
+      Efectivo: ventas.filter(v => v.metodoPago === 'Efectivo').reduce((s, v) => s + v.total, 0),
+      Tarjeta: ventas.filter(v => v.metodoPago === 'Tarjeta').reduce((s, v) => s + v.total, 0),
+      Yape: ventas.filter(v => v.metodoPago === 'Yape').reduce((s, v) => s + v.total, 0),
+      PedidosYa: ingresosPedidosYa,
+      Consumo: totalConsumos,
+    };
+
+    res.json({
+      atendidas,
+      ingresos: totalVentas,
+      ingresosCaja,
+      ingresosPedidosYa,
+      totalConsumos,
+      porMetodoPago,
+      igvVentas: totalIGVVentas,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

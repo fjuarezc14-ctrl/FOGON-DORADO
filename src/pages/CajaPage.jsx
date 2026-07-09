@@ -1442,13 +1442,23 @@ export default function CajaPage({ currentUser }) {
             ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
             : ventas;
           const activeAtendidas = ventasFiltradas.length;
-          const activeIngresos = ventasFiltradas.reduce((s, v) => s + v.total, 0);
+
+          // Separar ingresos reales (caja) vs PedidosYa vs Cortesías
+          const activeIngresosCaja = ventasFiltradas
+            .filter(v => v.metodoPago !== 'PedidosYa' && v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo')
+            .reduce((s, v) => s + v.total, 0);
+          const activeIngresosPedidosYa = ventasFiltradas
+            .filter(v => v.metodoPago === 'PedidosYa')
+            .reduce((s, v) => s + v.total, 0);
           const activeCortesias = ventasFiltradas
             .filter(v => v.metodoPago === 'Cortesía')
             .reduce((sum, v) => {
               const itemsVal = v.items?.reduce((s, i) => s + (i.cant * i.precio), 0) || 0;
               return sum + itemsVal;
             }, 0);
+          const activeConsumos = ventasFiltradas
+            .filter(v => v.metodoPago === 'Consumo')
+            .reduce((s, v) => s + v.total, 0);
 
           return (
             <div className="bg-slate-900 rounded-3xl shadow-xl p-6 text-white flex flex-col sticky top-4">
@@ -1466,21 +1476,39 @@ export default function CajaPage({ currentUser }) {
                   <p className="text-xs text-blue-300 font-black uppercase tracking-widest">Delivery Activos</p>
                   <p className="text-3xl font-black mt-2">{pedidosLlevar.length}</p>
                 </div>
-                <div className="bg-amber-500 p-5 rounded-2xl relative overflow-hidden text-slate-900 shadow-lg shadow-amber-500/20">
-                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-white rounded-full opacity-20"></div>
-                  <p className="text-xs font-black uppercase tracking-wider opacity-80">Ingresos del Día (S/)</p>
+                {/* Tarjeta: Ingresos Reales en Caja */}
+                <div className="bg-gradient-to-br from-emerald-600 to-green-600 p-5 rounded-2xl relative overflow-hidden text-white shadow-lg shadow-emerald-500/20">
+                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-white rounded-full opacity-10" />
+                  <p className="text-xs font-black uppercase tracking-wider opacity-90">💵 Ingresos en Caja</p>
+                  <p className="text-[10px] font-bold opacity-60 mt-0.5">Efectivo · Tarjeta · Yape</p>
                   <div className="flex items-center gap-3 mt-2 relative z-10">
-                    <div className="w-10 h-10 bg-amber-400 rounded-xl flex items-center justify-center text-slate-900"><Banknote className="w-5 h-5" /></div>
-                    <p className="text-3xl lg:text-4xl font-black font-mono tracking-tighter">S/ {activeIngresos.toFixed(2)}</p>
+                    <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center"><Banknote className="w-5 h-5" /></div>
+                    <p className="text-3xl lg:text-4xl font-black font-mono tracking-tighter">S/ {activeIngresosCaja.toFixed(2)}</p>
                   </div>
                 </div>
 
+                {/* Tarjeta: PedidosYa — separado */}
+                <div className={`p-5 rounded-2xl relative overflow-hidden border shadow-md transition-all ${
+                  activeIngresosPedidosYa > 0
+                    ? 'bg-gradient-to-br from-blue-900 to-indigo-900 border-blue-700 text-blue-100'
+                    : 'bg-slate-800 border-slate-700 text-slate-500'
+                }`}>
+                  <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10" />
+                  <p className={`text-xs font-black uppercase tracking-wider ${activeIngresosPedidosYa > 0 ? 'text-blue-300' : 'text-slate-500'}`}>🛵 PedidosYa</p>
+                  <p className={`text-[10px] font-bold mt-0.5 ${activeIngresosPedidosYa > 0 ? 'text-blue-400 opacity-80' : 'text-slate-600'}`}>Cobro semanal · no incluir en cuadre</p>
+                  <div className="flex items-center gap-3 mt-2 relative z-10">
+                    <p className={`text-3xl font-black font-mono tracking-tighter ${activeIngresosPedidosYa > 0 ? 'text-white' : 'text-slate-600'}`}>S/ {activeIngresosPedidosYa.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                {/* Tarjeta: Cortesías — solo si hay */}
                 {activeCortesias > 0 && (
                   <div className="bg-gradient-to-br from-indigo-900 to-purple-900 p-5 rounded-2xl relative overflow-hidden text-purple-200 border border-purple-800 shadow-md">
-                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10 animate-pulse"></div>
-                    <p className="text-xs font-black uppercase tracking-wider opacity-90 text-purple-300">🎁 Valor de Cortesías (S/)</p>
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10 animate-pulse" />
+                    <p className="text-xs font-black uppercase tracking-wider opacity-90 text-purple-300">🎁 Cortesías</p>
+                    <p className="text-[10px] font-bold opacity-60 mt-0.5">Valor referencial · sin cobro</p>
                     <div className="flex items-center gap-3 mt-2 relative z-10">
-                      <div className="w-10 h-10 bg-purple-800 rounded-xl flex items-center justify-center text-white"><Gift className="w-5 h-5 text-amber-400" /></div>
+                      <div className="w-9 h-9 bg-purple-800 rounded-xl flex items-center justify-center"><Gift className="w-5 h-5 text-amber-400" /></div>
                       <p className="text-3xl font-black font-mono tracking-tighter text-white">S/ {activeCortesias.toFixed(2)}</p>
                     </div>
                   </div>
@@ -2283,7 +2311,9 @@ export default function CajaPage({ currentUser }) {
         const totalTarjeta = ventasFiltradas.filter(v => v.metodoPago === 'Tarjeta').reduce((s, v) => s + v.total, 0);
         const totalYape = ventasFiltradas.filter(v => v.metodoPago === 'Yape').reduce((s, v) => s + v.total, 0);
         const totalPedidosYa = ventasFiltradas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0);
-        const totalCalculado = totalEfectivo + totalTarjeta + totalYape + totalPedidosYa;
+        const totalConsumos = ventasFiltradas.filter(v => v.metodoPago === 'Consumo').reduce((s, v) => s + v.total, 0);
+        // Total Caja = solo ingresos reales (sin PedidosYa ni Cortesías ni Consumo)
+        const totalCalculado = totalEfectivo + totalTarjeta + totalYape;
 
         const totalCortesias = ventasFiltradas
           .filter(v => v.metodoPago === 'Cortesía')
@@ -2331,22 +2361,35 @@ export default function CajaPage({ currentUser }) {
                     <span>📱 YAPE / PLIN:</span>
                     <span className="font-black text-slate-900">S/ {totalYape.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between font-bold text-slate-700">
-                    <span>🛵 PEDIDOS YA (POS):</span>
-                    <span className="font-black text-slate-900">S/ {totalPedidosYa.toFixed(2)}</span>
-                  </div>
+                  {totalConsumos > 0 && (
+                    <div className="flex justify-between font-bold text-violet-700 border-t border-dashed border-violet-200 pt-2">
+                      <span>👤 CONSUMO PERSONAL:</span>
+                      <span className="font-black text-violet-800">S/ {totalConsumos.toFixed(2)}</span>
+                    </div>
+                  )}
                   {totalCortesias > 0 && (
-                    <div className="flex justify-between font-bold text-amber-700 border-t border-dashed border-amber-250 pt-2">
+                    <div className="flex justify-between font-bold text-amber-700 border-t border-dashed border-amber-200 pt-2">
                       <span>🎁 CORTESÍAS (VALOR):</span>
                       <span className="font-black text-amber-900">S/ {totalCortesias.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {totalPedidosYa > 0 && (
+                    <div className="flex justify-between font-bold text-blue-700 border-t border-dashed border-blue-200 pt-2">
+                      <span>🛵 PEDIDOS YA <span className="font-normal text-[9px]">(cobro semanal)</span>:</span>
+                      <span className="font-black text-blue-800">S/ {totalPedidosYa.toFixed(2)}</span>
                     </div>
                   )}
                 </div>
 
                 <div className="flex justify-between items-center text-sm font-black text-slate-900 uppercase">
-                  <span>💰 TOTAL CAJA:</span>
+                  <span>💰 TOTAL EN CAJA:</span>
                   <span className="text-base text-emerald-700">S/ {totalCalculado.toFixed(2)}</span>
                 </div>
+                {totalPedidosYa > 0 && (
+                  <div className="mt-1 text-[9px] text-blue-600 font-bold text-right">
+                    + S/ {totalPedidosYa.toFixed(2)} PedidosYa (no incluir en cuadre físico)
+                  </div>
+                )}
 
                 <div className="text-center text-[9px] text-slate-400 font-bold mt-6 border-t border-dashed border-slate-200 pt-3">
                   *** Fin del Reporte de Turno ***
@@ -2368,7 +2411,7 @@ export default function CajaPage({ currentUser }) {
                     const nowISO = new Date().toISOString();
                     localStorage.setItem('ultimoCierre', nowISO);
                     setUltimoCierre(nowISO);
-                    alert(`✅ ¡Cierre de Turno exitoso!\n\nSe consolidó un total de S/ ${totalCalculado.toFixed(2)} en ventas.\nEl turno ha sido archivado e inicializado.`);
+                    alert(`✅ ¡Cierre de Turno exitoso!\n\nTotal en Caja (real): S/ ${totalCalculado.toFixed(2)}\n${totalPedidosYa > 0 ? `PedidosYa (cobro semanal): S/ ${totalPedidosYa.toFixed(2)}\n` : ''}El turno ha sido archivado e inicializado.`);
                     setCierreModalOpen(false);
                   }}
                   className="py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-900 font-black rounded-xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
