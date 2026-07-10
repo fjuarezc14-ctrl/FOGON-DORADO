@@ -507,34 +507,36 @@ export default function SalonPage({ currentUser }) {
   };
 
   const agregarAlTicketDirecto = (prod, notas = '') => {
-    let nuevosItems = [...ticketActual];
-    const index = nuevosItems.findIndex(t => String(t.id) === String(prod.id) && !t.yaEnviado && t.notas === notas);
-    
-    const cantEnTicket = index >= 0 ? nuevosItems[index].cant : 0;
-    
-    if (prod.tipoStock === 'limitado' && cantEnTicket >= prod.stock) {
-      alert(`⚠️ Stock agotado. Solo quedan ${prod.stock} unidades de "${prod.nombre}".`);
-      return;
-    }
-    
-    const precioFinal = prod.precioOferta !== null && prod.precioOferta !== undefined ? prod.precioOferta : prod.precio;
-    
-    if (index >= 0) {
-      nuevosItems[index].cant++;
-    } else {
-      nuevosItems.push({ 
-        id: String(prod.id), 
-        nombre: prod.nombre, 
-        precio: precioFinal, 
-        cant: 1, 
-        yaEnviado: false, 
-        historial: false, 
-        notas: notas,
-        ofertaNombre: prod.ofertaNombre || null,
-        precioOriginal: prod.precio
-      });
-    }
-    setTicketActual(nuevosItems);
+    setTicketActual(prevItems => {
+      let nuevosItems = [...prevItems];
+      const index = nuevosItems.findIndex(t => String(t.id) === String(prod.id) && !t.yaEnviado && t.notas === notas);
+      
+      const cantEnTicket = index >= 0 ? nuevosItems[index].cant : 0;
+      
+      if (prod.tipoStock === 'limitado' && cantEnTicket >= prod.stock) {
+        alert(`⚠️ Stock agotado. Solo quedan ${prod.stock} unidades de "${prod.nombre}".`);
+        return prevItems;
+      }
+      
+      const precioFinal = prod.precioOferta !== null && prod.precioOferta !== undefined ? prod.precioOferta : prod.precio;
+      
+      if (index >= 0) {
+        nuevosItems[index].cant++;
+      } else {
+        nuevosItems.push({ 
+          id: String(prod.id), 
+          nombre: prod.nombre, 
+          precio: precioFinal, 
+          cant: 1, 
+          yaEnviado: false, 
+          historial: false, 
+          notas: notas,
+          ofertaNombre: prod.ofertaNombre || null,
+          precioOriginal: prod.precio
+        });
+      }
+      return nuevosItems;
+    });
   };
 
   const alterarCantidad = (index, operacion) => {
