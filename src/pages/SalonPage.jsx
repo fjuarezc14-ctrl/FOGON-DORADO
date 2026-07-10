@@ -1545,9 +1545,9 @@ export default function SalonPage({ currentUser }) {
                 {esUltimoPaso ? (
                   <button
                     onClick={handleConfirm}
-                    disabled={!seleccionActual}
+                    disabled={currentStep.key === "producto_variante" && !seleccionActual}
                     className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg ${
-                      seleccionActual
+                      (currentStep.key !== "producto_variante" || seleccionActual)
                         ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 shadow-emerald-500/20'
                         : 'bg-slate-850 text-slate-600 border border-slate-800 cursor-not-allowed shadow-none'
                     }`}
@@ -1557,9 +1557,9 @@ export default function SalonPage({ currentUser }) {
                 ) : (
                   <button
                     onClick={() => setCurrentStepIdx(prev => prev + 1)}
-                    disabled={!seleccionActual}
+                    disabled={currentStep.key === "producto_variante" && !seleccionActual}
                     className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg ${
-                      seleccionActual
+                      (currentStep.key !== "producto_variante" || seleccionActual)
                         ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
                         : 'bg-slate-850 text-slate-600 border border-slate-800 cursor-not-allowed shadow-none'
                     }`}
