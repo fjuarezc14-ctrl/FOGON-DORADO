@@ -395,7 +395,7 @@ export default function SalonPage({ currentUser }) {
       prodNameLower.includes("piqueo fogón dorado");
 
     if (isParrilla2P) {
-      return [
+      const steps = [
         {
           name: "Elige el Acompañamiento",
           key: "guarnicion",
@@ -409,22 +409,33 @@ export default function SalonPage({ currentUser }) {
           ]
         },
         {
-          name: "Elige Bebida 1 (Medio Litro)",
+          name: "Elige la Bebida",
           key: "bebida_1",
           options: [
-            { label: "Sangría 1/2 Litro", value: "Sangría Española o Hawaiana 1/2 Lt" },
-            { label: "Gaseosa 1/2 Litro", value: "Gaseosa 1/2 Lt" }
-          ]
-        },
-        {
-          name: "Elige Bebida 2 (Un Litro)",
-          key: "bebida_2",
-          options: [
             { label: "Gaseosa 1 Litro", value: "Gaseosa 1 Lt" },
-            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" }
+            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" },
+            { label: "Gaseosa 1/2 Litro", value: "Gaseosa 1/2 Lt" },
+            { label: "Chicha Morada 1/2 Litro", value: "Chicha Morada - 1/2 Lt" },
+            { label: "Sangría 1/2 Litro", value: "Sangría Española o Hawaiana 1/2 Lt" }
           ]
         }
       ];
+
+      const selectedBebida1 = currentSelections["bebida_1"];
+      // Si la primera opción elegida es de 1/2 Litro, se requiere elegir una segunda bebida de 1/2 Litro para completar los 2 medios litros
+      if (selectedBebida1 && selectedBebida1.includes("1/2 Lt")) {
+        steps.push({
+          name: "Elige Bebida 2 (Medio Litro)",
+          key: "bebida_2",
+          options: [
+            { label: "Gaseosa 1/2 Litro", value: "Gaseosa 1/2 Lt" },
+            { label: "Chicha Morada 1/2 Litro", value: "Chicha Morada - 1/2 Lt" },
+            { label: "Sangría 1/2 Litro", value: "Sangría Española o Hawaiana 1/2 Lt" }
+          ]
+        });
+      }
+
+      return steps;
     }
 
     if (isParrillaFamily) {
