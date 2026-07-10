@@ -235,9 +235,11 @@ export default function BarraPage() {
                               <span className="block text-slate-100 font-bold text-sm leading-snug pt-0.5 uppercase tracking-wide">
                                 {item.nombre}
                               </span>
-                              <span className="inline-block mt-1 bg-slate-800 border border-slate-700/60 text-slate-400 font-black text-[10px] px-2 py-0.5 rounded-lg font-mono">
-                                S/ {parseFloat(item.precio || 0).toFixed(2)}
-                              </span>
+                              {parseFloat(item.precio || 0) > 0 && (
+                                <span className="inline-block mt-1 bg-slate-800 border border-slate-700/60 text-slate-400 font-black text-[10px] px-2 py-0.5 rounded-lg font-mono">
+                                  S/ {parseFloat(item.precio || 0).toFixed(2)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

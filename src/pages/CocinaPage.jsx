@@ -241,9 +241,11 @@ export default function CocinaPage() {
                                 {item.nombre}
                               </span>
                               {/* Precio del ítem — ayuda a identificar la porción */}
-                              <span className="inline-block mt-0.5 bg-slate-100 border border-slate-200 text-slate-500 font-black text-[10px] px-2 py-0.5 rounded-lg font-mono">
-                                S/ {parseFloat(item.precio || 0).toFixed(2)}
-                              </span>
+                              {parseFloat(item.precio || 0) > 0 && (
+                                <span className="inline-block mt-0.5 bg-slate-100 border border-slate-200 text-slate-500 font-black text-[10px] px-2 py-0.5 rounded-lg font-mono">
+                                  S/ {parseFloat(item.precio || 0).toFixed(2)}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <button

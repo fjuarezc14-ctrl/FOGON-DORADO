@@ -36,7 +36,7 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   48: {
     billingItemName: "Piqueo Personal (1 persona)",
     components: [
-      { nombre: "Piqueo Personal - Pancita, Mollejas, Ubres (4 u c/u)" }
+      { nombre: "Pancita, Mollejas, Ubres (4 u c/u)" }
     ],
     reportingItems: [
       { productoId: 213, nombre: "Vino Tabernero (Copa)", cantidadMultiplier: 1, toBar: true }
@@ -46,8 +46,8 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   49: {
     billingItemName: "Piqueo 2 Personas",
     components: [
-      { nombre: "Piqueo 2P - Panceta, Mollejas, Ubre, Trompas (4 u c/u)" },
-      { nombre: "Piqueo 2P - Anticuchos y Brochetas (2 u c/u)" }
+      { nombre: "Panceta, Mollejas, Ubre, Trompas (4 u c/u)" },
+      { nombre: "Anticuchos y Brochetas (2 u c/u)" }
     ],
     reportingItems: [
       { productoId: 12, nombre: "1/4 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
@@ -59,8 +59,8 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   50: {
     billingItemName: "Piqueo Familiar",
     components: [
-      { nombre: "Piqueo Fam - Panceta, Mollejas, Ubre, Trompas (8 u c/u)" },
-      { nombre: "Piqueo Fam - Chorizos, Anticuchos, Brochetas (2 u c/u)" }
+      { nombre: "Panceta, Mollejas, Ubre, Trompas (8 u c/u)" },
+      { nombre: "Chorizos, Anticuchos, Brochetas (2 u c/u)" }
     ],
     reportingItems: [
       { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 1, toBar: false, reportOnly: true }
@@ -71,8 +71,8 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   51: {
     billingItemName: "Piqueo Fogón Dorado",
     components: [
-      { nombre: "Piqueo Fogón - Panceta, Molleja, Ubre, Trompa (12 u c/u)" },
-      { nombre: "Piqueo Fogón - Chorizo, Anticucho, Brocheta, Lengua (4 u c/u)" }
+      { nombre: "Panceta, Molleja, Ubre, Trompa (12 u c/u)" },
+      { nombre: "Chorizo, Anticucho, Brocheta, Lengua (4 u c/u)" }
     ],
     reportingItems: [
       { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
@@ -84,8 +84,8 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   52: {
     billingItemName: "Parrillada Mixta Personal",
     components: [
-      { nombre: "Parrillada Personal - Res y Pollo (150g c/u)" },
-      { nombre: "Parrillada Personal - Chorizo (1 u)" }
+      { nombre: "Res y Pollo (150g c/u)" },
+      { nombre: "Chorizo (1 u)" }
     ],
     reportingItems: [
       { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
@@ -97,9 +97,9 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   53: {
     billingItemName: "Parrillada Mixta 2 Personas",
     components: [
-      { nombre: "Parrillada 2P - Res, Pollo y Cerdo (150g c/u)" },
-      { nombre: "Parrillada 2P - Mollejas y Ubre (4 u c/u)" },
-      { nombre: "Parrillada 2P - Chorizo (1 u)" }
+      { nombre: "Res, Pollo y Cerdo (150g c/u)" },
+      { nombre: "Mollejas y Ubre (4 u c/u)" },
+      { nombre: "Chorizo (1 u)" }
     ],
     reportingItems: [
       { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true }
@@ -110,8 +110,8 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   54: {
     billingItemName: "Parrillada Mixta 3 Personas",
     components: [
-      { nombre: "Parrillada 3P - Res, Pollo y Cerdo (150g c/u)" },
-      { nombre: "Parrillada 3P - Chorizos (3 u)" }
+      { nombre: "Res, Pollo y Cerdo (150g c/u)" },
+      { nombre: "Chorizos (3 u)" }
     ],
     reportingItems: [
       { productoId: 12, nombre: "1/4 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
@@ -124,8 +124,8 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   55: {
     billingItemName: "Parrillada Fina Familiar (5 personas)",
     components: [
-      { nombre: "Parrillada Fina - Res, Pollo y Cerdo (300g c/u)" },
-      { nombre: "Parrillada Fina - Chorizos (4 u)" }
+      { nombre: "Res, Pollo y Cerdo (300g c/u)" },
+      { nombre: "Chorizos (4 u)" }
     ],
     reportingItems: [
       { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
@@ -137,11 +137,11 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   56: {
     billingItemName: "Parrillada Fogón Dorado (8-10 personas)",
     components: [
-      { nombre: "Parrillada Fogón - Lomo Fino y Cerdo (300g c/u)" },
-      { nombre: "Parrillada Fogón - Filete Pollo (300g)" },
-      { nombre: "Parrillada Fogón - Ubre, Pancita y Mollejas (8 u c/u)" },
-      { nombre: "Parrillada Fogón - Chorizos y Brochetas (5 u c/u)" },
-      { nombre: "Parrillada Fogón - Trompa de Res (8 u)" }
+      { nombre: "Lomo Fino y Cerdo (300g c/u)" },
+      { nombre: "Filete Pollo (300g)" },
+      { nombre: "Ubre, Pancita y Mollejas (8 u c/u)" },
+      { nombre: "Chorizos y Brochetas (5 u c/u)" },
+      { nombre: "Trompa de Res (8 u)" }
     ],
     reportingItems: [
       { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
@@ -178,19 +178,31 @@ async function expandPedidoItemsForDb(itemsList) {
       const parsedNotes = parseSelectionsFromNotes(i.notas);
       const acompanamiento = parsedNotes["Elige el Acompañamiento"] || parsedNotes["Elige la Guarnición"] || parsedNotes["guarnicion"] || "Sin Acompañamiento";
       
-      // 1. MAIN BILLING ITEM: marked as ready (historial: true, entregado: true)
-      // so it does not appear on Cocina/Barra screens.
+      const detailedGrillNotesArray = [
+        `🥔 ACOMPAÑAMIENTO: ${acompanamiento}`
+      ];
+      
+      if (i.notas && i.notas.includes("(Nota:")) {
+        const customNoteMatch = i.notas.match(/\(Nota:\s*([^\)]+)\)/);
+        if (customNoteMatch && customNoteMatch[1]) {
+          detailedGrillNotesArray.push(`📝 NOTAS CAJA: ${customNoteMatch[1]}`);
+        }
+      }
+
+      // 1. MAIN BILLING ITEM: marked as pending (historial: false, entregado: false)
+      // so it shows up at the top (head) of Cocina card with the full price and accompaniment note.
       expandedList.push({
         productoId: prodId,
         nombre: String(i.nombre),
         precio: parseFloat(i.precio),
         cantidad: parseInt(i.cant || i.cantidad),
-        historial: true,
-        entregado: true,
-        notas: i.notas ? String(i.notas) : null,
+        historial: false,
+        entregado: false,
+        notas: detailedGrillNotesArray.join(' · '),
       });
       
-      // 2. DETAILED GRILL COMPONENTS (historial: false, entregado: false -> Go to Cocina!)
+      // 2. DETAILED GRILL COMPONENTS: created with precio: 0 and notes: null
+      // so they are listed clean without repeating notes or S/ 0.00 price badges.
       if (decomp.components && decomp.components.length > 0) {
         for (const comp of decomp.components) {
           expandedList.push({
@@ -200,7 +212,7 @@ async function expandPedidoItemsForDb(itemsList) {
             cantidad: parseInt(i.cant || i.cantidad),
             historial: false,
             entregado: false,
-            notas: `🥔 ACOMPAÑAMIENTO: ${acompanamiento}`,
+            notas: null,
           });
         }
       }
@@ -234,7 +246,7 @@ async function expandPedidoItemsForDb(itemsList) {
             cantidad: parseInt(i.cant || i.cantidad),
             historial: false, // Go to Barra!
             entregado: false,
-            notas: `(Bebida de Parrillada/Piqueo - S/ 0.00)`,
+            notas: null,
           });
         }
       }
@@ -249,7 +261,7 @@ async function expandPedidoItemsForDb(itemsList) {
             cantidad: Math.ceil(rep.cantidadMultiplier * parseInt(i.cant || i.cantidad)),
             historial: rep.toBar ? false : true,
             entregado: rep.toBar ? false : true, // Mark as delivered if only for reporting
-            notas: rep.toBar ? `(Bebida de Parrillada/Piqueo - S/ 0.00)` : `(Rotación/Consumo de Parrillada/Piqueo - S/ 0.00)`,
+            notas: null,
           });
         }
       }
