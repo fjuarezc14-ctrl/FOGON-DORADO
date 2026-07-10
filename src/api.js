@@ -28,6 +28,9 @@ export const api = {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seccion }),
   }).then(r => r.json()),
   servirPedido: (id) => fetch(`${API_BASE}/api/pedidos/${id}/servir`, { method: 'PATCH' }).then(r => r.json()),
+  updateItemNotas: (itemId, notas) => fetch(`${API_BASE}/api/pedidos/items/${itemId}/notas`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notas }),
+  }).then(r => r.json()),
   prepararItem: (itemId) => fetch(`${API_BASE}/api/pedidos/items/${itemId}/preparar`, {
     method: 'PATCH',
   }).then(r => r.json()),

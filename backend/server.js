@@ -935,6 +935,21 @@ app.patch('/api/pedidos/:id/entregar-todo', async (req, res) => {
   }
 });
 
+// Actualizar notas de un ítem de pedido individual
+app.patch('/api/pedidos/items/:id/notas', async (req, res) => {
+  const { id } = req.params;
+  const { notas } = req.body;
+  try {
+    const item = await prisma.itemPedido.update({
+      where: { id: parseInt(id) },
+      data: { notas: notas || null },
+    });
+    res.json({ ok: true, item });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================
 // CANCELACIÓN DE PEDIDOS (Solo Mozo, límite 5 min)
 // ============================================================

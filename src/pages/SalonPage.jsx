@@ -1132,11 +1132,29 @@ export default function SalonPage({ currentUser }) {
                                     )}
                                   </div>
                                 </div>
-                                {item.notas && (
-                                  <div className="mt-1.5">
-                                    <span className="inline-block bg-amber-500 border border-amber-600 text-slate-950 text-xs px-2.5 py-1 rounded-xl font-black shadow-sm uppercase tracking-wide">📋 NOTA: {item.notas}</span>
-                                  </div>
-                                )}
+                                <div className="mt-1.5 flex items-center gap-2">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">📋 NOTA:</span>
+                                  <input 
+                                    type="text" 
+                                    placeholder="Especificaciones (ej: Coca Cola helada)..." 
+                                    value={item.notas || ''} 
+                                    onChange={(e) => {
+                                      let nuevos = [...ticketActual];
+                                      nuevos[idx].notas = e.target.value;
+                                      setTicketActual(nuevos);
+                                    }}
+                                    onBlur={async (e) => {
+                                      if (item.itemId) {
+                                        try {
+                                          await api.updateItemNotas(item.itemId, e.target.value);
+                                        } catch (err) {
+                                          console.error("Error al actualizar nota:", err);
+                                        }
+                                      }
+                                    }}
+                                    className="flex-1 bg-white border border-slate-250 rounded-lg px-2.5 py-1 text-[10px] font-bold text-slate-700 focus:outline-none focus:border-amber-400 focus:bg-white"
+                                  />
+                                </div>
                               </li>
                             );
                           }

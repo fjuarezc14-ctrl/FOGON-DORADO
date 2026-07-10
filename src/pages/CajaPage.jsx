@@ -1865,17 +1865,55 @@ export default function CajaPage({ currentUser }) {
                       const prodOriginal = productosMenu.find(p => String(p.id) === String(item.id));
                       const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
                       return (
-                        <li key={idx} className="flex justify-between items-start text-xs border-b border-dashed border-slate-100 pb-1.5 last:border-0 last:pb-0">
-                          <span className="text-slate-800 font-medium">
-                            <span className="font-black text-slate-900 mr-1.5">{item.cant}x</span>
-                            <span className="uppercase">{item.nombre}</span>
-                          </span>
-                          <span className="font-mono text-slate-600 font-bold shrink-0 flex items-center gap-1.5">
-                            {tieneDescuento && (
-                              <span className="line-through text-slate-400 font-semibold text-[10px]">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
-                            )}
-                            <span>S/ {(item.cant * item.precio).toFixed(2)}</span>
-                          </span>
+                        <li key={idx} className="flex flex-col border-b border-dashed border-slate-100 pb-1.5 last:border-0 last:pb-0">
+                          <div className="flex justify-between items-start text-xs">
+                            <span className="text-slate-800 font-medium">
+                              <span className="font-black text-slate-900 mr-1.5">{item.cant}x</span>
+                              <span className="uppercase">{item.nombre}</span>
+                            </span>
+                            <span className="font-mono text-slate-600 font-bold shrink-0 flex items-center gap-1.5">
+                              {tieneDescuento && (
+                                <span className="line-through text-slate-400 font-semibold text-[10px]">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                              )}
+                              <span>S/ {(item.cant * item.precio).toFixed(2)}</span>
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider shrink-0">📋 NOTA:</span>
+                            <input 
+                              type="text" 
+                              placeholder="Ej: Coca Cola helada..." 
+                              value={item.notas || item.notes || ''} 
+                              onChange={(e) => {
+                                setMesaSeleccionada(prev => {
+                                  if (!prev || !prev.pedidoData) return prev;
+                                  const nuevosItems = [...prev.pedidoData.items];
+                                  const originalIdx = prev.pedidoData.items.findIndex(x => x.itemId === item.itemId);
+                                  if (originalIdx >= 0) {
+                                    nuevosItems[originalIdx].notas = e.target.value;
+                                  }
+                                  return {
+                                    ...prev,
+                                    pedidoData: {
+                                      ...prev.pedidoData,
+                                      items: nuevosItems
+                                    }
+                                  };
+                                });
+                              }}
+                              onBlur={async (e) => {
+                                if (item.itemId) {
+                                  try {
+                                    await api.updateItemNotas(item.itemId, e.target.value);
+                                  } catch (err) {
+                                    console.error("Error al actualizar nota en caja:", err);
+                                  }
+                                }
+                              }}
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-[9px] font-bold text-slate-700 focus:outline-none focus:border-indigo-400 focus:bg-white"
+                            />
+                          </div>
                         </li>
                       );
                     })}
