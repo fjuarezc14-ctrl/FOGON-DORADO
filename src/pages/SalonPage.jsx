@@ -1379,7 +1379,8 @@ export default function SalonPage({ currentUser }) {
           } else {
             const notesArray = [];
             const isParrilla2P = selectedProduct.nombre.toLowerCase().includes("parrillada mixta 2 personas") || selectedProduct.nombre.toLowerCase().includes("piqueo 2 personas");
-            
+            let additionalDrinkProduct = null;
+
             if (isParrilla2P) {
               const guarn = selections["guarnicion"];
               if (guarn) notesArray.push(`[Acompañamiento: ${guarn}]`);
@@ -1403,7 +1404,10 @@ export default function SalonPage({ currentUser }) {
               }
               
               if (b_adic && b_adic !== "Sin Bebida Adicional") {
-                notesArray.push(`[Adicional: ${b_adic}]`);
+                // Buscamos el producto en la lista de productos cargada de la base de datos
+                additionalDrinkProduct = productos.find(p => p.nombre === b_adic);
+                // No lo agregamos como nota de texto para evitar duplicidad visual en cocina/barra, 
+                // ya que se ingresará como un producto de línea pagado e independiente en el ticket.
               }
             } else {
               steps.forEach(step => {
@@ -1418,7 +1422,15 @@ export default function SalonPage({ currentUser }) {
               notesArray.push(`(Nota: ${additionalNotes.trim()})`);
             }
             const finalNotes = notesArray.join(' · ');
+            
+            // 1. Agregar el producto base (Combo)
             agregarAlTicketDirecto(selectedProduct, finalNotes);
+            
+            // 2. Si hay bebida adicional seleccionada, la agregamos como un producto separado e independiente
+            // Esto asegura que se sume al precio total de la boleta y descuente stock correctamente
+            if (additionalDrinkProduct) {
+              agregarAlTicketDirecto(additionalDrinkProduct);
+            }
           }
           
           setOptionsModalOpen(false);
