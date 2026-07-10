@@ -8,14 +8,16 @@ const prisma = new PrismaClient();
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000; // 5 minutos
 
 // ============================================================
-// STORE EN MEMORIA: ALERTAS DE CANCELACIÓN PARA COCINA
+// STORE EN MEMORIA: ALERTAS DE CANCELACIÓN PARA COCINA Y BARRA
 // Se limpia automáticamente cada 2 horas (ítems > 2h se descartan).
 // ============================================================
 let cancelacionesCocina = []; // [{ id, pedidoId, items, mesaInfo, canceladoEn, codigoPedidosYa }]
+let cancelacionesBarra = [];  // [{ id, pedidoId, items, mesaInfo, canceladoEn, codigoPedidosYa }]
 
 setInterval(() => {
   const dosHorasAtras = Date.now() - 2 * 60 * 60 * 1000;
   cancelacionesCocina = cancelacionesCocina.filter(c => new Date(c.canceladoEn).getTime() > dosHorasAtras);
+  cancelacionesBarra = cancelacionesBarra.filter(c => new Date(c.canceladoEn).getTime() > dosHorasAtras);
 }, 30 * 60 * 1000); // limpiar cada 30 min
 
 // Categorías que van a la BARRA (el resto va a COCINA)
@@ -436,6 +438,7 @@ app.get('/api/pedidos/cocina', async (req, res) => {
           id: i.id,
           nombre: i.nombre,
           cant: i.cantidad,
+          precio: i.precio,
           categoria: i.producto?.categoria || '',
           notas: i.notas || null,
         })),
@@ -477,6 +480,7 @@ app.get('/api/pedidos/barra', async (req, res) => {
         .map(i => ({
           nombre: i.nombre,
           cant: i.cantidad,
+          precio: i.precio,
           categoria: i.producto?.categoria || '',
           notas: i.notas || null,
         })),
@@ -751,7 +755,6 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
     }
 
     // 🔔 Registrar alerta de cancelación para cocina (store en memoria)
-    // Solo si el pedido tenía items visibles en cocina (no de barra)
     const itemsParaCocina = pedido.items.filter(i =>
       !BARRA_CATEGORIAS.includes(i.producto?.categoria || '')
     );
@@ -772,13 +775,34 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
       });
     }
 
+    // 🔔 Registrar alerta de cancelación para barra (store en memoria)
+    const itemsParaBarra = pedido.items.filter(i =>
+      BARRA_CATEGORIAS.includes(i.producto?.categoria || '')
+    );
+    if (itemsParaBarra.length > 0) {
+      cancelacionesBarra.push({
+        id: `cancel-${Date.now()}-${pedido.id}`,
+        pedidoId: pedido.id,
+        items: itemsParaBarra.map(i => ({
+          nombre: i.nombre,
+          cantidad: i.cantidad,
+          precio: i.precio,
+          notas: i.notas || null,
+        })),
+        mesaInfo: pedido.mesaId ? `Mesa ${pedido.mesa?.numero || pedido.mesaId}` : (pedido.codigoPedidosYa ? `🛵 ${pedido.codigoPedidosYa}` : 'Para Llevar/Delivery'),
+        codigoPedidosYa: pedido.codigoPedidosYa || null,
+        canceladoPor: canceladoPor || 'Administrador',
+        canceladoEn: new Date().toISOString(),
+      });
+    }
+
     res.json({ ok: true, mesaLiberada, nuevoEstadoMesa });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/cocina/cancelaciones → Devuelve las alertas de cancelación pendientes de confirmación
+// GET /api/cocina/cancelaciones → Devuelve las alertas de cancelación pendientes de confirmación para Cocina
 app.get('/api/cocina/cancelaciones', (req, res) => {
   res.json(cancelacionesCocina);
 });
@@ -787,6 +811,18 @@ app.get('/api/cocina/cancelaciones', (req, res) => {
 app.delete('/api/cocina/cancelaciones/:id', (req, res) => {
   const { id } = req.params;
   cancelacionesCocina = cancelacionesCocina.filter(c => c.id !== id);
+  res.json({ ok: true });
+});
+
+// GET /api/barra/cancelaciones → Devuelve las alertas de cancelación pendientes de confirmación para Barra
+app.get('/api/barra/cancelaciones', (req, res) => {
+  res.json(cancelacionesBarra);
+});
+
+// DELETE /api/barra/cancelaciones/:id → Barra confirma que vio la alerta ("Entendido")
+app.delete('/api/barra/cancelaciones/:id', (req, res) => {
+  const { id } = req.params;
+  cancelacionesBarra = cancelacionesBarra.filter(c => c.id !== id);
   res.json({ ok: true });
 });
 

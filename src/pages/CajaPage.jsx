@@ -190,6 +190,12 @@ export default function CajaPage({ currentUser }) {
   // PIN para autorizar Consumo en modal de Delivery/Para Llevar
   const [pinAdminDelivery, setPinAdminDelivery] = useState('');
 
+  // Modal de autorización de cancelación para Llevar/Delivery
+  const [cancelLlevarModalOpen, setCancelLlevarModalOpen] = useState(false);
+  const [pedidoACancelarLlevar, setPedidoACancelarLlevar] = useState(null);
+  const [pinCancelLlevar, setPinCancelLlevar] = useState('');
+  const [errorCancelLlevar, setErrorCancelLlevar] = useState('');
+
   // Modal PedidosYa y Para Llevar
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [codigoPY, setCodigoPY] = useState('');
@@ -869,6 +875,35 @@ export default function CajaPage({ currentUser }) {
     setItemsDelivery(nuevo);
   };
 
+  const handleExecuteCancelLlevar = async () => {
+    if (!pinCancelLlevar.trim()) {
+      setErrorCancelLlevar('El PIN es obligatorio.');
+      return;
+    }
+    try {
+      const auth = await api.validateAuth(pinCancelLlevar.trim());
+      if (!auth || !auth.ok) {
+        setErrorCancelLlevar('PIN incorrecto. Autorización denegada.');
+        return;
+      }
+      const res = await api.cancelarPedido(pedidoACancelarLlevar.pedidoId, {
+        canceladoPor: cajeroNombre,
+        motivo: 'Cancelado por cajero (error en pedido)',
+        force: true,
+      });
+      if (res.ok) {
+        addToast('Pedido cancelado. Cocina ha sido notificada.', 'success');
+        setCancelLlevarModalOpen(false);
+        setPedidoACancelarLlevar(null);
+        fetchCajaData();
+      } else {
+        setErrorCancelLlevar(res.error || 'No se pudo cancelar el pedido.');
+      }
+    } catch (err) {
+      setErrorCancelLlevar('Error de conexión con el servidor.');
+    }
+  };
+
   const abrirTicketImpresionDirecto = (total, response, tipoComprobante, numDocumento, clienteNombre, clienteDireccion, items, mesaNum = 'Delivery', deliveryInfo = null) => {
     if (!response) response = {};
     const fecha = new Date().toLocaleDateString('es-PE');
@@ -1266,27 +1301,12 @@ export default function CajaPage({ currentUser }) {
                               <span className="text-[10px] text-slate-400 font-medium">En cocina...</span>
                               <button
                                 onClick={() => {
-                                  const pin = prompt('🔐 PIN del Administrador para cancelar este pedido:');
-                                  if (!pin) return;
-                                  api.validateAuth(pin.trim()).then(auth => {
-                                    if (!auth?.ok) { alert('❌ PIN incorrecto. Cancelación denegada.'); return; }
-                                    const confirmMsg = `¿Cancelar el pedido de "${p.codigoPedidosYa || 'este cliente'}"?\n\nEsta acción notificará a cocina.`;
-                                    if (!window.confirm(confirmMsg)) return;
-                                    api.cancelarPedido(p.pedidoId, {
-                                      canceladoPor: cajeroNombre,
-                                      motivo: 'Cancelado por cajero (error en pedido)',
-                                      force: true,
-                                    }).then(res => {
-                                      if (res.ok) {
-                                        addToast('Pedido cancelado. Cocina ha sido notificada.', 'success');
-                                        fetchCajaData();
-                                      } else {
-                                        alert('Error: ' + (res.error || 'No se pudo cancelar.'));
-                                      }
-                                    });
-                                  });
+                                  setPedidoACancelarLlevar(p);
+                                  setPinCancelLlevar('');
+                                  setErrorCancelLlevar('');
+                                  setCancelLlevarModalOpen(true);
                                 }}
-                                className="px-3 py-1.5 bg-red-100 hover:bg-red-600 text-red-700 hover:text-white border border-red-300 hover:border-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                                className="px-3 py-1.5 bg-red-100 hover:bg-red-655 text-red-700 hover:text-white border border-red-300 hover:border-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
                               >
                                 🗑 Cancelar
                               </button>
@@ -2680,6 +2700,78 @@ export default function CajaPage({ currentUser }) {
           </div>
         </div>
       )}
+
+      {/* Modal: Autorizar Cancelación de Llevar/Delivery */}
+      {cancelLlevarModalOpen && pedidoACancelarLlevar && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[260] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-500 to-rose-600 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                  <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  Autorizar Cancelación
+                </h3>
+                <p className="text-xs font-bold opacity-90 mt-0.5">Pedido: {pedidoACancelarLlevar.codigoPedidosYa || `ID: ${pedidoACancelarLlevar.pedidoId}`} · Total: S/ {pedidoACancelarLlevar.total.toFixed(2)}</p>
+              </div>
+              <button onClick={() => { setCancelLlevarModalOpen(false); setPedidoACancelarLlevar(null); setPinCancelLlevar(''); setErrorCancelLlevar(''); }} className="bg-black/20 hover:bg-black/30 p-2 rounded-xl transition-colors text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4">
+              <div className="bg-red-50 rounded-2xl p-3 border border-red-100 text-slate-800 text-xs font-semibold leading-relaxed">
+                ⚠️ <strong className="font-black text-red-700">Atención:</strong> Esta acción cancelará la orden del cliente de forma permanente y enviará una alerta en tiempo real a cocina/barra para detener la preparación.
+              </div>
+
+              {/* PIN Admin */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">🔐 PIN del Administrador</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pinCancelLlevar}
+                  onChange={e => { setPinCancelLlevar(e.target.value); setErrorCancelLlevar(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleExecuteCancelLlevar()}
+                  placeholder="Ingresa PIN de administrador"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-500 focus:bg-white rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
+                  style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
+                  autoComplete="off"
+                  name="cancel-pin-auth"
+                  autoFocus
+                />
+              </div>
+
+              {/* Error */}
+              {errorCancelLlevar && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-black px-4 py-2.5 rounded-2xl uppercase tracking-wide flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {errorCancelLlevar}
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => { setCancelLlevarModalOpen(false); setPedidoACancelarLlevar(null); setPinCancelLlevar(''); setErrorCancelLlevar(''); }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase rounded-2xl transition-all"
+                >
+                  Regresar
+                </button>
+                <button
+                  onClick={handleExecuteCancelLlevar}
+                  disabled={!pinCancelLlevar.trim()}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase rounded-2xl transition-all disabled:opacity-50 shadow-md shadow-red-500/20"
+                >
+                  ✓ Cancelar Orden
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {sunatModalOpen && activeComprobante && (
         <div id="modal-comprobante-sunat-print-container" className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">

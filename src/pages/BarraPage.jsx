@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, CheckCheck, CheckCircle2, User, Truck, GlassWater } from 'lucide-react';
+import { Clock, CheckCheck, CheckCircle2, User, Truck, GlassWater, XCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../api';
 
 const parseDeliveryInfo = (code) => {
@@ -23,6 +23,7 @@ const parseDeliveryInfo = (code) => {
 export default function BarraPage() {
   const [pedidos, setPedidos] = useState([]);
   const [horaLocal, setHoraLocal] = useState('');
+  const [cancelaciones, setCancelaciones] = useState([]);
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -33,17 +34,28 @@ export default function BarraPage() {
     }
   }, []);
 
+  const fetchCancelaciones = useCallback(async () => {
+    try {
+      const data = await api.getCancelacionesBarra();
+      if (Array.isArray(data)) setCancelaciones(data);
+    } catch (err) {
+      console.error('Error cargando cancelaciones de barra:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPedidos();
+    fetchCancelaciones();
     const tick = () => {
       fetchPedidos();
+      fetchCancelaciones();
       setHoraLocal(new Date().toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }));
     };
     const interval = setInterval(tick, 3000);
     return () => clearInterval(interval);
-  }, [fetchPedidos]);
+  }, [fetchPedidos, fetchCancelaciones]);
 
   const marcarListoBarra = async (pedidoId) => {
     try {
@@ -51,6 +63,15 @@ export default function BarraPage() {
       await fetchPedidos();
     } catch (err) {
       alert('Error al despachar bebidas: ' + err.message);
+    }
+  };
+
+  const dismissCancelacion = async (id) => {
+    try {
+      await api.dismissCancelacionBarra(id);
+      setCancelaciones(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      setCancelaciones(prev => prev.filter(c => c.id !== id));
     }
   };
 
@@ -73,6 +94,51 @@ export default function BarraPage() {
           </div>
         </div>
       </header>
+
+      {/* ═══════════════════════════════════════════════════
+          ALERTAS DE CANCELACIÓN PERSISTENTES EN BARRA
+          (permanecen hasta que el barman presione "Entendido")
+      ═══════════════════════════════════════════════════ */}
+      {cancelaciones.length > 0 && (
+        <div className="bg-red-950 border-b-4 border-red-655 px-4 py-3 space-y-3 shrink-0 z-20">
+          {cancelaciones.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-start gap-4 bg-red-900/80 border border-red-500 rounded-2xl p-4 shadow-2xl"
+              style={{ animation: 'pulse 1.5s ease-in-out 3' }}
+            >
+              <div className="shrink-0 mt-0.5">
+                <AlertTriangle className="w-8 h-8 text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-red-200 font-black text-sm uppercase tracking-wider flex items-center gap-2 mb-1">
+                  <XCircle className="w-4 h-4 text-red-404 shrink-0" />
+                  BEBIDA CANCELADA — {c.mesaInfo}
+                </p>
+                <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mb-2">
+                  Cancelado por: {c.canceladoPor} · {new Date(c.canceladoEn).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {c.items.map((item, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 bg-red-800 border border-red-600 text-red-100 font-black text-xs px-3 py-1.5 rounded-xl">
+                      <span className="text-red-300">{item.cantidad}×</span>
+                      {item.nombre}
+                      <span className="text-red-400 font-mono">S/ {parseFloat(item.precio || 0).toFixed(2)}</span>
+                      {item.notas && <span className="text-red-300 italic">· {item.notas}</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => dismissCancelacion(c.id)}
+                className="shrink-0 px-4 py-2.5 bg-red-655 hover:bg-red-500 active:bg-red-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg border border-red-400"
+              >
+                ✓ Entendido
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <section className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -156,19 +222,24 @@ export default function BarraPage() {
                     </span>
                   </div>
 
-
-
                   {/* Detalle de Bebidas */}
                   <div className="p-4 flex-1 bg-slate-900/40 min-h-[120px]">
                     {p.items.map((item, i) => (
                       <div key={i} className="flex flex-col py-2.5 border-b border-indigo-950/30 last:border-0">
-                        <div className="flex items-start">
-                          <span className="font-mono font-black text-base mr-3 text-purple-400 w-5 text-center shrink-0">
-                            {item.cant}
-                          </span>
-                          <span className="flex-1 text-slate-100 font-bold text-sm leading-snug pt-0.5 uppercase tracking-wide">
-                            {item.nombre}
-                          </span>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start flex-1 min-w-0">
+                            <span className="font-mono font-black text-base mr-3 text-purple-400 w-5 text-center shrink-0">
+                              {item.cant}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <span className="block text-slate-100 font-bold text-sm leading-snug pt-0.5 uppercase tracking-wide">
+                                {item.nombre}
+                              </span>
+                              <span className="inline-block mt-1 bg-slate-800 border border-slate-700/60 text-slate-400 font-black text-[10px] px-2 py-0.5 rounded-lg font-mono">
+                                S/ {parseFloat(item.precio || 0).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                         {item.notas && (
                           <div className="ml-8 mt-1.5">

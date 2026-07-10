@@ -43,6 +43,10 @@ export const api = {
   // Alertas de cancelación para cocina
   getCancelacionesCocina: () => fetch(`${API_BASE}/api/cocina/cancelaciones`).then(r => r.json()),
   dismissCancelacionCocina: (id) => fetch(`${API_BASE}/api/cocina/cancelaciones/${id}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Alertas de cancelación para barra
+  getCancelacionesBarra: () => fetch(`${API_BASE}/api/barra/cancelaciones`).then(r => r.json()),
+  dismissCancelacionBarra: (id) => fetch(`${API_BASE}/api/barra/cancelaciones/${id}`, { method: 'DELETE' }).then(r => r.json()),
   entregarItem: (itemId) => fetch(`${API_BASE}/api/pedidos/items/${itemId}/entregar`, {
     method: 'PATCH',
   }).then(r => r.json()),
