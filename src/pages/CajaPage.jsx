@@ -2140,10 +2140,10 @@ export default function CajaPage({ currentUser }) {
                           type="password"
                           inputMode="numeric"
                           maxLength={6}
-                          placeholder="PIN del Administrador..."
+                          placeholder="••••••"
                           value={pinAdminDelivery || ''}
                           onChange={(e) => setPinAdminDelivery(e.target.value)}
-                          className="w-full bg-white border border-violet-300 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-800 focus:outline-none focus:border-violet-500 text-center tracking-widest"
+                          className="w-full bg-white border border-violet-300 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-800 placeholder:tracking-normal placeholder:text-slate-300 focus:outline-none focus:border-violet-500 text-center tracking-widest"
                         />
                       </div>
                     )}
@@ -2662,8 +2662,8 @@ export default function CajaPage({ currentUser }) {
                   value={cambioPin}
                   onChange={e => { setCambioPin(e.target.value); setCambioError(''); }}
                   onKeyDown={e => e.key === 'Enter' && handleCambiarMetodoPago()}
-                  placeholder="Ingresa tu PIN"
-                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:bg-white rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
+                  placeholder="••••••"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-amber-500 focus:bg-white rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.5em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-300 focus:outline-none transition-all"
                   style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
                   autoComplete="off"
                   name="cambio-pin-auth"
@@ -2721,7 +2721,24 @@ export default function CajaPage({ currentUser }) {
 
             <div className="p-5 flex flex-col gap-4">
               <div className="bg-red-50 rounded-2xl p-3 border border-red-100 text-slate-800 text-xs font-semibold leading-relaxed">
-                ⚠️ <strong className="font-black text-red-700">Atención:</strong> Esta acción cancelará la orden del cliente de forma permanente y enviará una alerta en tiempo real a cocina/barra para detener la preparación.
+                ⚠️ <strong className="font-black text-red-700">Atención:</strong> Esta acción cancelará la orden del cliente de forma permanente y enviará una alerta en tiempo real a cocina/barra.
+              </div>
+
+              {/* Detalle de ítems del pedido */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Detalle del Pedido a Cancelar:</p>
+                <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto pr-1">
+                  {pedidoACancelarLlevar.items && pedidoACancelarLlevar.items.length > 0 ? (
+                    pedidoACancelarLlevar.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between py-1.5 text-xs text-slate-800 font-bold uppercase">
+                        <span>{item.cant}× {item.nombre}</span>
+                        <span className="font-mono text-slate-600">S/ {(item.cant * item.precio).toFixed(2)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">Sin productos registrados</p>
+                  )}
+                </div>
               </div>
 
               {/* PIN Admin */}
@@ -2734,8 +2751,8 @@ export default function CajaPage({ currentUser }) {
                   value={pinCancelLlevar}
                   onChange={e => { setPinCancelLlevar(e.target.value); setErrorCancelLlevar(''); }}
                   onKeyDown={e => e.key === 'Enter' && handleExecuteCancelLlevar()}
-                  placeholder="Ingresa PIN de administrador"
-                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-500 focus:bg-white rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
+                  placeholder="••••••"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-500 focus:bg-white rounded-2xl px-4 py-3 text-center text-xl font-black tracking-[0.5em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-300 focus:outline-none transition-all"
                   style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
                   autoComplete="off"
                   name="cancel-pin-auth"
