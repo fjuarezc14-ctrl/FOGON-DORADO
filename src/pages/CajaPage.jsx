@@ -2659,6 +2659,14 @@ export default function CajaPage({ currentUser }) {
                 </button>
                 <button
                   onClick={() => {
+                    // Validar si quedan mesas pendientes de cobro antes de cerrar turno
+                    const pendientes = mesas.filter(m => m.estado !== 'Libre' && m.pedidoData);
+                    if (pendientes.length > 0) {
+                      const nombresMesas = pendientes.map(m => `Mesa ${m.numero}`).join(', ');
+                      alert(`⚠️ No se puede realizar el cierre de turno.\n\nAún quedan mesas activas o pendientes de cobración:\n👉 ${nombresMesas}\n\nPor favor, cobre o libere estas mesas antes de cerrar caja.`);
+                      return;
+                    }
+
                     const nowISO = new Date().toISOString();
                     localStorage.setItem('ultimoCierre', nowISO);
                     setUltimoCierre(nowISO);

@@ -1378,12 +1378,42 @@ export default function SalonPage({ currentUser }) {
             agregarAlTicketDirecto(selectedProduct, finalNotes);
           } else {
             const notesArray = [];
-            steps.forEach(step => {
-              const val = selections[step.key];
-              if (val) {
-                notesArray.push(`[${step.name}: ${val}]`);
+            const isParrilla2P = selectedProduct.nombre.toLowerCase().includes("parrillada mixta 2 personas") || selectedProduct.nombre.toLowerCase().includes("piqueo 2 personas");
+            
+            if (isParrilla2P) {
+              const guarn = selections["guarnicion"];
+              if (guarn) notesArray.push(`[Acompañamiento: ${guarn}]`);
+              
+              const b1 = selections["bebida_1"];
+              const b2 = selections["bebida_2"];
+              const b_adic = selections["bebida_adicional"];
+              
+              if (b1 && b2) {
+                if (b1 === b2) {
+                  // Agrupar dos de 1/2 Lt iguales en un solo litro para la Barra (ej: Gaseosa 1/2 Lt + Gaseosa 1/2 Lt => Gaseosa 1 Lt)
+                  const cleanName = b1.replace(" 1/2 Lt", " 1 Lt").replace(" - 1/2 Lt", " - 1 Lt");
+                  notesArray.push(`[Bebida: ${cleanName}]`);
+                } else {
+                  notesArray.push(`[Bebida 1: ${b1}]`);
+                  notesArray.push(`[Bebida 2: ${b2}]`);
+                }
+              } else {
+                if (b1) notesArray.push(`[Bebida 1: ${b1}]`);
+                if (b2) notesArray.push(`[Bebida 2: ${b2}]`);
               }
-            });
+              
+              if (b_adic && b_adic !== "Sin Bebida Adicional") {
+                notesArray.push(`[Adicional: ${b_adic}]`);
+              }
+            } else {
+              steps.forEach(step => {
+                const val = selections[step.key];
+                if (val) {
+                  notesArray.push(`[${step.name}: ${val}]`);
+                }
+              });
+            }
+            
             if (additionalNotes.trim()) {
               notesArray.push(`(Nota: ${additionalNotes.trim()})`);
             }
