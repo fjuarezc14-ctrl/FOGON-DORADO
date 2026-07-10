@@ -28,6 +28,197 @@ const BARRA_CATEGORIAS = [
   'Postres',
 ];
 
+// ============================================================
+// CONFIGURACIÓN DE PARRILLADAS Y PIQUEOS MIX (COMBO DECOMPOSITION)
+// ============================================================
+const MIX_PRODUCTS_DECOMPOSITION = {
+  // Piqueo Personal (1 persona) -> ID 48
+  48: {
+    grillDesc: "4 unid. pancita + 4 mollejas + 4 ubres",
+    reportingItems: [
+      { productoId: 213, nombre: "Vino Tabernero (Copa)", cantidadMultiplier: 1, toBar: true }
+    ]
+  },
+  // Piqueo 2 Personas -> ID 49
+  49: {
+    grillDesc: "4 pancetas + 4 mollejas + 4 ubres + 4 trompas + 2 anticuchos + 2 brochetas + 1/4 pollo a la brasa",
+    reportingItems: [
+      { productoId: 12, nombre: "1/4 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
+      { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 1, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
+  },
+  // Piqueo Familiar -> ID 50
+  50: {
+    grillDesc: "8 pancetas + 8 mollejas + 8 ubres + 8 trompas + 2 chorizo + 2 anticucho + 2 brochetas",
+    reportingItems: [
+      { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 1, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
+  },
+  // Piqueo Fogón Dorado -> ID 51
+  51: {
+    grillDesc: "12 pancetas + 12 mollejas + 12 ubres + 12 trompas + 4 chorizos + 4 anticuchos + 4 brochetas + 4 dados de lengua + 1/2 pollo a la brasa",
+    reportingItems: [
+      { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
+      { productoId: 35, nombre: "Anticuchos (3 palos)", cantidadMultiplier: 1.33, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
+  },
+  // Parrillada Mixta Personal -> ID 52
+  52: {
+    grillDesc: "150 g de res + 150 g de pollo + 1/8 pollo a la brasa + 1 chorizo + 1 palito de anticucho",
+    reportingItems: [
+      { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
+      { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 0.5, toBar: false, reportOnly: true },
+      { productoId: 213, nombre: "Vino Tabernero (Copa)", cantidadMultiplier: 1, toBar: true }
+    ]
+  },
+  // Parrillada Mixta 2 Personas -> ID 53
+  53: {
+    grillDesc: "150 g de res + 150 g de pollo + 150 g de cerdo + 4 mollejas + 4 dados de ubre + 1 chorizo + 1/8 pollo a la brasa",
+    reportingItems: [
+      { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
+  },
+  // Parrillada Mixta 3 Personas -> ID 54
+  54: {
+    grillDesc: "150 g de res + 150 g de pollo + 150 g de cerdo + 3 chorizos + 3 palitos de anticucho + 3/8 pollo a la brasa",
+    reportingItems: [
+      { productoId: 12, nombre: "1/4 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
+      { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
+      { productoId: 35, nombre: "Anticuchos (3 palos)", cantidadMultiplier: 1, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
+  },
+  // Parrillada Fina Familiar (5 personas) -> ID 55
+  55: {
+    grillDesc: "300 g de pollo + 300 g de res + 300 g de cerdo + 4 palitos de anticuchos + 4 chorizos + 1/2 pollo a la brasa",
+    reportingItems: [
+      { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
+      { productoId: 35, nombre: "Anticuchos (3 palos)", cantidadMultiplier: 1.33, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
+  },
+  // Parrillada Fogón Dorado (8-10 personas) -> ID 56
+  56: {
+    grillDesc: "300 g de lomo fino + 300 g de filete de pollo + 300 g de carne de cerdo + 5 palitos de anticuchos + 5 brochetas de pollo + 8 dados de ubre + 5 chorizos + 8 dados de pancita + 8 mollejas + 8 dados de trompa de res + 1/2 de pollo a la brasa",
+    reportingItems: [
+      { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
+      { productoId: 35, nombre: "Anticuchos (3 palos)", cantidadMultiplier: 1.67, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
+  }
+};
+
+function parseSelectionsFromNotes(notas) {
+  const selections = {};
+  if (!notas) return selections;
+  const matches = notas.match(/\[([^\]:]+):\s*([^\]]+)\]/g);
+  if (matches) {
+    matches.forEach(m => {
+      const parts = m.slice(1, -1).split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts[1].trim();
+        selections[key] = val;
+      }
+    });
+  }
+  return selections;
+}
+
+async function expandPedidoItemsForDb(itemsList) {
+  const expandedList = [];
+  for (const i of itemsList) {
+    const prodId = parseInt(i.id || i.productoId);
+    const decomp = MIX_PRODUCTS_DECOMPOSITION[prodId];
+    
+    if (decomp) {
+      const parsedNotes = parseSelectionsFromNotes(i.notas);
+      const acompanamiento = parsedNotes["Elige el Acompañamiento"] || parsedNotes["Elige la Guarnición"] || parsedNotes["guarnicion"] || "Sin Acompañamiento";
+      
+      const detailedGrillNotesArray = [
+        `🥩 DETALLE PARRILLA:`,
+        decomp.grillDesc,
+        `🥔 ACOMPAÑAMIENTO: ${acompanamiento}`
+      ];
+      
+      if (i.notas && i.notas.includes("(Nota:")) {
+        const customNoteMatch = i.notas.match(/\(Nota:\s*([^\)]+)\)/);
+        if (customNoteMatch && customNoteMatch[1]) {
+          detailedGrillNotesArray.push(`📝 NOTAS CAJA: ${customNoteMatch[1]}`);
+        }
+      }
+      
+      expandedList.push({
+        productoId: prodId,
+        nombre: String(i.nombre),
+        precio: parseFloat(i.precio),
+        cantidad: parseInt(i.cant || i.cantidad),
+        historial: false,
+        notas: detailedGrillNotesArray.join(' · '),
+      });
+      
+      if (decomp.hasDrinkSelections) {
+        const drink1 = parsedNotes["Elige Bebida 1 (Medio Litro)"];
+        const drink2 = parsedNotes["Elige Bebida 2 (Un Litro)"];
+        const drinkFam = parsedNotes["Elige la Bebida"];
+        
+        const selectedDrinkNames = [];
+        if (drink1) selectedDrinkNames.push(drink1);
+        if (drink2) selectedDrinkNames.push(drink2);
+        if (drinkFam) selectedDrinkNames.push(drinkFam);
+        
+        if (selectedDrinkNames.length === 0) {
+          if (prodId === 50 || prodId === 51) {
+            selectedDrinkNames.push("Vino Tabernero (Botella)");
+          }
+        }
+        
+        for (const drinkName of selectedDrinkNames) {
+          const drinkProd = await prisma.producto.findFirst({
+            where: { nombre: { contains: drinkName } }
+          });
+          
+          expandedList.push({
+            productoId: drinkProd ? drinkProd.id : 213,
+            nombre: drinkProd ? drinkProd.nombre : drinkName,
+            precio: 0,
+            cantidad: parseInt(i.cant || i.cantidad),
+            historial: false, // Goes to Barra!
+            notas: `(Bebida de Parrillada/Piqueo - S/ 0.00)`,
+          });
+        }
+      }
+      
+      if (decomp.reportingItems && decomp.reportingItems.length > 0) {
+        for (const rep of decomp.reportingItems) {
+          expandedList.push({
+            productoId: rep.productoId,
+            nombre: rep.nombre,
+            precio: 0,
+            cantidad: Math.ceil(rep.cantidadMultiplier * parseInt(i.cant || i.cantidad)),
+            historial: rep.toBar ? false : true,
+            notas: rep.toBar ? `(Bebida de Parrillada/Piqueo - S/ 0.00)` : `(Rotación/Consumo de Parrillada/Piqueo - S/ 0.00)`,
+          });
+        }
+      }
+    } else {
+      expandedList.push({
+        productoId: prodId,
+        nombre: String(i.nombre),
+        precio: parseFloat(i.precio),
+        cantidad: parseInt(i.cant || i.cantidad),
+        historial: i.historial || false,
+        notas: i.notas ? String(i.notas) : null,
+      });
+    }
+  }
+  return expandedList;
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -363,6 +554,7 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
     }
 
     const itemsNuevos = items.filter(i => !i.historial);
+    const expandedItems = await expandPedidoItemsForDb(itemsNuevos);
 
     const pedido = await prisma.pedido.create({
       data: {
@@ -372,13 +564,13 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
         adicional: adicional || false,
         estado: 'Cocina',
         items: {
-          create: itemsNuevos.map(i => ({
-            productoId: parseInt(i.id),
-            nombre: String(i.nombre),
-            precio: parseFloat(i.precio),
-            cantidad: parseInt(i.cant),
-            historial: false,
-            notas: i.notas ? String(i.notas) : null,
+          create: expandedItems.map(i => ({
+            productoId: i.productoId,
+            nombre: i.nombre,
+            precio: i.precio,
+            cantidad: i.cantidad,
+            historial: i.historial,
+            notas: i.notas,
           })),
         },
       },
@@ -999,6 +1191,8 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     const itemsTotal = parseFloat(total);
     const grandTotal = itemsTotal + shippingFee;
 
+    const expandedItems = await expandPedidoItemsForDb(items);
+
     const pedido = await prisma.pedido.create({
       data: {
         mesaId: null,
@@ -1008,13 +1202,13 @@ app.post('/api/pedidos/llevar', async (req, res) => {
         tipoEntrega: isOwnDelivery ? 'delivery' : 'llevar',
         codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null,
         items: {
-          create: items.map(i => ({
-            productoId: parseInt(i.id),
-            nombre: String(i.nombre),
-            precio: parseFloat(i.precio),
-            cantidad: parseInt(i.cant),
-            historial: false,
-            notas: i.notas ? String(i.notas) : null,
+          create: expandedItems.map(i => ({
+            productoId: i.productoId,
+            nombre: i.nombre,
+            precio: i.precio,
+            cantidad: i.cantidad,
+            historial: i.historial,
+            notas: i.notas,
           })),
         },
       },

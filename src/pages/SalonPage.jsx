@@ -384,21 +384,90 @@ export default function SalonPage({ currentUser }) {
       return baseSteps;
     }
     
-    // 4. Guarniciones genéricas para carnes y pollos (SIN Pollos a la Brasa)
+    // 4. Parrilladas y Piqueos Mix con Opciones de Bebidas
+    const prodNameLower = prod.nombre.toLowerCase();
+    const isParrilla2P = prodNameLower.includes("parrillada mixta 2 personas") || prodNameLower.includes("piqueo 2 personas");
+    const isParrillaFamily = 
+      prodNameLower.includes("parrillada mixta 3 personas") || 
+      prodNameLower.includes("parrillada fina familiar") || 
+      prodNameLower.includes("parrillada fogón dorado") || 
+      prodNameLower.includes("piqueo familiar") || 
+      prodNameLower.includes("piqueo fogón dorado");
+
+    if (isParrilla2P) {
+      return [
+        {
+          name: "Elige el Acompañamiento",
+          key: "guarnicion",
+          options: [
+            { label: "Papas Fritas", value: "Papas Fritas" },
+            { label: "Arroz", value: "Arroz" },
+            { label: "Papa Sancochada", value: "Papa Sancochada" },
+            { label: "Choclo Sancochado", value: "Choclo Sancochado" },
+            { label: "Ensalada", value: "Ensalada" },
+            { label: "Omitir (Sin Acompañamiento)", value: "Sin Acompañamiento" }
+          ]
+        },
+        {
+          name: "Elige Bebida 1 (Medio Litro)",
+          key: "bebida_1",
+          options: [
+            { label: "Sangría 1/2 Litro", value: "Sangría Española o Hawaiana 1/2 Lt" },
+            { label: "Gaseosa 1/2 Litro", value: "Gaseosa 1/2 Lt" }
+          ]
+        },
+        {
+          name: "Elige Bebida 2 (Un Litro)",
+          key: "bebida_2",
+          options: [
+            { label: "Gaseosa 1 Litro", value: "Gaseosa 1 Lt" },
+            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" }
+          ]
+        }
+      ];
+    }
+
+    if (isParrillaFamily) {
+      return [
+        {
+          name: "Elige el Acompañamiento",
+          key: "guarnicion",
+          options: [
+            { label: "Papas Fritas", value: "Papas Fritas" },
+            { label: "Arroz", value: "Arroz" },
+            { label: "Papa Sancochada", value: "Papa Sancochada" },
+            { label: "Choclo Sancochado", value: "Choclo Sancochado" },
+            { label: "Ensalada", value: "Ensalada" },
+            { label: "Omitir (Sin Acompañamiento)", value: "Sin Acompañamiento" }
+          ]
+        },
+        {
+          name: "Elige la Bebida",
+          key: "bebida_familia",
+          options: [
+            { label: "Vino Tabernero 750 ML", value: "Vino Tabernero (Botella)" },
+            { label: "Sangría 1 Litro", value: "Sangría Española o Hawaiana 1 Lt" }
+          ]
+        }
+      ];
+    }
+
+    // 5. Guarniciones genéricas para carnes y pollos (SIN Pollos a la Brasa)
     const requiereGuarnicion = 
       ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
       !prod.nombre.toLowerCase().includes('solo');
       
     if (requiereGuarnicion) {
       return [{
-        name: "Elige la Guarnición",
+        name: "Elige el Acompañamiento",
         key: "guarnicion",
         options: [
           { label: "Papas Fritas", value: "Papas Fritas" },
-          { label: "Arroz Chaufa", value: "Arroz Chaufa" },
+          { label: "Arroz", value: "Arroz" },
           { label: "Papa Sancochada", value: "Papa Sancochada" },
           { label: "Choclo Sancochado", value: "Choclo Sancochado" },
-          { label: "Sin Guarnición", value: "Sin Guarnición" }
+          { label: "Ensalada", value: "Ensalada" },
+          { label: "Omitir (Sin Acompañamiento)", value: "Sin Acompañamiento" }
         ]
       }];
     }
