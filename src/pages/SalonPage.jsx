@@ -457,7 +457,9 @@ export default function SalonPage({ currentUser }) {
           key: "bebida_familia",
           options: [
             { label: "Vino Tabernero 750 ML", value: "Vino Tabernero (Botella)" },
-            { label: "Sangría 1 Litro", value: "Sangría Española o Hawaiana 1 Lt" }
+            { label: "Sangría 1 Litro", value: "Sangría Española o Hawaiana 1 Lt" },
+            { label: "Gaseosa 1.5 Litros (Equivalente)", value: "Gaseosa 1 1/2 Lt" },
+            { label: "Chicha Morada 1.5 Litros (Equivalente)", value: "Chicha Morada - 1 1/2 Lt" }
           ]
         }
       ];
