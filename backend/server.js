@@ -219,14 +219,25 @@ async function expandPedidoItemsForDb(itemsList) {
       
       // 3. DRINK SELECTIONS (historial: false, entregado: false -> Go to Barra!)
       if (decomp.hasDrinkSelections) {
-        const drink1 = parsedNotes["Elige Bebida 1 (Medio Litro)"];
-        const drink2 = parsedNotes["Elige Bebida 2 (Un Litro)"];
-        const drinkFam = parsedNotes["Elige la Bebida"];
-        
         const selectedDrinkNames = [];
-        if (drink1) selectedDrinkNames.push(drink1);
-        if (drink2) selectedDrinkNames.push(drink2);
-        if (drinkFam) selectedDrinkNames.push(drinkFam);
+        
+        // Buscar todas las posibles llaves de bebidas en parsedNotes (tanto nuevos como de legado)
+        const drinkKeys = [
+          "Elige Bebida 1 (Medio Litro)",
+          "Elige Bebida 2 (Medio Litro)",
+          "Elige Bebida 2 (Un Litro)",
+          "Elige la Bebida",
+          "Bebida",
+          "Bebida 1",
+          "Bebida 2"
+        ];
+        
+        for (const key of drinkKeys) {
+          const val = parsedNotes[key];
+          if (val) {
+            selectedDrinkNames.push(val);
+          }
+        }
         
         if (selectedDrinkNames.length === 0) {
           if (prodId === 50 || prodId === 51) {
