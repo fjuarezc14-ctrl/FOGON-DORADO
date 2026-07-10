@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, CheckCheck, CheckCircle2, User, Truck } from 'lucide-react';
+import { Clock, CheckCheck, CheckCircle2, User, Truck, XCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../api';
 
 const parseDeliveryInfo = (code) => {
@@ -23,6 +23,7 @@ const parseDeliveryInfo = (code) => {
 export default function CocinaPage() {
   const [pedidos, setPedidos] = useState([]);
   const [horaLocal, setHoraLocal] = useState('');
+  const [cancelaciones, setCancelaciones] = useState([]);
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -33,17 +34,28 @@ export default function CocinaPage() {
     }
   }, []);
 
+  const fetchCancelaciones = useCallback(async () => {
+    try {
+      const data = await api.getCancelacionesCocina();
+      if (Array.isArray(data)) setCancelaciones(data);
+    } catch (err) {
+      console.error('Error cargando cancelaciones:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPedidos();
+    fetchCancelaciones();
     const tick = () => {
       fetchPedidos();
+      fetchCancelaciones();
       setHoraLocal(new Date().toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }));
     };
     const interval = setInterval(tick, 3000);
     return () => clearInterval(interval);
-  }, [fetchPedidos]);
+  }, [fetchPedidos, fetchCancelaciones]);
 
   const marcarListo = async (pedidoId) => {
     try {
@@ -60,6 +72,16 @@ export default function CocinaPage() {
       await fetchPedidos();
     } catch (err) {
       alert('Error al marcar listo el plato: ' + err.message);
+    }
+  };
+
+  const dismissCancelacion = async (id) => {
+    try {
+      await api.dismissCancelacionCocina(id);
+      setCancelaciones(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      // Si falla la red, lo quitamos localmente igual para no bloquear al cocinero
+      setCancelaciones(prev => prev.filter(c => c.id !== id));
     }
   };
 
@@ -80,6 +102,51 @@ export default function CocinaPage() {
           </div>
         </div>
       </header>
+
+      {/* ═══════════════════════════════════════════════════
+          ALERTAS DE CANCELACIÓN PERSISTENTES
+          (permanecen hasta que el cocinero presione "Entendido")
+      ═══════════════════════════════════════════════════ */}
+      {cancelaciones.length > 0 && (
+        <div className="bg-red-950 border-b-4 border-red-600 px-4 py-3 space-y-3 shrink-0 z-20">
+          {cancelaciones.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-start gap-4 bg-red-900/80 border border-red-500 rounded-2xl p-4 shadow-2xl"
+              style={{ animation: 'pulse 1.5s ease-in-out 3' }}
+            >
+              <div className="shrink-0 mt-0.5">
+                <AlertTriangle className="w-8 h-8 text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-red-200 font-black text-sm uppercase tracking-wider flex items-center gap-2 mb-1">
+                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  PEDIDO CANCELADO — {c.mesaInfo}
+                </p>
+                <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mb-2">
+                  Cancelado por: {c.canceladoPor} · {new Date(c.canceladoEn).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {c.items.map((item, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 bg-red-800 border border-red-600 text-red-100 font-black text-xs px-3 py-1.5 rounded-xl">
+                      <span className="text-red-300">{item.cantidad}×</span>
+                      {item.nombre}
+                      <span className="text-red-400 font-mono">S/ {parseFloat(item.precio || 0).toFixed(2)}</span>
+                      {item.notas && <span className="text-red-300 italic">· {item.notas}</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => dismissCancelacion(c.id)}
+                className="shrink-0 px-4 py-2.5 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg border border-red-400"
+              >
+                ✓ Entendido
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <section className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -160,20 +227,24 @@ export default function CocinaPage() {
                     </span>
                   </div>
 
-
-
                   {/* Items (solo cocina, sin bebidas) */}
                   <div className="p-4 flex-1 bg-white min-h-[150px]">
                     {p.items.map((item, i) => (
                       <div key={i} className="flex flex-col py-2 border-b border-dashed border-slate-200 last:border-0">
                         <div className="flex items-start justify-between">
-                          <div className="flex items-start">
+                          <div className="flex items-start flex-1 min-w-0">
                             <span className="font-black text-lg mr-3 text-slate-900 w-6 text-center shrink-0">
                               {item.cant}
                             </span>
-                            <span className="flex-1 text-slate-800 font-bold text-sm leading-snug pt-0.5 uppercase">
-                              {item.nombre}
-                            </span>
+                            <div className="flex-1 min-w-0">
+                              <span className="block text-slate-800 font-bold text-sm leading-snug pt-0.5 uppercase">
+                                {item.nombre}
+                              </span>
+                              {/* Precio del ítem — ayuda a identificar la porción */}
+                              <span className="inline-block mt-0.5 bg-slate-100 border border-slate-200 text-slate-500 font-black text-[10px] px-2 py-0.5 rounded-lg font-mono">
+                                S/ {parseFloat(item.precio || 0).toFixed(2)}
+                              </span>
+                            </div>
                           </div>
                           <button
                             onClick={() => marcarItemListo(item.id)}

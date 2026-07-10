@@ -7,6 +7,17 @@ const app = express();
 const prisma = new PrismaClient();
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000; // 5 minutos
 
+// ============================================================
+// STORE EN MEMORIA: ALERTAS DE CANCELACIÓN PARA COCINA
+// Se limpia automáticamente cada 2 horas (ítems > 2h se descartan).
+// ============================================================
+let cancelacionesCocina = []; // [{ id, pedidoId, items, mesaInfo, canceladoEn, codigoPedidosYa }]
+
+setInterval(() => {
+  const dosHorasAtras = Date.now() - 2 * 60 * 60 * 1000;
+  cancelacionesCocina = cancelacionesCocina.filter(c => new Date(c.canceladoEn).getTime() > dosHorasAtras);
+}, 30 * 60 * 1000); // limpiar cada 30 min
+
 // Categorías que van a la BARRA (el resto va a COCINA)
 const BARRA_CATEGORIAS = [
   'Bebidas y Refrescos',
@@ -739,10 +750,44 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
       }
     }
 
+    // 🔔 Registrar alerta de cancelación para cocina (store en memoria)
+    // Solo si el pedido tenía items visibles en cocina (no de barra)
+    const itemsParaCocina = pedido.items.filter(i =>
+      !BARRA_CATEGORIAS.includes(i.producto?.categoria || '')
+    );
+    if (itemsParaCocina.length > 0) {
+      cancelacionesCocina.push({
+        id: `cancel-${Date.now()}-${pedido.id}`,
+        pedidoId: pedido.id,
+        items: itemsParaCocina.map(i => ({
+          nombre: i.nombre,
+          cantidad: i.cantidad,
+          precio: i.precio,
+          notas: i.notas || null,
+        })),
+        mesaInfo: pedido.mesaId ? `Mesa ${pedido.mesa?.numero || pedido.mesaId}` : (pedido.codigoPedidosYa ? `🛵 ${pedido.codigoPedidosYa}` : 'Para Llevar/Delivery'),
+        codigoPedidosYa: pedido.codigoPedidosYa || null,
+        canceladoPor: canceladoPor || 'Administrador',
+        canceladoEn: new Date().toISOString(),
+      });
+    }
+
     res.json({ ok: true, mesaLiberada, nuevoEstadoMesa });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/cocina/cancelaciones → Devuelve las alertas de cancelación pendientes de confirmación
+app.get('/api/cocina/cancelaciones', (req, res) => {
+  res.json(cancelacionesCocina);
+});
+
+// DELETE /api/cocina/cancelaciones/:id → Cocina confirma que vio la alerta ("Entendido")
+app.delete('/api/cocina/cancelaciones/:id', (req, res) => {
+  const { id } = req.params;
+  cancelacionesCocina = cancelacionesCocina.filter(c => c.id !== id);
+  res.json({ ok: true });
 });
 
 app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {

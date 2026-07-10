@@ -187,6 +187,9 @@ export default function CajaPage({ currentUser }) {
   const [cambiando, setCambiando] = useState(false);
   const [cambioError, setCambioError] = useState('');
 
+  // PIN para autorizar Consumo en modal de Delivery/Para Llevar
+  const [pinAdminDelivery, setPinAdminDelivery] = useState('');
+
   // Modal PedidosYa y Para Llevar
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [codigoPY, setCodigoPY] = useState('');
@@ -210,6 +213,13 @@ export default function CajaPage({ currentUser }) {
   const [enviandoDelivery, setEnviandoDelivery] = useState(false);
   const [tipoDelivery, setTipoDelivery] = useState('PedidosYa'); // 'PedidosYa' | 'ParaLlevar'
   const [toasts, setToasts] = useState([]);
+  const addToast = (mensaje, tipo = 'info') => {
+    const toastId = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id: toastId, mensaje, tipo }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== toastId));
+    }, 5000);
+  };
   const prevPedidosLlevarRef = useRef([]);
   const historialScrollRef = useRef(null);
 
@@ -684,6 +694,7 @@ export default function CajaPage({ currentUser }) {
     setDeliveryClienteNombre('');
     setDeliveryNumDocumento('');
     setTipoDelivery('PedidosYa');
+    setPinAdminDelivery('');
     setDeliveryModal(true);
   };
 
@@ -852,6 +863,12 @@ export default function CajaPage({ currentUser }) {
     setItemsDelivery(nuevo);
   };
 
+  const alterarNotasDelivery = (idx, value) => {
+    const nuevo = [...itemsDelivery];
+    nuevo[idx] = { ...nuevo[idx], notas: value };
+    setItemsDelivery(nuevo);
+  };
+
   const abrirTicketImpresionDirecto = (total, response, tipoComprobante, numDocumento, clienteNombre, clienteDireccion, items, mesaNum = 'Delivery', deliveryInfo = null) => {
     if (!response) response = {};
     const fecha = new Date().toLocaleDateString('es-PE');
@@ -958,6 +975,20 @@ export default function CajaPage({ currentUser }) {
           alert('Para emitir Factura, el RUC debe tener 11 dígitos.');
           return;
         }
+      }
+    }
+
+    // Validar PIN de administrador si el método de pago es Consumo
+    if (deliveryMetodoPago === 'Consumo') {
+      if (!pinAdminDelivery.trim()) {
+        alert('Debes ingresar el PIN del administrador para registrar un Consumo de Personal.');
+        return;
+      }
+      const authResult = await api.validateAuth(pinAdminDelivery.trim());
+      if (!authResult || !authResult.ok) {
+        alert('❌ PIN incorrecto. Solo el administrador puede autorizar un Consumo de Personal.');
+        setPinAdminDelivery('');
+        return;
       }
     }
 
@@ -1231,7 +1262,35 @@ export default function CajaPage({ currentUser }) {
                               className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md hover:bg-blue-700 active:scale-95"
                             >Confirmar Entrega</button>
                           ) : (
-                            <span className="text-xs text-slate-400 font-medium">Esperando...</span>
+                            <div className="flex flex-col items-center gap-1.5">
+                              <span className="text-[10px] text-slate-400 font-medium">En cocina...</span>
+                              <button
+                                onClick={() => {
+                                  const pin = prompt('🔐 PIN del Administrador para cancelar este pedido:');
+                                  if (!pin) return;
+                                  api.validateAuth(pin.trim()).then(auth => {
+                                    if (!auth?.ok) { alert('❌ PIN incorrecto. Cancelación denegada.'); return; }
+                                    const confirmMsg = `¿Cancelar el pedido de "${p.codigoPedidosYa || 'este cliente'}"?\n\nEsta acción notificará a cocina.`;
+                                    if (!window.confirm(confirmMsg)) return;
+                                    api.cancelarPedido(p.pedidoId, {
+                                      canceladoPor: cajeroNombre,
+                                      motivo: 'Cancelado por cajero (error en pedido)',
+                                      force: true,
+                                    }).then(res => {
+                                      if (res.ok) {
+                                        addToast('Pedido cancelado. Cocina ha sido notificada.', 'success');
+                                        fetchCajaData();
+                                      } else {
+                                        alert('Error: ' + (res.error || 'No se pudo cancelar.'));
+                                      }
+                                    });
+                                  });
+                                }}
+                                className="px-3 py-1.5 bg-red-100 hover:bg-red-600 text-red-700 hover:text-white border border-red-300 hover:border-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                              >
+                                🗑 Cancelar
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -1977,26 +2036,31 @@ export default function CajaPage({ currentUser }) {
                         const prodOriginal = productosMenu.find(p => String(p.id) === String(item.id));
                         const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
                         return (
-                          <div key={idx} className="flex items-center justify-between py-2 border-b border-dashed border-slate-100 last:border-0">
-                            <div className="flex-1 pr-2">
-                              <p className="font-bold text-slate-800 text-xs uppercase leading-tight">{item.nombre}</p>
-                              {item.notas && (
-                                <div className="mt-1">
-                                  <p className="inline-block bg-amber-500 border border-amber-600 text-slate-950 font-black text-[11px] px-2 py-0.5 rounded-lg shadow-sm uppercase tracking-wide break-all">📋 NOTA: {item.notas}</p>
+                          <div key={idx} className="py-2 border-b border-dashed border-slate-100 last:border-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 pr-2">
+                                <p className="font-bold text-slate-800 text-xs uppercase leading-tight">{item.nombre}</p>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                  {tieneDescuento && (
+                                    <span className="line-through text-slate-400 font-semibold text-xs">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                                  )}
+                                  <span className="font-mono text-blue-600 font-bold text-sm">S/ {(item.cant * item.precio).toFixed(2)}</span>
                                 </div>
-                              )}
-                              <div className="flex items-baseline gap-1.5 mt-0.5">
-                                {tieneDescuento && (
-                                  <span className="line-through text-slate-400 font-semibold text-xs">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
-                                )}
-                                <span className="font-mono text-blue-600 font-bold text-sm">S/ {(item.cant * item.precio).toFixed(2)}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200 shrink-0">
+                                <button type="button" onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
+                                <span className="font-bold text-slate-900 w-5 text-center text-sm">{item.cant}</span>
+                                <button type="button" onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200 shrink-0">
-                              <button type="button" onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
-                              <span className="font-bold text-slate-900 w-5 text-center text-sm">{item.cant}</span>
-                              <button type="button" onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
-                            </div>
+                            {/* Campo de especificaciones por ítem */}
+                            <input
+                              type="text"
+                              placeholder="Especificaciones (ej: sin cebolla)..."
+                              value={item.notas || ''}
+                              onChange={(e) => alterarNotasDelivery(idx, e.target.value)}
+                              className="w-full mt-1.5 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[10px] font-bold text-slate-700 focus:outline-none focus:border-amber-400 focus:bg-amber-50/30"
+                            />
                           </div>
                         );
                       })
@@ -2014,32 +2078,55 @@ export default function CajaPage({ currentUser }) {
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Comprobante:</label>
                         <select 
-                          value={deliveryTipoComprobante} 
+                          value={deliveryMetodoPago === 'Consumo' ? 'Ticket' : deliveryTipoComprobante} 
                           onChange={(e) => {
                             setDeliveryTipoComprobante(e.target.value);
                             setDeliveryNumDocumento('');
                             setDeliveryClienteNombre('');
                           }} 
-                          className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none"
+                          disabled={deliveryMetodoPago === 'Consumo'}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <option value="Ticket">Ticket Interno</option>
-                          <option value="Boleta">Boleta (DNI)</option>
-                          <option value="Factura">Factura (RUC)</option>
+                          <option value="Ticket">{deliveryMetodoPago === 'Consumo' ? 'Ticket Interno (forzado)' : 'Ticket Interno'}</option>
+                          {deliveryMetodoPago !== 'Consumo' && <option value="Boleta">Boleta (DNI)</option>}
+                          {deliveryMetodoPago !== 'Consumo' && <option value="Factura">Factura (RUC)</option>}
                         </select>
                       </div>
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Método Pago:</label>
                         <select 
                           value={deliveryMetodoPago} 
-                          onChange={(e) => setDeliveryMetodoPago(e.target.value)} 
+                          onChange={(e) => {
+                            setDeliveryMetodoPago(e.target.value);
+                            if (e.target.value === 'Consumo') {
+                              setDeliveryTipoComprobante('Ticket');
+                              setDeliveryNumDocumento('');
+                            }
+                          }} 
                           className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none"
                         >
                           <option value="Efectivo">Efectivo</option>
                           <option value="Tarjeta">Tarjeta (Visa/MC)</option>
                           <option value="Yape">Yape / Plin</option>
+                          <option value="Consumo">👤 Consumo (Personal)</option>
                         </select>
                       </div>
                     </div>
+                    {/* PIN de administrador cuando se selecciona Consumo */}
+                    {deliveryMetodoPago === 'Consumo' && (
+                      <div className="bg-violet-50 border border-violet-200 rounded-2xl p-3 space-y-2">
+                        <p className="text-[10px] font-black text-violet-700 uppercase tracking-wider flex items-center gap-1.5">🔐 Autorización de Administrador requerida</p>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder="PIN del Administrador..."
+                          value={pinAdminDelivery || ''}
+                          onChange={(e) => setPinAdminDelivery(e.target.value)}
+                          className="w-full bg-white border border-violet-300 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-800 focus:outline-none focus:border-violet-500 text-center tracking-widest"
+                        />
+                      </div>
+                    )}
 
                     {/* DNI o RUC si es Boleta o Factura */}
                     {(deliveryTipoComprobante === 'Boleta' || deliveryTipoComprobante === 'Factura') && (
@@ -2898,24 +2985,34 @@ export default function CajaPage({ currentUser }) {
 
       {/* FLOATING TOASTS NOTIFICATIONS SYSTEM FOR CAJA */}
       <div className="fixed bottom-6 right-6 z-[250] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
-        {toasts.map(t => (
-          <div key={t.id} className="pointer-events-auto bg-slate-900 border border-emerald-500/20 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent"></div>
-            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-lg animate-bounce shrink-0 shadow-lg shadow-emerald-500/20">
-              🛎️
+        {toasts.map(t => {
+          const isError = t.tipo === 'error';
+          const isSuccess = t.tipo === 'success';
+          const borderClass = isError ? 'border-red-500/20' : (isSuccess ? 'border-emerald-500/20' : 'border-blue-500/20');
+          const gradientClass = isError ? 'from-red-500/10' : (isSuccess ? 'from-emerald-500/10' : 'from-blue-500/10');
+          const bgClass = isError ? 'bg-red-500 shadow-red-500/20' : (isSuccess ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-blue-500 shadow-blue-500/20');
+          const icon = isError ? '🗑️' : (isSuccess ? '✅' : '🛎️');
+          const textTitle = isError ? 'Pedido Cancelado' : (isSuccess ? 'Operación Exitosa' : '¡Pedido Listo!');
+          const titleColor = isError ? 'text-red-400' : (isSuccess ? 'text-emerald-400' : 'text-blue-400');
+          return (
+            <div key={t.id} className={`pointer-events-auto bg-slate-900 border ${borderClass} text-white rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up relative overflow-hidden`}>
+              <div className={`absolute inset-0 bg-gradient-to-r ${gradientClass} to-transparent`}></div>
+              <div className={`w-10 h-10 ${bgClass} rounded-xl flex items-center justify-center font-bold text-lg animate-bounce shrink-0 shadow-lg`}>
+                {icon}
+              </div>
+              <div className="flex-1 pr-2 relative z-10">
+                <h4 className={`font-black text-xs ${titleColor} uppercase tracking-widest leading-none mb-1`}>{textTitle}</h4>
+                <p className="font-bold text-sm text-slate-100">{t.mensaje}</p>
+              </div>
+              <button 
+                onClick={() => setToasts(prev => prev.filter(item => item.id !== t.id))}
+                className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-colors relative z-10 shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <div className="flex-1 pr-2 relative z-10">
-              <h4 className="font-black text-xs text-emerald-400 uppercase tracking-widest leading-none mb-1">¡Pedido Listo!</h4>
-              <p className="font-bold text-sm text-slate-100">{t.mensaje}</p>
-            </div>
-            <button 
-              onClick={() => setToasts(prev => prev.filter(item => item.id !== t.id))}
-              className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-colors relative z-10 shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
