@@ -34,14 +34,21 @@ const BARRA_CATEGORIAS = [
 const MIX_PRODUCTS_DECOMPOSITION = {
   // Piqueo Personal (1 persona) -> ID 48
   48: {
-    grillDesc: "4 unid. pancita + 4 mollejas + 4 ubres",
+    billingItemName: "Piqueo Personal (1 persona)",
+    components: [
+      { nombre: "Piqueo Personal - Pancita, Mollejas, Ubres (4 u c/u)" }
+    ],
     reportingItems: [
       { productoId: 213, nombre: "Vino Tabernero (Copa)", cantidadMultiplier: 1, toBar: true }
     ]
   },
   // Piqueo 2 Personas -> ID 49
   49: {
-    grillDesc: "4 pancetas + 4 mollejas + 4 ubres + 4 trompas + 2 anticuchos + 2 brochetas + 1/4 pollo a la brasa",
+    billingItemName: "Piqueo 2 Personas",
+    components: [
+      { nombre: "Piqueo 2P - Panceta, Mollejas, Ubre, Trompas (4 u c/u)" },
+      { nombre: "Piqueo 2P - Anticuchos y Brochetas (2 u c/u)" }
+    ],
     reportingItems: [
       { productoId: 12, nombre: "1/4 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
       { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 1, toBar: false, reportOnly: true }
@@ -50,7 +57,11 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   },
   // Piqueo Familiar -> ID 50
   50: {
-    grillDesc: "8 pancetas + 8 mollejas + 8 ubres + 8 trompas + 2 chorizo + 2 anticucho + 2 brochetas",
+    billingItemName: "Piqueo Familiar",
+    components: [
+      { nombre: "Piqueo Fam - Panceta, Mollejas, Ubre, Trompas (8 u c/u)" },
+      { nombre: "Piqueo Fam - Chorizos, Anticuchos, Brochetas (2 u c/u)" }
+    ],
     reportingItems: [
       { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 1, toBar: false, reportOnly: true }
     ],
@@ -58,7 +69,11 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   },
   // Piqueo Fogón Dorado -> ID 51
   51: {
-    grillDesc: "12 pancetas + 12 mollejas + 12 ubres + 12 trompas + 4 chorizos + 4 anticuchos + 4 brochetas + 4 dados de lengua + 1/2 pollo a la brasa",
+    billingItemName: "Piqueo Fogón Dorado",
+    components: [
+      { nombre: "Piqueo Fogón - Panceta, Molleja, Ubre, Trompa (12 u c/u)" },
+      { nombre: "Piqueo Fogón - Chorizo, Anticucho, Brocheta, Lengua (4 u c/u)" }
+    ],
     reportingItems: [
       { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
       { productoId: 35, nombre: "Anticuchos (3 palos)", cantidadMultiplier: 1.33, toBar: false, reportOnly: true }
@@ -67,7 +82,11 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   },
   // Parrillada Mixta Personal -> ID 52
   52: {
-    grillDesc: "150 g de res + 150 g de pollo + 1/8 pollo a la brasa + 1 chorizo + 1 palito de anticucho",
+    billingItemName: "Parrillada Mixta Personal",
+    components: [
+      { nombre: "Parrillada Personal - Res y Pollo (150g c/u)" },
+      { nombre: "Parrillada Personal - Chorizo (1 u)" }
+    ],
     reportingItems: [
       { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
       { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 0.5, toBar: false, reportOnly: true },
@@ -76,7 +95,12 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   },
   // Parrillada Mixta 2 Personas -> ID 53
   53: {
-    grillDesc: "150 g de res + 150 g de pollo + 150 g de cerdo + 4 mollejas + 4 dados de ubre + 1 chorizo + 1/8 pollo a la brasa",
+    billingItemName: "Parrillada Mixta 2 Personas",
+    components: [
+      { nombre: "Parrillada 2P - Res, Pollo y Cerdo (150g c/u)" },
+      { nombre: "Parrillada 2P - Mollejas y Ubre (4 u c/u)" },
+      { nombre: "Parrillada 2P - Chorizo (1 u)" }
+    ],
     reportingItems: [
       { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true }
     ],
@@ -84,7 +108,11 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   },
   // Parrillada Mixta 3 Personas -> ID 54
   54: {
-    grillDesc: "150 g de res + 150 g de pollo + 150 g de cerdo + 3 chorizos + 3 palitos de anticucho + 3/8 pollo a la brasa",
+    billingItemName: "Parrillada Mixta 3 Personas",
+    components: [
+      { nombre: "Parrillada 3P - Res, Pollo y Cerdo (150g c/u)" },
+      { nombre: "Parrillada 3P - Chorizos (3 u)" }
+    ],
     reportingItems: [
       { productoId: 12, nombre: "1/4 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
       { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
@@ -94,7 +122,11 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   },
   // Parrillada Fina Familiar (5 personas) -> ID 55
   55: {
-    grillDesc: "300 g de pollo + 300 g de res + 300 g de cerdo + 4 palitos de anticuchos + 4 chorizos + 1/2 pollo a la brasa",
+    billingItemName: "Parrillada Fina Familiar (5 personas)",
+    components: [
+      { nombre: "Parrillada Fina - Res, Pollo y Cerdo (300g c/u)" },
+      { nombre: "Parrillada Fina - Chorizos (4 u)" }
+    ],
     reportingItems: [
       { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
       { productoId: 35, nombre: "Anticuchos (3 palos)", cantidadMultiplier: 1.33, toBar: false, reportOnly: true }
@@ -103,7 +135,14 @@ const MIX_PRODUCTS_DECOMPOSITION = {
   },
   // Parrillada Fogón Dorado (8-10 personas) -> ID 56
   56: {
-    grillDesc: "300 g de lomo fino + 300 g de filete de pollo + 300 g de carne de cerdo + 5 palitos de anticuchos + 5 brochetas de pollo + 8 dados de ubre + 5 chorizos + 8 dados de pancita + 8 mollejas + 8 dados de trompa de res + 1/2 de pollo a la brasa",
+    billingItemName: "Parrillada Fogón Dorado (8-10 personas)",
+    components: [
+      { nombre: "Parrillada Fogón - Lomo Fino y Cerdo (300g c/u)" },
+      { nombre: "Parrillada Fogón - Filete Pollo (300g)" },
+      { nombre: "Parrillada Fogón - Ubre, Pancita y Mollejas (8 u c/u)" },
+      { nombre: "Parrillada Fogón - Chorizos y Brochetas (5 u c/u)" },
+      { nombre: "Parrillada Fogón - Trompa de Res (8 u)" }
+    ],
     reportingItems: [
       { productoId: 11, nombre: "1/2 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
       { productoId: 35, nombre: "Anticuchos (3 palos)", cantidadMultiplier: 1.67, toBar: false, reportOnly: true }
@@ -139,28 +178,34 @@ async function expandPedidoItemsForDb(itemsList) {
       const parsedNotes = parseSelectionsFromNotes(i.notas);
       const acompanamiento = parsedNotes["Elige el Acompañamiento"] || parsedNotes["Elige la Guarnición"] || parsedNotes["guarnicion"] || "Sin Acompañamiento";
       
-      const detailedGrillNotesArray = [
-        `🥩 DETALLE PARRILLA:`,
-        decomp.grillDesc,
-        `🥔 ACOMPAÑAMIENTO: ${acompanamiento}`
-      ];
-      
-      if (i.notas && i.notas.includes("(Nota:")) {
-        const customNoteMatch = i.notas.match(/\(Nota:\s*([^\)]+)\)/);
-        if (customNoteMatch && customNoteMatch[1]) {
-          detailedGrillNotesArray.push(`📝 NOTAS CAJA: ${customNoteMatch[1]}`);
-        }
-      }
-      
+      // 1. MAIN BILLING ITEM: marked as ready (historial: true, entregado: true)
+      // so it does not appear on Cocina/Barra screens.
       expandedList.push({
         productoId: prodId,
         nombre: String(i.nombre),
         precio: parseFloat(i.precio),
         cantidad: parseInt(i.cant || i.cantidad),
-        historial: false,
-        notas: detailedGrillNotesArray.join(' · '),
+        historial: true,
+        entregado: true,
+        notas: i.notas ? String(i.notas) : null,
       });
       
+      // 2. DETAILED GRILL COMPONENTS (historial: false, entregado: false -> Go to Cocina!)
+      if (decomp.components && decomp.components.length > 0) {
+        for (const comp of decomp.components) {
+          expandedList.push({
+            productoId: prodId,
+            nombre: comp.nombre,
+            precio: 0,
+            cantidad: parseInt(i.cant || i.cantidad),
+            historial: false,
+            entregado: false,
+            notas: `🥔 ACOMPAÑAMIENTO: ${acompanamiento}`,
+          });
+        }
+      }
+      
+      // 3. DRINK SELECTIONS (historial: false, entregado: false -> Go to Barra!)
       if (decomp.hasDrinkSelections) {
         const drink1 = parsedNotes["Elige Bebida 1 (Medio Litro)"];
         const drink2 = parsedNotes["Elige Bebida 2 (Un Litro)"];
@@ -187,12 +232,14 @@ async function expandPedidoItemsForDb(itemsList) {
             nombre: drinkProd ? drinkProd.nombre : drinkName,
             precio: 0,
             cantidad: parseInt(i.cant || i.cantidad),
-            historial: false, // Goes to Barra!
+            historial: false, // Go to Barra!
+            entregado: false,
             notas: `(Bebida de Parrillada/Piqueo - S/ 0.00)`,
           });
         }
       }
       
+      // 4. FIXED REPORTING / BAR ITEMS (historial: true, entregado: true for reportOnly)
       if (decomp.reportingItems && decomp.reportingItems.length > 0) {
         for (const rep of decomp.reportingItems) {
           expandedList.push({
@@ -201,6 +248,7 @@ async function expandPedidoItemsForDb(itemsList) {
             precio: 0,
             cantidad: Math.ceil(rep.cantidadMultiplier * parseInt(i.cant || i.cantidad)),
             historial: rep.toBar ? false : true,
+            entregado: rep.toBar ? false : true, // Mark as delivered if only for reporting
             notas: rep.toBar ? `(Bebida de Parrillada/Piqueo - S/ 0.00)` : `(Rotación/Consumo de Parrillada/Piqueo - S/ 0.00)`,
           });
         }
@@ -212,6 +260,7 @@ async function expandPedidoItemsForDb(itemsList) {
         precio: parseFloat(i.precio),
         cantidad: parseInt(i.cant || i.cantidad),
         historial: i.historial || false,
+        entregado: i.entregado || false,
         notas: i.notas ? String(i.notas) : null,
       });
     }
@@ -570,6 +619,7 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
             precio: i.precio,
             cantidad: i.cantidad,
             historial: i.historial,
+            entregado: i.entregado || false,
             notas: i.notas,
           })),
         },
@@ -1208,6 +1258,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
             precio: i.precio,
             cantidad: i.cantidad,
             historial: i.historial,
+            entregado: i.entregado || false,
             notas: i.notas,
           })),
         },
@@ -1921,13 +1972,17 @@ app.get('/api/ventas', async (req, res) => {
       estadoNubefact: v.estadoNubefact,
       serie: v.serie,
       numero: v.numero,
-      itemsResumen: v.pedido?.items?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
+      itemsResumen: v.pedido?.items
+        ?.filter(i => i.precio > 0 || BARRA_CATEGORIAS.includes(i.producto?.categoria))
+        ?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
 
-      items: v.pedido?.items?.map(i => ({
-        nombre: i.nombre,
-        cant: i.cantidad,
-        precio: i.precio
-      })) || [],
+      items: v.pedido?.items
+        ?.filter(i => i.precio > 0 || BARRA_CATEGORIAS.includes(i.producto?.categoria))
+        ?.map(i => ({
+          nombre: i.nombre,
+          cant: i.cantidad,
+          precio: i.precio
+        })) || [],
     }));
 
     res.json(formateadas);
@@ -2429,7 +2484,13 @@ app.listen(PORT, () => {
 // HELPERS E INTEGRACIÓN APISUNAT.PE (SUNAT PSE)
 // ============================================================
 
-async function enviarAApisunat(venta, items) {
+async function enviarAApisunat(venta, itemsRaw) {
+  // Filtrar los items para excluir componentes de combos de precio 0 que no son barra
+  const items = itemsRaw.filter(i => {
+    const isBar = BARRA_CATEGORIAS.includes(i.categoria) || (i.producto?.categoria && BARRA_CATEGORIAS.includes(i.producto?.categoria));
+    return i.precio > 0 || isBar;
+  });
+
   // Simular caída de red si está activa la variable de entorno
   if (process.env.APISUNAT_SIMULATE_OUTAGE === 'true') {
     throw new Error('Outage Simulator Active: apisunat.pe server is simulated down.');

@@ -1852,7 +1852,9 @@ export default function CajaPage({ currentUser }) {
                     <span className="text-slate-500">Mesa {mesaSeleccionada.num}</span>
                   </h3>
                   <ul className="space-y-1.5">
-                    {mesaSeleccionada.pedidoData?.items?.map((item, idx) => {
+                    {mesaSeleccionada.pedidoData?.items
+                      ?.filter(item => item.precio > 0 || BARRA_CATEGORIAS.includes(item.categoria))
+                      ?.map((item, idx) => {
                       const prodOriginal = productosMenu.find(p => String(p.id) === String(item.id));
                       const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
                       return (
@@ -2945,7 +2947,9 @@ export default function CajaPage({ currentUser }) {
                 <span className="w-20 text-right shrink-0">TOTAL</span>
               </div>
               
-              {activeComprobante.items.map((item, idx) => {
+              {activeComprobante.items
+                .filter(item => item.precio > 0 || BARRA_CATEGORIAS.includes(item.categoria))
+                .map((item, idx) => {
                 const subTotalItem = item.cant * item.precio;
                 return (
                   <div key={idx} className="flex flex-col mb-1.5">
