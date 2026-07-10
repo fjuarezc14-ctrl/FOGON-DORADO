@@ -55,6 +55,13 @@ const SINONIMOS = {
   entero: ['entero', 'completo', 'pollo entero', '1', 'uno']
 };
 
+const BARRA_CATEGORIAS = [
+  'Bebidas y Refrescos',
+  'Cervezas',
+  'Bar y Cocteles',
+  'Postres',
+];
+
 const normalizePhonetic = (text) => {
   if (!text) return '';
   return text
@@ -1020,7 +1027,7 @@ export default function CajaPage({ currentUser }) {
       clienteNombre: clienteNombre || 'Consumidor Final',
       clienteDoc: numDocumento || 'S/D',
       clienteDireccion: clienteDireccion || '',
-      items: items.map(i => ({ cant: i.cant, nombre: i.nombre, precio: i.precio, notas: i.notas })),
+      items: items.map(i => ({ cant: i.cant, nombre: i.nombre, precio: i.precio, notas: i.notas, categoria: i.categoria || '' })),
       subtotal,
       igv,
       total,
@@ -2659,10 +2666,9 @@ export default function CajaPage({ currentUser }) {
                 </button>
                 <button
                   onClick={() => {
-                    // Validar si quedan mesas pendientes de cobro antes de cerrar turno
                     const pendientes = mesas.filter(m => m.estado !== 'Libre' && m.pedidoData);
                     if (pendientes.length > 0) {
-                      const nombresMesas = pendientes.map(m => `Mesa ${m.numero}`).join(', ');
+                      const nombresMesas = pendientes.map(m => `Mesa ${m.num}`).join(', ');
                       alert(`⚠️ No se puede realizar el cierre de turno.\n\nAún quedan mesas activas o pendientes de cobración:\n👉 ${nombresMesas}\n\nPor favor, cobre o libere estas mesas antes de cerrar caja.`);
                       return;
                     }

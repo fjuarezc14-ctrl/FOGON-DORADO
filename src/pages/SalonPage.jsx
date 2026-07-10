@@ -386,7 +386,7 @@ export default function SalonPage({ currentUser }) {
     
     // 4. Parrilladas y Piqueos Mix con Opciones de Bebidas
     const prodNameLower = prod.nombre.toLowerCase();
-    const isParrilla2P = prodNameLower.includes("parrillada mixta 2 personas") || prodNameLower.includes("piqueo 2 personas");
+    const isParrilla2P = prodNameLower.includes("2 personas") || prodNameLower.includes("2p") || prodNameLower.includes("2 p") || prodNameLower.includes("2 pers");
     const isParrillaFamily = 
       prodNameLower.includes("parrillada mixta 3 personas") || 
       prodNameLower.includes("parrillada fina familiar") || 
@@ -1380,7 +1380,7 @@ export default function SalonPage({ currentUser }) {
             agregarAlTicketDirecto(selectedProduct, finalNotes);
           } else {
             const notesArray = [];
-            const isParrilla2P = selectedProduct.nombre.toLowerCase().includes("parrillada mixta 2 personas") || selectedProduct.nombre.toLowerCase().includes("piqueo 2 personas");
+            const isParrilla2P = selectedProduct.nombre.toLowerCase().includes("2 personas") || selectedProduct.nombre.toLowerCase().includes("2p") || selectedProduct.nombre.toLowerCase().includes("2 p") || selectedProduct.nombre.toLowerCase().includes("2 pers");
             let additionalDrinkProduct = null;
 
             if (isParrilla2P) {
