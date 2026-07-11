@@ -209,6 +209,9 @@ export default function CajaPage({ currentUser }) {
   const [cambioTipoError, setCambioTipoError] = useState('');
   const [cambioTipoCambiando, setCambioTipoCambiando] = useState(false);
 
+  // Mostrar todas las ventas del día ignorando el Cierre de Turno
+  const [mostrarTodoElDia, setMostrarTodoElDia] = useState(false);
+
   // PIN para autorizar Consumo en modal de Delivery/Para Llevar
   const [pinAdminDelivery, setPinAdminDelivery] = useState('');
 
@@ -1566,7 +1569,7 @@ export default function CajaPage({ currentUser }) {
 
           {/* HISTORIAL DE VENTAS DEL DÍA */}
           {(() => {
-            let ventasFiltradas = ultimoCierre 
+            let ventasFiltradas = (ultimoCierre && !mostrarTodoElDia)
               ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
               : ventas;
 
@@ -1589,7 +1592,20 @@ export default function CajaPage({ currentUser }) {
                     <Receipt className="w-4 h-4 text-emerald-500" />
                     <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Historial de Ventas del Día</h2>
                   </div>
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+                    {ultimoCierre && (
+                      <button
+                        type="button"
+                        onClick={() => setMostrarTodoElDia(prev => !prev)}
+                        className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl uppercase tracking-wider transition-all border shadow-sm ${
+                          mostrarTodoElDia
+                            ? 'bg-amber-500 border-amber-600 text-slate-950 hover:bg-amber-600'
+                            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-350'
+                        }`}
+                      >
+                        {mostrarTodoElDia ? '👁️ Ocultar Cierre' : '👁️ Mostrar Todo el Día'}
+                      </button>
+                    )}
                     <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-sm">
                       <span className="text-[9px] font-black uppercase text-slate-400">Filtrar:</span>
                       <select
@@ -2934,7 +2950,7 @@ export default function CajaPage({ currentUser }) {
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Nuevo Método de Pago</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa'].map(mp => (
+                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo'].map(mp => (
                     <button
                       key={mp}
                       onClick={() => setCambioNuevoMetodo(mp)}
@@ -2943,11 +2959,12 @@ export default function CajaPage({ currentUser }) {
                           ? mp === 'Efectivo' ? 'bg-emerald-500 border-emerald-600 text-white' :
                             mp === 'Tarjeta' ? 'bg-blue-500 border-blue-600 text-white' :
                             mp === 'Yape' ? 'bg-purple-500 border-purple-600 text-white' :
+                            mp === 'Consumo' ? 'bg-slate-700 border-slate-800 text-white' :
                             'bg-indigo-500 border-indigo-600 text-white'
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}
                     >
-                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : '🛵'} {mp}
+                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : mp === 'Consumo' ? '👤' : '🛵'} {mp === 'Consumo' ? 'Consumo' : mp}
                     </button>
                   ))}
                 </div>

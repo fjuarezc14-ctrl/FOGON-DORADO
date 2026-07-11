@@ -1811,7 +1811,7 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
   const { ventaId } = req.params;
   const { metodoPago, pin } = req.body;
 
-  const metodosPermitidos = ['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa'];
+  const metodosPermitidos = ['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo'];
   if (!metodoPago || !metodosPermitidos.includes(metodoPago)) {
     return res.status(400).json({ error: `Método de pago inválido. Opciones: ${metodosPermitidos.join(', ')}` });
   }
