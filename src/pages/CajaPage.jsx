@@ -1753,7 +1753,7 @@ export default function CajaPage({ currentUser }) {
                                   method = 'Efectivo';
                                 }
                               }
-                              const editable = method !== 'Cortesía' && method !== 'Consumo';
+                              const editable = true;
                               return (
                                 <div className="flex items-center gap-1.5">
                                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
@@ -1769,7 +1769,7 @@ export default function CajaPage({ currentUser }) {
                                       title="Corregir método de pago (requiere PIN Administrador)"
                                       onClick={() => {
                                         setVentaACambiar(v);
-                                        setCambioNuevoMetodo(v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' ? 'Efectivo' : v.metodoPago);
+                                        setCambioNuevoMetodo(v.metodoPago);
                                         setCambioPin('');
                                         setCambioError('');
                                         setCambioMetodoModal(true);
@@ -1829,7 +1829,7 @@ export default function CajaPage({ currentUser }) {
 
         {/* RESUMEN LATERAL */}
         {(() => {
-          const ventasFiltradas = ultimoCierre 
+          const ventasFiltradas = (ultimoCierre && !mostrarTodoElDia)
             ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
             : ventas;
           const activeAtendidas = ventasFiltradas.length;
@@ -2949,22 +2949,23 @@ export default function CajaPage({ currentUser }) {
               {/* Nuevo método */}
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Nuevo Método de Pago</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo'].map(mp => (
+                <div className="grid grid-cols-3 gap-2">
+                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo', 'Cortesía'].map(mp => (
                     <button
                       key={mp}
                       onClick={() => setCambioNuevoMetodo(mp)}
-                      className={`py-2.5 px-3 rounded-2xl text-xs font-black uppercase border-2 transition-all ${
+                      className={`py-2.5 px-2 rounded-2xl text-[10px] font-black uppercase border-2 transition-all ${
                         cambioNuevoMetodo === mp
                           ? mp === 'Efectivo' ? 'bg-emerald-500 border-emerald-600 text-white' :
                             mp === 'Tarjeta' ? 'bg-blue-500 border-blue-600 text-white' :
                             mp === 'Yape' ? 'bg-purple-500 border-purple-600 text-white' :
                             mp === 'Consumo' ? 'bg-slate-700 border-slate-800 text-white' :
+                            mp === 'Cortesía' ? 'bg-amber-500 border-amber-600 text-slate-950' :
                             'bg-indigo-500 border-indigo-600 text-white'
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}
                     >
-                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : mp === 'Consumo' ? '👤' : '🛵'} {mp === 'Consumo' ? 'Consumo' : mp}
+                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : mp === 'Consumo' ? '👤' : mp === 'Cortesía' ? '🎁' : '🛵'} {mp === 'Consumo' ? 'Consumo' : mp === 'Cortesía' ? 'Corte.' : mp}
                     </button>
                   ))}
                 </div>

@@ -1811,7 +1811,7 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
   const { ventaId } = req.params;
   const { metodoPago, pin } = req.body;
 
-  const metodosPermitidos = ['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo'];
+  const metodosPermitidos = ['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo', 'Cortesía'];
   if (!metodoPago || !metodosPermitidos.includes(metodoPago)) {
     return res.status(400).json({ error: `Método de pago inválido. Opciones: ${metodosPermitidos.join(', ')}` });
   }
@@ -1820,26 +1820,62 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
   }
 
   try {
-    // Validar PIN — solo Administrador puede cambiar método de pago
+    // Validar PIN
     const admin = await prisma.usuario.findFirst({ where: { pin, activo: true } });
     if (!admin) return res.status(401).json({ error: 'PIN incorrecto.' });
     if (admin.rol !== 'Administrador') {
       return res.status(403).json({ error: 'Solo el Administrador puede cambiar el método de pago.' });
     }
 
-    // Obtener la venta
-    const venta = await prisma.venta.findUnique({ where: { id: parseInt(ventaId) } });
+    // Obtener la venta con su pedido
+    const venta = await prisma.venta.findUnique({
+      where: { id: parseInt(ventaId) },
+      include: { pedido: { include: { items: true } } }
+    });
     if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
+
+    const pedido = venta.pedido;
+    if (!pedido) return res.status(404).json({ error: 'Pedido asociado no encontrado.' });
 
     const metodoPagoAnterior = venta.metodoPago;
 
-    // Actualizar el método de pago
+    // Calcular costo original del pedido
+    const baseItemsTotal = pedido.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+    
+    let shippingFee = 0;
+    if (pedido.tipoEntrega === 'delivery' && pedido.codigoPedidosYa?.startsWith('DELIVERY -')) {
+      const matchEnvio = pedido.codigoPedidosYa.match(/\[E:(\d+\.?\d*)\]/);
+      if (matchEnvio && matchEnvio[1]) {
+        shippingFee = parseFloat(matchEnvio[1]);
+      }
+    }
+    const originalTotal = baseItemsTotal + shippingFee;
+
+    // Si el nuevo método es Cortesía, el total va a 0.00
+    const nuevoTotal = metodoPago === 'Cortesía' ? 0.00 : originalTotal;
+    const subtotal = parseFloat((nuevoTotal / 1.18).toFixed(2));
+    const igv = parseFloat((nuevoTotal - subtotal).toFixed(2));
+
+    // Actualizar Venta
     const ventaActualizada = await prisma.venta.update({
       where: { id: parseInt(ventaId) },
-      data: { metodoPago },
+      data: {
+        metodoPago,
+        total: nuevoTotal,
+        subtotal,
+        igv
+      },
     });
 
-    console.log(`🔄 Método de pago corregido por ${admin.nombre} (${admin.rol}): Venta #${ventaId} → ${metodoPagoAnterior} → ${metodoPago}`);
+    // Actualizar Pedido
+    await prisma.pedido.update({
+      where: { id: pedido.id },
+      data: {
+        total: nuevoTotal
+      }
+    });
+
+    console.log(`🔄 Método de pago corregido por ${admin.nombre} (${admin.rol}): Venta #${ventaId} → ${metodoPagoAnterior} (S/ ${venta.total.toFixed(2)}) → ${metodoPago} (S/ ${nuevoTotal.toFixed(2)})`);
 
     res.json({ ok: true, ventaId: ventaActualizada.id, metodoPago: ventaActualizada.metodoPago, cambiadoPor: admin.nombre });
   } catch (err) {
