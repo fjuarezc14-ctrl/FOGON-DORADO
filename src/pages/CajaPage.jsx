@@ -1597,7 +1597,7 @@ export default function CajaPage({ currentUser }) {
                     <button
                       type="button"
                       onClick={() => setHistorialColapsado(prev => !prev)}
-                      className={`text-[9px] font-black px-2 py-1 rounded-xl uppercase tracking-widest transition-all ${
+                      className={`text-[9px] font-black px-2 py-1 rounded-xl uppercase tracking-widest transition-all whitespace-nowrap ${
                         historialColapsado 
                           ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300' 
                           : 'bg-slate-200 hover:bg-slate-300 text-slate-600 border border-slate-300'
@@ -1611,7 +1611,7 @@ export default function CajaPage({ currentUser }) {
                       <button
                         type="button"
                         onClick={() => setMostrarTodoElDia(prev => !prev)}
-                        className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl uppercase tracking-wider transition-all border shadow-sm ${
+                        className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl uppercase tracking-wider transition-all border shadow-sm whitespace-nowrap ${
                           !mostrarTodoElDia
                             ? 'bg-amber-500 border-amber-600 text-slate-950 hover:bg-amber-600'
                             : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-350'
