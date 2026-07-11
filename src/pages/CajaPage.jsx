@@ -1860,9 +1860,9 @@ export default function CajaPage({ currentUser }) {
                   </h3>
                   <ul className="space-y-1.5">
                     {mesaSeleccionada.pedidoData?.items
-                      ?.filter(item => item.precio > 0 || BARRA_CATEGORIAS.includes(item.categoria))
+                      ?.filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria))))
                       ?.map((item, idx) => {
-                      const prodOriginal = productosMenu.find(p => String(p.id) === String(item.id));
+                      const prodOriginal = productosMenu && productosMenu.find(p => p && String(p.id) === String(item.id));
                       const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
                       return (
                         <li key={idx} className="flex flex-col border-b border-dashed border-slate-100 pb-1.5 last:border-0 last:pb-0">
@@ -3000,7 +3000,7 @@ export default function CajaPage({ currentUser }) {
               </div>
               
               {activeComprobante.items
-                .filter(item => item.precio > 0 || BARRA_CATEGORIAS.includes(item.categoria))
+                .filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria))))
                 .map((item, idx) => {
                 const subTotalItem = item.cant * item.precio;
                 return (
