@@ -789,14 +789,37 @@ export default function CajaPage({ currentUser }) {
     }
     
     // 4. Parrilladas y Piqueos Mix con Opciones de Bebidas
-    const prodNameLower = prod.nombre.toLowerCase();
-    const isParrilla2P = prodNameLower.includes("parrillada mixta 2 personas") || prodNameLower.includes("piqueo 2 personas");
-    const isParrillaFamily = 
-      prodNameLower.includes("parrillada mixta 3 personas") || 
-      prodNameLower.includes("parrillada fina familiar") || 
-      prodNameLower.includes("parrillada fogón dorado") || 
-      prodNameLower.includes("piqueo familiar") || 
-      prodNameLower.includes("piqueo fogón dorado");
+    const prodId = parseInt(prod.id);
+    const isParrillaPersonal = prodId === 48 || prodId === 52;
+    const isParrilla2P = prodId === 49 || prodId === 53;
+    const isParrilla3P = prodId === 50 || prodId === 54;
+    const isParrillaFina = prodId === 51 || prodId === 55 || prodId === 56;
+
+    if (isParrillaPersonal) {
+      return [
+        {
+          name: "Elige el Acompañamiento",
+          key: "guarnicion",
+          options: [
+            { label: "Papas Fritas", value: "Papas Fritas" },
+            { label: "Arroz", value: "Arroz" },
+            { label: "Papa Sancochada", value: "Papa Sancochada" },
+            { label: "Choclo Sancochado", value: "Choclo Sancochado" },
+            { label: "Ensalada", value: "Ensalada" },
+            { label: "Omitir (Sin Acompañamiento)", value: "Sin Acompañamiento" }
+          ]
+        },
+        {
+          name: "Elige la Bebida",
+          key: "bebida_personal",
+          options: [
+            { label: "Copa de Vino Tabernero", value: "Vino Tabernero (Copa)" },
+            { label: "Vaso de Chicha Morada", value: "Chicha Morada - Vaso" },
+            { label: "Gaseosa Chiki", value: "Gaseosa Mediana" }
+          ]
+        }
+      ];
+    }
 
     if (isParrilla2P) {
       return [
@@ -817,21 +840,23 @@ export default function CajaPage({ currentUser }) {
           key: "bebida_1",
           options: [
             { label: "Sangría 1/2 Litro", value: "Sangría Española o Hawaiana 1/2 Lt" },
-            { label: "Gaseosa 1/2 Litro", value: "Gaseosa 1/2 Lt" }
+            { label: "Gaseosa 1/2 Litro", value: "Gaseosa 1/2 Lt" },
+            { label: "Chicha Morada 1/2 Litro", value: "Chicha Morada - 1/2 Lt" }
           ]
         },
         {
-          name: "Elige Bebida 2 (Un Litro)",
+          name: "Elige Bebida 2 (Medio Litro)",
           key: "bebida_2",
           options: [
-            { label: "Gaseosa 1 Litro", value: "Gaseosa 1 Lt" },
-            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" }
+            { label: "Sangría 1/2 Litro", value: "Sangría Española o Hawaiana 1/2 Lt" },
+            { label: "Gaseosa 1/2 Litro", value: "Gaseosa 1/2 Lt" },
+            { label: "Chicha Morada 1/2 Litro", value: "Chicha Morada - 1/2 Lt" }
           ]
         }
       ];
     }
 
-    if (isParrillaFamily) {
+    if (isParrilla3P) {
       return [
         {
           name: "Elige el Acompañamiento",
@@ -850,7 +875,37 @@ export default function CajaPage({ currentUser }) {
           key: "bebida_familia",
           options: [
             { label: "Vino Tabernero 750 ML", value: "Vino Tabernero (Botella)" },
-            { label: "Sangría 1 Litro", value: "Sangría Española o Hawaiana 1 Lt" }
+            { label: "Sangría 1 Litro", value: "Sangría Española o Hawaiana 1 Lt" },
+            { label: "Gaseosa 1 Litro", value: "Gaseosa 1 Lt" },
+            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" }
+          ]
+        }
+      ];
+    }
+
+    if (isParrillaFina) {
+      return [
+        {
+          name: "Elige el Acompañamiento",
+          key: "guarnicion",
+          options: [
+            { label: "Papas Fritas", value: "Papas Fritas" },
+            { label: "Arroz", value: "Arroz" },
+            { label: "Papa Sancochada", value: "Papa Sancochada" },
+            { label: "Choclo Sancochado", value: "Choclo Sancochado" },
+            { label: "Ensalada", value: "Ensalada" },
+            { label: "Omitir (Sin Acompañamiento)", value: "Sin Acompañamiento" }
+          ]
+        },
+        {
+          name: "Elige la Bebida",
+          key: "bebida_familia",
+          options: [
+            { label: "Vino Tabernero 750 ML", value: "Vino Tabernero (Botella)" },
+            { label: "Sangría 1 Litro", value: "Sangría Española o Hawaiana 1 Lt" },
+            { label: "Gaseosa 1.5 Litros", value: "Gaseosa 1 1/2 Lt" },
+            { label: "Chicha Morada 1.5 Litros", value: "Chicha Morada - 1 1/2 Lt" },
+            { label: "Gaseosa 3 Litros", value: "Gaseosa 3 Lt" }
           ]
         }
       ];

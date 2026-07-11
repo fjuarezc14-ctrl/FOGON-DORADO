@@ -38,9 +38,8 @@ const MIX_PRODUCTS_DECOMPOSITION = {
     components: [
       { nombre: "Pancita, Mollejas, Ubres (4 u c/u)" }
     ],
-    reportingItems: [
-      { productoId: 213, nombre: "Vino Tabernero (Copa)", cantidadMultiplier: 1, toBar: true }
-    ]
+    reportingItems: [],
+    hasDrinkSelections: true
   },
   // Piqueo 2 Personas -> ID 49
   49: {
@@ -89,9 +88,9 @@ const MIX_PRODUCTS_DECOMPOSITION = {
     ],
     reportingItems: [
       { productoId: 13, nombre: "1/8 Pollo a la Brasa", cantidadMultiplier: 1, toBar: false, reportOnly: true },
-      { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 0.5, toBar: false, reportOnly: true },
-      { productoId: 213, nombre: "Vino Tabernero (Copa)", cantidadMultiplier: 1, toBar: true }
-    ]
+      { productoId: 38, nombre: "Anticuchos (2 palos)", cantidadMultiplier: 0.5, toBar: false, reportOnly: true }
+    ],
+    hasDrinkSelections: true
   },
   // Parrillada Mixta 2 Personas -> ID 53
   53: {
@@ -239,20 +238,54 @@ async function expandPedidoItemsForDb(itemsList) {
           }
         }
         
-        if (selectedDrinkNames.length === 0) {
-          if (prodId === 50 || prodId === 51) {
-            selectedDrinkNames.push("Vino Tabernero (Botella)");
+        // Agrupar si hay duplicados de bebidas de medio litro
+        let groupedDrinks = [...selectedDrinkNames];
+        if (prodId === 49 || prodId === 53) {
+          // Si hay 2 bebidas del mismo tipo de medio litro, agruparlas en 1 litro
+          if (selectedDrinkNames.length === 2 && selectedDrinkNames[0] === selectedDrinkNames[1]) {
+            const drinkName = selectedDrinkNames[0];
+            const name1Lt = drinkName
+              .replace("1/2 Lt", "1 Lt")
+              .replace("1/2 Litro", "1 Litro")
+              .replace("1/2 lt", "1 lt");
+            groupedDrinks = [name1Lt];
           }
         }
         
-        for (const drinkName of selectedDrinkNames) {
+        if (groupedDrinks.length === 0) {
+          if (prodId === 50 || prodId === 51) {
+            groupedDrinks.push("Vino Tabernero (Botella)");
+          }
+        }
+        
+        for (const drinkName of groupedDrinks) {
+          let lookupName = drinkName;
+          let displayName = drinkName;
+          
+          if (drinkName === "Gaseosa Chiki") {
+            lookupName = "Gaseosa Mediana";
+            displayName = "Gaseosa Chiki";
+          } else if (drinkName === "Vino Tabernero (Copa)") {
+            lookupName = "Vino Tabernero";
+            displayName = "Vino Tabernero (Copa)";
+          } else if (drinkName === "Vaso de Chicha Morada" || drinkName === "Chicha Morada - Vaso") {
+            lookupName = "Chicha Morada - Vaso";
+            displayName = "Chicha Morada - Vaso";
+          } else if (drinkName === "Sangría 1/2 Litro" || drinkName === "Sangria 1/2 Litro") {
+            lookupName = "Sangría Española o Hawaiana 1/2 Lt";
+            displayName = "Sangría Española o Hawaiana 1/2 Lt";
+          } else if (drinkName === "Sangría 1 Litro" || drinkName === "Sangria 1 Litro") {
+            lookupName = "Sangría Española o Hawaiana 1 Lt";
+            displayName = "Sangría Española o Hawaiana 1 Lt";
+          }
+          
           const drinkProd = await prisma.producto.findFirst({
-            where: { nombre: { contains: drinkName } }
+            where: { nombre: { contains: lookupName } }
           });
           
           expandedList.push({
             productoId: drinkProd ? drinkProd.id : 213,
-            nombre: drinkProd ? drinkProd.nombre : drinkName,
+            nombre: drinkProd ? drinkProd.nombre : displayName,
             precio: 0,
             cantidad: parseInt(i.cant || i.cantidad),
             historial: false, // Go to Barra!
