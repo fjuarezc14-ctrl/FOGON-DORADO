@@ -1310,7 +1310,12 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     
     const shippingFee = parseFloat(montoDelivery || 0);
     const itemsTotal = parseFloat(total);
-    const grandTotal = itemsTotal + shippingFee;
+    const finalMetodoPago = metodoPago || (tipoDelivery === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
+    
+    let grandTotal = itemsTotal + shippingFee;
+    if (finalMetodoPago === 'Cortesía') {
+      grandTotal = 0.00;
+    }
 
     const expandedItems = await expandPedidoItemsForDb(items);
 
@@ -1357,7 +1362,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
 
     // Calcular correlativo para apisunat.pe si es Boleta o Factura
     const finalTipoComprobante = tipoComprobante || 'Ticket';
-    const finalMetodoPago = metodoPago || (tipoDelivery === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
+    // finalMetodoPago is already defined above
 
     let serie = null;
     let numero = null;
@@ -2230,6 +2235,9 @@ app.get('/api/ventas/resumen', async (req, res) => {
     const totalConsumos = ventas
       .filter(v => v.metodoPago === 'Consumo')
       .reduce((s, v) => s + v.total, 0);
+    const totalCortesias = ventas
+      .filter(v => v.metodoPago === 'Cortesía')
+      .reduce((s, v) => s + v.total, 0);
 
     // Desglose por método (solo ingresos reales de caja)
     const porMetodoPago = {
@@ -2238,6 +2246,7 @@ app.get('/api/ventas/resumen', async (req, res) => {
       Yape: ventas.filter(v => v.metodoPago === 'Yape').reduce((s, v) => s + v.total, 0),
       PedidosYa: ingresosPedidosYa,
       Consumo: totalConsumos,
+      Cortesía: totalCortesias,
     };
 
     res.json({
@@ -2246,6 +2255,7 @@ app.get('/api/ventas/resumen', async (req, res) => {
       ingresosCaja,
       ingresosPedidosYa,
       totalConsumos,
+      totalCortesias,
       porMetodoPago,
       igvVentas: totalIGVVentas,
     });

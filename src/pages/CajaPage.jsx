@@ -611,10 +611,10 @@ export default function CajaPage({ currentUser }) {
       return;
     }
 
-    // Si es Consumo, requerir PIN de supervisor/cajero en el modal
-    if (metodoPago === 'Consumo') {
+    // Si es Consumo o Cortesía, requerir PIN de supervisor/cajero en el modal
+    if (metodoPago === 'Consumo' || metodoPago === 'Cortesía') {
       if (!consumoPin.trim()) {
-        setConsumoPinError("El PIN es requerido para autorizar el Consumo Personal.");
+        setConsumoPinError(`El PIN es requerido para autorizar la ${metodoPago === 'Cortesía' ? 'Cortesía' : 'Consumo Personal'}.`);
         return;
       }
       
@@ -1259,15 +1259,15 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
-    // Validar PIN de administrador si el método de pago es Consumo
-    if (deliveryMetodoPago === 'Consumo') {
+    // Validar PIN de administrador si el método de pago es Consumo o Cortesía
+    if (deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') {
       if (!pinAdminDelivery.trim()) {
-        alert('Debes ingresar el PIN del administrador para registrar un Consumo de Personal.');
+        alert(`Debes ingresar el PIN del administrador para registrar una ${deliveryMetodoPago === 'Cortesía' ? 'Cortesía' : 'Consumo de Personal'}.`);
         return;
       }
       const authResult = await api.validateAuth(pinAdminDelivery.trim());
       if (!authResult || !authResult.ok) {
-        alert('❌ PIN incorrecto. Solo el administrador puede autorizar un Consumo de Personal.');
+        alert(`❌ PIN incorrecto. Solo el administrador puede autorizar una ${deliveryMetodoPago === 'Cortesía' ? 'Cortesía' : 'Consumo de Personal'}.`);
         setPinAdminDelivery('');
         return;
       }
@@ -1992,12 +1992,13 @@ export default function CajaPage({ currentUser }) {
                 )}
                 <div>
                   <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Método de Pago:</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     {[
                       { id: 'Efectivo', icon: Banknote, label: 'Efectivo' }, 
                       { id: 'Tarjeta', icon: CreditCard, label: 'Tarjeta' }, 
                       { id: 'Yape', icon: Wallet, label: 'Yape / Plin' },
-                      { id: 'Consumo', icon: Users, label: '👤 Consumo' }
+                      { id: 'Consumo', icon: Users, label: '👤 Consumo' },
+                      { id: 'Cortesía', icon: Gift, label: '🎁 Cortesía' }
                     ].map(item => {
                       const IconComp = item.icon;
                       const active = metodoPago === item.id;
@@ -2007,7 +2008,7 @@ export default function CajaPage({ currentUser }) {
                           type="button"
                           onClick={() => {
                             setMetodoPago(item.id);
-                            if (item.id === 'Consumo') {
+                            if (item.id === 'Consumo' || item.id === 'Cortesía') {
                               setTipoComprobante('Ticket');
                             }
                           }} 
@@ -2021,9 +2022,9 @@ export default function CajaPage({ currentUser }) {
                   </div>
                 </div>
 
-                {metodoPago === 'Consumo' && (
+                {(metodoPago === 'Consumo' || metodoPago === 'Cortesía') && (
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm space-y-2">
-                    <label className="block text-slate-500 font-bold text-[10px] tracking-widest uppercase">🔐 PIN DE AUTORIZACIÓN (ADMINISTRADOR):</label>
+                    <label className="block text-slate-550 font-bold text-[10px] tracking-widest uppercase">🔐 PIN DE AUTORIZACIÓN (ADMINISTRADOR):</label>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -2408,18 +2409,18 @@ export default function CajaPage({ currentUser }) {
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Comprobante:</label>
                         <select 
-                          value={deliveryMetodoPago === 'Consumo' ? 'Ticket' : deliveryTipoComprobante} 
+                          value={(deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') ? 'Ticket' : deliveryTipoComprobante} 
                           onChange={(e) => {
                             setDeliveryTipoComprobante(e.target.value);
                             setDeliveryNumDocumento('');
                             setDeliveryClienteNombre('');
                           }} 
-                          disabled={deliveryMetodoPago === 'Consumo'}
+                          disabled={deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía'}
                           className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <option value="Ticket">{deliveryMetodoPago === 'Consumo' ? 'Ticket Interno (forzado)' : 'Ticket Interno'}</option>
-                          {deliveryMetodoPago !== 'Consumo' && <option value="Boleta">Boleta (DNI)</option>}
-                          {deliveryMetodoPago !== 'Consumo' && <option value="Factura">Factura (RUC)</option>}
+                          <option value="Ticket">{(deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') ? 'Ticket Interno (forzado)' : 'Ticket Interno'}</option>
+                          {deliveryMetodoPago !== 'Consumo' && deliveryMetodoPago !== 'Cortesía' && <option value="Boleta">Boleta (DNI)</option>}
+                          {deliveryMetodoPago !== 'Consumo' && deliveryMetodoPago !== 'Cortesía' && <option value="Factura">Factura (RUC)</option>}
                         </select>
                       </div>
                       <div>
@@ -2428,7 +2429,7 @@ export default function CajaPage({ currentUser }) {
                           value={deliveryMetodoPago} 
                           onChange={(e) => {
                             setDeliveryMetodoPago(e.target.value);
-                            if (e.target.value === 'Consumo') {
+                            if (e.target.value === 'Consumo' || e.target.value === 'Cortesía') {
                               setDeliveryTipoComprobante('Ticket');
                               setDeliveryNumDocumento('');
                             }
@@ -2439,11 +2440,12 @@ export default function CajaPage({ currentUser }) {
                           <option value="Tarjeta">Tarjeta (Visa/MC)</option>
                           <option value="Yape">Yape / Plin</option>
                           <option value="Consumo">👤 Consumo (Personal)</option>
+                          <option value="Cortesía">🎁 Cortesía</option>
                         </select>
                       </div>
                     </div>
-                    {/* PIN de administrador cuando se selecciona Consumo */}
-                    {deliveryMetodoPago === 'Consumo' && (
+                    {/* PIN de administrador cuando se selecciona Consumo o Cortesía */}
+                    {(deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') && (
                       <div className="bg-violet-50 border border-violet-200 rounded-2xl p-3 space-y-2">
                         <p className="text-[10px] font-black text-violet-700 uppercase tracking-wider flex items-center gap-1.5">🔐 Autorización de Administrador requerida</p>
                         <input
