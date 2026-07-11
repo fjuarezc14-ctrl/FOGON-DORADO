@@ -209,8 +209,9 @@ export default function CajaPage({ currentUser }) {
   const [cambioTipoError, setCambioTipoError] = useState('');
   const [cambioTipoCambiando, setCambioTipoCambiando] = useState(false);
 
-  // Mostrar todas las ventas del día ignorando el Cierre de Turno
-  const [mostrarTodoElDia, setMostrarTodoElDia] = useState(false);
+  // Mostrar todas las ventas del día ignorando el Cierre de Turno por defecto
+  const [mostrarTodoElDia, setMostrarTodoElDia] = useState(true);
+  const [historialColapsado, setHistorialColapsado] = useState(false);
 
   // PIN para autorizar Consumo en modal de Delivery/Para Llevar
   const [pinAdminDelivery, setPinAdminDelivery] = useState('');
@@ -1588,9 +1589,22 @@ export default function CajaPage({ currentUser }) {
             return (
               <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm" style={{ overflow: 'clip' }}>
                 <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Receipt className="w-4 h-4 text-emerald-500" />
-                    <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Historial de Ventas del Día</h2>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-emerald-500" />
+                      <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider">Historial de Ventas del Día</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setHistorialColapsado(prev => !prev)}
+                      className={`text-[9px] font-black px-2 py-1 rounded-xl uppercase tracking-widest transition-all ${
+                        historialColapsado 
+                          ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300' 
+                          : 'bg-slate-200 hover:bg-slate-300 text-slate-600 border border-slate-300'
+                      }`}
+                    >
+                      {historialColapsado ? '👁️ MOSTRAR VENTAS' : '👁️ OCULTAR VENTAS'}
+                    </button>
                   </div>
                   <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap">
                     {ultimoCierre && (
@@ -1598,12 +1612,13 @@ export default function CajaPage({ currentUser }) {
                         type="button"
                         onClick={() => setMostrarTodoElDia(prev => !prev)}
                         className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl uppercase tracking-wider transition-all border shadow-sm ${
-                          mostrarTodoElDia
+                          !mostrarTodoElDia
                             ? 'bg-amber-500 border-amber-600 text-slate-950 hover:bg-amber-600'
                             : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-350'
                         }`}
+                        title={mostrarTodoElDia ? "Ocultar ventas de turnos ya cerrados" : "Mostrar todas las ventas del día"}
                       >
-                        {mostrarTodoElDia ? '👁️ Ocultar Cierre' : '👁️ Mostrar Todo el Día'}
+                        {mostrarTodoElDia ? '👁️ Ver Turno Activo' : '👁️ Ver Todo el Día'}
                       </button>
                     )}
                     <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-sm">
@@ -1640,7 +1655,8 @@ export default function CajaPage({ currentUser }) {
                     title="Desplazar derecha"
                   >▶</button>
                 </div>
-                <div ref={historialScrollRef} className="table-scroll pb-1">
+                {!historialColapsado ? (
+                  <div ref={historialScrollRef} className="table-scroll pb-1">
                   <table className="w-full text-left min-w-[650px]">
                     <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                       <tr>
@@ -1822,6 +1838,20 @@ export default function CajaPage({ currentUser }) {
                     </tbody>
                   </table>
                 </div>
+                ) : (
+                  <div className="p-12 text-center bg-slate-50 border-t border-slate-100 flex flex-col items-center justify-center gap-3">
+                    <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px] tracking-widest">
+                      🔒 El historial de ventas está oculto para maximizar la visibilidad del resumen.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setHistorialColapsado(false)}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95"
+                    >
+                      🔓 Mostrar Historial de Ventas
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -1853,9 +1883,19 @@ export default function CajaPage({ currentUser }) {
 
           return (
             <div className="bg-slate-900 rounded-3xl shadow-xl p-5 text-white flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
-              <h2 className="font-black uppercase text-xs tracking-widest mb-4 text-amber-400 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-400" /> Resumen del Turno
-              </h2>
+              <div className="flex flex-col gap-3 mb-4 border-b border-slate-800 pb-4">
+                <h2 className="font-black uppercase text-xs tracking-widest text-amber-400 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-400" /> Resumen del Turno
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setCierreModalOpen(true)}
+                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 border border-purple-500/20"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Cerrar Caja (Turno)
+                </button>
+              </div>
               <div className="space-y-3 flex-1">
                 <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                   <p className="text-xs text-slate-400 font-black uppercase tracking-widest">Mesas Atendidas Hoy</p>
@@ -1918,14 +1958,7 @@ export default function CajaPage({ currentUser }) {
                   </div>
                 )}
 
-                {/* BOTÓN CIERRE DE CAJA TURNO */}
-                <button
-                  onClick={() => setCierreModalOpen(true)}
-                  className="w-full py-3.5 mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl shadow-purple-950/40 transition-all active:scale-95 flex items-center justify-center gap-2 border border-purple-500/20"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Cierre de Caja (Turno)
-                </button>
+
               </div>
             </div>
           );
