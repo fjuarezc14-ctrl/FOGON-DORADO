@@ -194,6 +194,21 @@ export default function CajaPage({ currentUser }) {
   const [cambiando, setCambiando] = useState(false);
   const [cambioError, setCambioError] = useState('');
 
+  // Modal cambiar tipo de entrega
+  const [cambioTipoEntregaModal, setCambioTipoEntregaModal] = useState(false);
+  const [ventaATipoCambiar, setVentaATipoCambiar] = useState(null);
+  const [cambioNuevoTipo, setCambioNuevoTipo] = useState('ParaLlevar');
+  const [cambioCodigoPY, setCambioCodigoPY] = useState('');
+  const [cambioNombreCliente, setCambioNombreCliente] = useState('');
+  const [cambioTelefono, setCambioTelefono] = useState('');
+  const [cambioDireccion, setCambioDireccion] = useState('');
+  const [cambioMontoDelivery, setCambioMontoDelivery] = useState('');
+  const [cambioMontoConCuanto, setCambioMontoConCuanto] = useState('');
+  const [cambioMetodoPago, setCambioMetodoPago] = useState('Efectivo');
+  const [cambioTipoPin, setCambioTipoPin] = useState('');
+  const [cambioTipoError, setCambioTipoError] = useState('');
+  const [cambioTipoCambiando, setCambioTipoCambiando] = useState(false);
+
   // PIN para autorizar Consumo en modal de Delivery/Para Llevar
   const [pinAdminDelivery, setPinAdminDelivery] = useState('');
 
@@ -686,6 +701,103 @@ export default function CajaPage({ currentUser }) {
       setCambioError('Error de conexión: ' + err.message);
     } finally {
       setCambiando(false);
+    }
+  };
+
+  // --- Cambiar tipo de entrega de una venta existente ---
+  const abrirCambioTipoEntregaModal = (v) => {
+    setVentaATipoCambiar(v);
+    setCambioTipoPin('');
+    setCambioTipoError('');
+    
+    let currentType = 'ParaLlevar';
+    let currentCodePY = '';
+    let currentName = '';
+    let currentPhone = '';
+    let currentDir = '';
+    let currentFee = '';
+    let currentPayWith = '';
+    let currentMethod = v.metodoPago || 'Efectivo';
+
+    if (v.codigoPedidosYa) {
+      if (v.codigoPedidosYa.startsWith('DELIVERY -')) {
+        currentType = 'DeliveryPropio';
+        const parsed = parseDeliveryInfo(v.codigoPedidosYa);
+        if (parsed) {
+          currentName = parsed.nombre;
+          currentPhone = parsed.telefono;
+          currentDir = parsed.direccion;
+          currentFee = parsed.montoDelivery || '';
+          currentPayWith = parsed.conCuanto || '';
+        }
+      } else if (v.codigoPedidosYa.startsWith('LLEVAR -')) {
+        currentType = 'ParaLlevar';
+        currentName = v.codigoPedidosYa.replace('LLEVAR - ', '');
+      } else {
+        currentType = 'PedidosYa';
+        currentCodePY = v.codigoPedidosYa;
+        currentName = 'PEDIDOS YA';
+        currentMethod = 'PedidosYa';
+      }
+    }
+
+    setCambioNuevoTipo(currentType);
+    setCambioCodigoPY(currentCodePY);
+    setCambioNombreCliente(currentName);
+    setCambioTelefono(currentPhone);
+    setCambioDireccion(currentDir);
+    setCambioMontoDelivery(currentFee);
+    setCambioMontoConCuanto(currentPayWith);
+    setCambioMetodoPago(currentMethod === 'PedidosYa' ? 'Efectivo' : currentMethod);
+    setCambioTipoEntregaModal(true);
+  };
+
+  const handleCambiarTipoEntrega = async () => {
+    if (!cambioTipoPin.trim()) { setCambioTipoError('Ingresa el PIN de Administrador.'); return; }
+    
+    if (cambioNuevoTipo === 'PedidosYa' && !cambioCodigoPY.trim()) {
+      setCambioTipoError('Ingresa el Código de PedidosYa.');
+      return;
+    }
+    if ((cambioNuevoTipo === 'ParaLlevar' || cambioNuevoTipo === 'DeliveryPropio') && !cambioNombreCliente.trim()) {
+      setCambioTipoError('Ingresa el nombre del cliente.');
+      return;
+    }
+    if (cambioNuevoTipo === 'DeliveryPropio' && !cambioDireccion.trim()) {
+      setCambioTipoError('Ingresa la dirección de envío.');
+      return;
+    }
+
+    setCambioTipoCambiando(true);
+    setCambioTipoError('');
+
+    try {
+      const res = await api.cambiarTipoEntrega(ventaATipoCambiar.id, {
+        tipoEntrega: cambioNuevoTipo,
+        codigoPedidosYa: cambioCodigoPY.trim(),
+        nombreCliente: cambioNombreCliente.trim(),
+        telefono: cambioTelefono.trim(),
+        direccion: cambioDireccion.trim(),
+        montoDelivery: parseFloat(cambioMontoDelivery || 0),
+        montoConCuanto: parseFloat(cambioMontoConCuanto || 0),
+        metodoPago: cambioMetodoPago,
+        pin: cambioTipoPin.trim()
+      });
+
+      if (res.error) {
+        setCambioTipoError(res.error);
+        return;
+      }
+
+      await fetchCajaData();
+      setCambioTipoEntregaModal(false);
+      setVentaATipoCambiar(null);
+      setCambioTipoPin('');
+      alert('✅ Tipo de entrega corregido exitosamente.');
+    } catch (err) {
+      setCambioTipoError('Error de conexión: ' + err.message);
+    } finally {
+      setCambioTipoCambiando(false);
     }
   };
 
@@ -1577,34 +1689,45 @@ export default function CajaPage({ currentUser }) {
                               </div>
                            </td>
                            <td className="px-6 py-4">
-                            {v.codigoPedidosYa ? (
-                              v.codigoPedidosYa.startsWith('DELIVERY -') ? (
-                                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
-                                  🛵 DEL: {(() => {
-                                    const parsed = parseDeliveryInfo(v.codigoPedidosYa);
-                                    const name = parsed ? parsed.nombre : v.codigoPedidosYa.replace('DELIVERY - ', '');
-                                    const first = name.split(/\s+/)[0] || '';
-                                    return first.substring(0, 10);
-                                  })()}
-                                </span>
-                              ) : v.codigoPedidosYa.startsWith('LLEVAR -') ? (
-                                <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
-                                  🛍️ LLEVAR: {(() => {
-                                    const name = v.codigoPedidosYa.replace('LLEVAR - ', '');
-                                    const first = name.split(/\s+/)[0] || '';
-                                    return first.substring(0, 10);
-                                  })()}
-                                </span>
+                            <div className="flex items-center gap-1.5 justify-start">
+                              {v.codigoPedidosYa ? (
+                                <>
+                                  {v.codigoPedidosYa.startsWith('DELIVERY -') ? (
+                                    <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                                      🛵 DEL: {(() => {
+                                        const parsed = parseDeliveryInfo(v.codigoPedidosYa);
+                                        const name = parsed ? parsed.nombre : v.codigoPedidosYa.replace('DELIVERY - ', '');
+                                        const first = name.split(/\s+/)[0] || '';
+                                        return first.substring(0, 10);
+                                      })()}
+                                    </span>
+                                  ) : v.codigoPedidosYa.startsWith('LLEVAR -') ? (
+                                    <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                                      🛍️ LLEVAR: {(() => {
+                                        const name = v.codigoPedidosYa.replace('LLEVAR - ', '');
+                                        const first = name.split(/\s+/)[0] || '';
+                                        return first.substring(0, 10);
+                                      })()}
+                                    </span>
+                                  ) : (
+                                    <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono whitespace-nowrap">
+                                      🛵 PY: {v.codigoPedidosYa}
+                                    </span>
+                                  )}
+                                  <button
+                                    title="Corregir tipo de entrega (requiere PIN Administrador)"
+                                    onClick={() => abrirCambioTipoEntregaModal(v)}
+                                    className="p-1 rounded-lg bg-slate-100 hover:bg-indigo-150 text-slate-400 hover:text-indigo-600 border border-slate-200 hover:border-indigo-300 transition-all shrink-0"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                  </button>
+                                </>
                               ) : (
-                                <span className="bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono whitespace-nowrap">
-                                  🛵 PY: {v.codigoPedidosYa}
+                                <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
+                                  🍽️ Mesa {v.mesaNum}
                                 </span>
-                              )
-                            ) : (
-                              <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap">
-                                🍽️ Mesa {v.mesaNum}
-                              </span>
-                            )}
+                              )}
+                            </div>
                            </td>
                           <td className="px-6 py-4">
                             {(() => {
@@ -2872,6 +2995,230 @@ export default function CajaPage({ currentUser }) {
                 >
                   {cambiando ? <span className="w-4 h-4 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" /> : null}
                   {cambiando ? 'Guardando...' : 'Confirmar Cambio'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Corregir Tipo de Entrega */}
+      {cambioTipoEntregaModal && ventaATipoCambiar && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[260] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-500 to-blue-500 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+                  Corregir Tipo de Entrega
+                </h3>
+                <p className="text-xs font-bold opacity-80 mt-0.5">Venta #{ventaATipoCambiar.id} · S/ {ventaATipoCambiar.total.toFixed(2)}</p>
+              </div>
+              <button onClick={() => { setCambioTipoEntregaModal(false); setCambioTipoPin(''); setCambioTipoError(''); }} className="bg-black/20 hover:bg-black/30 p-2 rounded-xl transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
+              {/* Selector de Nuevo Tipo */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Nuevo Tipo de Entrega</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { type: 'ParaLlevar', label: '🛍️ Llevar' },
+                    { type: 'DeliveryPropio', label: '🛵 Delivery' },
+                    { type: 'PedidosYa', label: '🛵 PedidosYa' }
+                  ].map(item => (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => setCambioNuevoTipo(item.type)}
+                      className={`py-3 px-2 rounded-2xl text-xs font-black uppercase border-2 transition-all ${
+                        cambioNuevoTipo === item.type
+                          ? 'bg-indigo-500 border-indigo-600 text-white'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Campos dinámicos según el tipo de entrega */}
+              {cambioNuevoTipo === 'PedidosYa' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Código PedidosYa</label>
+                    <input
+                      type="text"
+                      value={cambioCodigoPY}
+                      onChange={e => setCambioCodigoPY(e.target.value)}
+                      placeholder="Ej. FG-4821"
+                      className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-350 focus:outline-none transition-all uppercase"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {cambioNuevoTipo === 'ParaLlevar' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Nombre del Cliente</label>
+                    <input
+                      type="text"
+                      value={cambioNombreCliente}
+                      onChange={e => setCambioNombreCliente(e.target.value)}
+                      placeholder="Ej. Juan Pérez"
+                      className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-350 focus:outline-none transition-all uppercase"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Método de Pago</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Efectivo', 'Tarjeta', 'Yape'].map(mp => (
+                        <button
+                          key={mp}
+                          type="button"
+                          onClick={() => setCambioMetodoPago(mp)}
+                          className={`py-2 px-1 rounded-xl text-[10px] font-black uppercase border transition-all ${
+                            cambioMetodoPago === mp
+                              ? 'bg-slate-800 text-white border-slate-800'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          {mp}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {cambioNuevoTipo === 'DeliveryPropio' && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Nombre del Cliente</label>
+                    <input
+                      type="text"
+                      value={cambioNombreCliente}
+                      onChange={e => setCambioNombreCliente(e.target.value)}
+                      placeholder="Ej. Juan Pérez"
+                      className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-350 focus:outline-none transition-all uppercase"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Teléfono</label>
+                      <input
+                        type="text"
+                        value={cambioTelefono}
+                        onChange={e => setCambioTelefono(e.target.value)}
+                        placeholder="Ej. 999888777"
+                        className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-350 focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Costo Delivery (S/)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={cambioMontoDelivery}
+                        onChange={e => setCambioMontoDelivery(e.target.value)}
+                        placeholder="Ej. 5.00"
+                        className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-350 focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Dirección de Envío</label>
+                    <input
+                      type="text"
+                      value={cambioDireccion}
+                      onChange={e => setCambioDireccion(e.target.value)}
+                      placeholder="Ej. Av. Larco 123"
+                      className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-350 focus:outline-none transition-all"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Paga Con (S/)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={cambioMontoConCuanto}
+                        onChange={e => setCambioMontoConCuanto(e.target.value)}
+                        placeholder="Ej. 100.00"
+                        className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-350 focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Método de Pago</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {['Efectivo', 'Tarjeta', 'Yape'].map(mp => (
+                          <button
+                            key={mp}
+                            type="button"
+                            onClick={() => setCambioMetodoPago(mp)}
+                            className={`py-2 px-1 rounded-xl text-[9px] font-black uppercase border transition-all ${
+                              cambioMetodoPago === mp
+                                ? 'bg-slate-800 text-white border-slate-800'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                            }`}
+                          >
+                            {mp}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PIN Admin */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">🔐 PIN de Administrador</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={cambioTipoPin}
+                  onChange={e => { setCambioTipoPin(e.target.value); setCambioTipoError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleCambiarTipoEntrega()}
+                  placeholder="••••••"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-2.5 text-center text-xl font-black tracking-[0.5em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-300 focus:outline-none transition-all"
+                  style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
+                  autoComplete="off"
+                  name="cambio-tipo-pin-auth"
+                />
+              </div>
+
+              {/* Error */}
+              {cambioTipoError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-black px-4 py-2.5 rounded-2xl uppercase tracking-wide flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {cambioTipoError}
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setCambioTipoEntregaModal(false); setCambioTipoPin(''); setCambioTipoError(''); }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase rounded-2xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCambiarTipoEntrega}
+                  disabled={cambioTipoCambiando || !cambioTipoPin.trim()}
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-xs uppercase rounded-2xl transition-all flex items-center justify-center gap-2 shadow-md"
+                >
+                  {cambioTipoCambiando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                  {cambioTipoCambiando ? 'Guardando...' : 'Confirmar Cambio'}
                 </button>
               </div>
             </div>

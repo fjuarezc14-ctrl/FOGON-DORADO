@@ -1847,6 +1847,111 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
   }
 });
 
+// PATCH /api/ventas/:ventaId/tipo-entrega → Corregir tipo de entrega (PedidosYa, Para Llevar, Delivery)
+app.patch('/api/ventas/:ventaId/tipo-entrega', async (req, res) => {
+  const { ventaId } = req.params;
+  const { 
+    tipoEntrega, // "ParaLlevar", "DeliveryPropio", "PedidosYa"
+    codigoPedidosYa,
+    nombreCliente,
+    telefono,
+    direccion,
+    montoDelivery,
+    montoConCuanto,
+    metodoPago, // 'Efectivo' | 'Tarjeta' | 'Yape'
+    pin 
+  } = req.body;
+
+  if (!pin) {
+    return res.status(400).json({ error: 'Se requiere PIN de Administrador.' });
+  }
+
+  try {
+    // Validar PIN
+    const admin = await prisma.usuario.findFirst({ where: { pin, activo: true } });
+    if (!admin) return res.status(401).json({ error: 'PIN incorrecto.' });
+    if (admin.rol !== 'Administrador') {
+      return res.status(403).json({ error: 'Solo el Administrador puede cambiar el tipo de entrega.' });
+    }
+
+    // Obtener la venta con su pedido
+    const venta = await prisma.venta.findUnique({
+      where: { id: parseInt(ventaId) },
+      include: { pedido: { include: { items: true } } }
+    });
+    if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
+
+    const pedido = venta.pedido;
+    if (!pedido) return res.status(404).json({ error: 'Pedido asociado no encontrado.' });
+
+    // Calcular el costo base de los ítems del pedido
+    const baseItemsTotal = pedido.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+
+    let nuevoTotal = baseItemsTotal;
+    let finalCodigo = '';
+    let finalNombre = nombreCliente || 'CONSUMIDOR FINAL';
+    let finalMetodoPago = metodoPago || 'Efectivo';
+    let nuevoTipoEntrega = 'llevar';
+
+    if (tipoEntrega === 'PedidosYa') {
+      nuevoTipoEntrega = 'llevar';
+      finalCodigo = codigoPedidosYa ? String(codigoPedidosYa) : 'S/D';
+      finalNombre = 'PEDIDOS YA';
+      finalMetodoPago = 'PedidosYa';
+    } else if (tipoEntrega === 'ParaLlevar') {
+      nuevoTipoEntrega = 'llevar';
+      finalCodigo = `LLEVAR - ${finalNombre.toUpperCase()}`;
+    } else if (tipoEntrega === 'DeliveryPropio') {
+      nuevoTipoEntrega = 'delivery';
+      const shippingFee = parseFloat(montoDelivery || 0);
+      nuevoTotal = baseItemsTotal + shippingFee;
+      
+      const tVal = telefono || 'S/D';
+      const dVal = direccion || 'S/D';
+      const eVal = shippingFee.toFixed(2);
+      const cVal = parseFloat(montoConCuanto || 0).toFixed(2);
+
+      finalCodigo = `DELIVERY - ${finalNombre.toUpperCase()} [T:${tVal}] [D:${dVal}] [E:${eVal}] [C:${cVal}]`;
+      finalNombre = `DELIVERY - ${finalNombre.toUpperCase()} [T:${tVal}] [D:${dVal}] [E:${eVal}] [C:${cVal}]`;
+    } else {
+      return res.status(400).json({ error: 'Tipo de entrega inválido.' });
+    }
+
+    const subtotal = parseFloat((nuevoTotal / 1.18).toFixed(2));
+    const igv = parseFloat((nuevoTotal - subtotal).toFixed(2));
+
+    // Actualizar Pedido
+    await prisma.pedido.update({
+      where: { id: pedido.id },
+      data: {
+        total: nuevoTotal,
+        tipoEntrega: nuevoTipoEntrega,
+        codigoPedidosYa: finalCodigo,
+      }
+    });
+
+    // Actualizar Venta
+    const ventaActualizada = await prisma.venta.update({
+      where: { id: venta.id },
+      data: {
+        total: nuevoTotal,
+        subtotal,
+        igv,
+        metodoPago: finalMetodoPago,
+        nombreCliente: finalNombre,
+        numDocumento: tipoEntrega === 'PedidosYa' ? finalCodigo : (venta.numDocumento || 'S/D'),
+      }
+    });
+
+    console.log(`🔄 Tipo de entrega corregido por ${admin.nombre} (${admin.rol}): Venta #${ventaId} a ${tipoEntrega}`);
+
+    res.json({ ok: true, ventaId: ventaActualizada.id, cambiadoPor: admin.nombre });
+  } catch (err) {
+    console.error('Error al cambiar tipo de entrega:', err);
+    res.status(500).json({ error: 'Error interno: ' + err.message });
+  }
+});
+
 // POST /api/ventas → Cobrar mesa (acepta pedidoIds array o pedidoId simple)
 app.post('/api/ventas', async (req, res) => {
   const { pedidoId, pedidoIds, tipoComprobante, numDocumento, nombreCliente, total, metodoPago, clienteDireccion, ofertaDescripcion, descuentoAplicado } = req.body;

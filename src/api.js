@@ -99,6 +99,9 @@ export const api = {
   cambiarMetodoPago: (ventaId, metodoPago, pin) => fetch(`${API_BASE}/api/ventas/${ventaId}/metodo-pago`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metodoPago, pin }),
   }).then(r => r.json()),
+  cambiarTipoEntrega: (ventaId, body) => fetch(`${API_BASE}/api/ventas/${ventaId}/tipo-entrega`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
 
   // Compras
   getCompras: (desde, hasta) => fetch(`${API_BASE}/api/compras${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
