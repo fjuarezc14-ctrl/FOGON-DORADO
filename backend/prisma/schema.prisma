@@ -100,6 +100,9 @@ model Venta {
   igv             Float
   subtotal        Float
   metodoPago      String   @default("Efectivo") // "Efectivo", "Tarjeta", "Yape", "PedidosYa"
+  montoEfectivo   Float    @default(0)
+  montoTarjeta    Float    @default(0)
+  montoYape       Float    @default(0)
   estadoNubefact  String   @default("PENDIENTE") // Obsoleto (usar estadoSunat en su lugar)
   estadoSunat     String   @default("PENDIENTE")
   serie           String?  // "F001" o "B001"

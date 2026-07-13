@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check, Users } from 'lucide-react';
+import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check, Users, Layers } from 'lucide-react';
 
 import { api } from '../api';
 
@@ -159,6 +159,9 @@ export default function CajaPage({ currentUser }) {
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
   const [tipoComprobante, setTipoComprobante] = useState('Boleta');
   const [metodoPago, setMetodoPago] = useState('Efectivo');
+  const [mixtoEfectivo, setMixtoEfectivo] = useState('');
+  const [mixtoTarjeta, setMixtoTarjeta] = useState('');
+  const [mixtoYape, setMixtoYape] = useState('');
   const [numDocumento, setNumDocumento] = useState('');
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteDireccion, setClienteDireccion] = useState('');
@@ -174,6 +177,9 @@ export default function CajaPage({ currentUser }) {
   const [deliveryConCuanto, setDeliveryConCuanto] = useState('');
   const [deliveryTipoComprobante, setDeliveryTipoComprobante] = useState('Ticket');
   const [deliveryMetodoPago, setDeliveryMetodoPago] = useState('Efectivo');
+  const [deliveryMixtoEfectivo, setDeliveryMixtoEfectivo] = useState('');
+  const [deliveryMixtoTarjeta, setDeliveryMixtoTarjeta] = useState('');
+  const [deliveryMixtoYape, setDeliveryMixtoYape] = useState('');
   const [deliveryClienteNombre, setDeliveryClienteNombre] = useState('');
   const [deliveryNumDocumento, setDeliveryNumDocumento] = useState('');
 
@@ -205,6 +211,9 @@ export default function CajaPage({ currentUser }) {
   const [cambioMontoDelivery, setCambioMontoDelivery] = useState('');
   const [cambioMontoConCuanto, setCambioMontoConCuanto] = useState('');
   const [cambioMetodoPago, setCambioMetodoPago] = useState('Efectivo');
+  const [cambioMixtoEfectivo, setCambioMixtoEfectivo] = useState('');
+  const [cambioMixtoTarjeta, setCambioMixtoTarjeta] = useState('');
+  const [cambioMixtoYape, setCambioMixtoYape] = useState('');
   const [cambioTipoPin, setCambioTipoPin] = useState('');
   const [cambioTipoError, setCambioTipoError] = useState('');
   const [cambioTipoCambiando, setCambioTipoCambiando] = useState(false);
@@ -548,6 +557,9 @@ export default function CajaPage({ currentUser }) {
       totalLetras,
       hashResumen,
       metodoPago: v.metodoPago,
+      montoEfectivo: v.montoEfectivo || 0,
+      montoTarjeta: v.montoTarjeta || 0,
+      montoYape: v.montoYape || 0,
       qrImageUrl,
       enlacePdf,
       contingencia,
@@ -628,9 +640,35 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
+    // Validar y calcular montos si es Pago Mixto
+    let finalMontoEfectivo = 0;
+    let finalMontoTarjeta = 0;
+    let finalMontoYape = 0;
+    const total = mesaSeleccionada.pedidoData.total;
+
+    if (metodoPago === 'Mixto') {
+      const efecVal = parseFloat(mixtoEfectivo || 0);
+      const tarjVal = parseFloat(mixtoTarjeta || 0);
+      const yapeVal = parseFloat(mixtoYape || 0);
+
+      if (tarjVal + yapeVal > total) {
+        alert('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
+        return;
+      }
+
+      const restante = total - (tarjVal + yapeVal);
+      if (efecVal < restante) {
+        alert(`Monto insuficiente. Debes cubrir el total de S/ ${total.toFixed(2)}.\nFaltan S/ ${(restante - efecVal).toFixed(2)}`);
+        return;
+      }
+
+      finalMontoEfectivo = restante;
+      finalMontoTarjeta = tarjVal;
+      finalMontoYape = yapeVal;
+    }
+
     setCobrando(true);
     try {
-      const total = mesaSeleccionada.pedidoData.total;
       const response = await api.cobrar({
         pedidoIds: mesaSeleccionada.pedidoData.pedidoIds,
         tipoComprobante,
@@ -638,6 +676,9 @@ export default function CajaPage({ currentUser }) {
         nombreCliente: clienteNombre || 'PÚBLICO GENERAL',
         total,
         metodoPago,
+        montoEfectivo: finalMontoEfectivo,
+        montoTarjeta: finalMontoTarjeta,
+        montoYape: finalMontoYape,
         clienteDireccion: clienteDireccion || '',
       });
 
@@ -647,6 +688,9 @@ export default function CajaPage({ currentUser }) {
       setClienteDireccion('');
       setConsumoPin('');
       setConsumoPinError('');
+      setMixtoEfectivo('');
+      setMixtoTarjeta('');
+      setMixtoYape('');
 
       // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
       if (metodoPago !== 'Consumo') {
@@ -690,17 +734,58 @@ export default function CajaPage({ currentUser }) {
   const handleCambiarMetodoPago = async () => {
     if (!cambioPin.trim()) { setCambioError('Ingresa el PIN de Administrador.'); return; }
     if (!cambioNuevoMetodo) { setCambioError('Selecciona el nuevo método de pago.'); return; }
+    
+    let finalMontoEfectivo = 0;
+    let finalMontoTarjeta = 0;
+    let finalMontoYape = 0;
+    const total = ventaACambiar.total;
+
+    if (cambioNuevoMetodo === 'Mixto') {
+      const efecVal = parseFloat(cambioMixtoEfectivo || 0);
+      const tarjVal = parseFloat(cambioMixtoTarjeta || 0);
+      const yapeVal = parseFloat(cambioMixtoYape || 0);
+
+      if (tarjVal + yapeVal > total) {
+        setCambioError('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
+        return;
+      }
+
+      const restante = total - (tarjVal + yapeVal);
+      if (efecVal < restante) {
+        setCambioError(`Monto insuficiente. Debes cubrir el total de S/ ${total.toFixed(2)}. Faltan S/ ${(restante - efecVal).toFixed(2)}`);
+        return;
+      }
+
+      finalMontoEfectivo = restante;
+      finalMontoTarjeta = tarjVal;
+      finalMontoYape = yapeVal;
+    }
+
     setCambiando(true);
     setCambioError('');
     try {
-      const res = await api.cambiarMetodoPago(ventaACambiar.id, cambioNuevoMetodo, cambioPin.trim());
+      const res = await api.cambiarMetodoPago(ventaACambiar.id, cambioNuevoMetodo, cambioPin.trim(), {
+        montoEfectivo: finalMontoEfectivo,
+        montoTarjeta: finalMontoTarjeta,
+        montoYape: finalMontoYape
+      });
       if (res.error) { setCambioError(res.error); return; }
       // Actualizar el estado local de ventas sin recargar
-      setVentas(prev => prev.map(v => v.id === ventaACambiar.id ? { ...v, metodoPago: cambioNuevoMetodo } : v));
+      setVentas(prev => prev.map(v => v.id === ventaACambiar.id ? { 
+        ...v, 
+        metodoPago: cambioNuevoMetodo,
+        montoEfectivo: finalMontoEfectivo,
+        montoTarjeta: finalMontoTarjeta,
+        montoYape: finalMontoYape 
+      } : v));
       setCambioMetodoModal(false);
       setVentaACambiar(null);
       setCambioPin('');
       setCambioNuevoMetodo('Efectivo');
+      setCambioMixtoEfectivo('');
+      setCambioMixtoTarjeta('');
+      setCambioMixtoYape('');
+      await fetchCajaData();
     } catch (err) {
       setCambioError('Error de conexión: ' + err.message);
     } finally {
@@ -1205,6 +1290,9 @@ export default function CajaPage({ currentUser }) {
       totalLetras,
       hashResumen,
       metodoPago: response.metodoPago || metodoPago,
+      montoEfectivo: response.montoEfectivo || 0,
+      montoTarjeta: response.montoTarjeta || 0,
+      montoYape: response.montoYape || 0,
       qrImageUrl,
       enlacePdf,
       contingencia,
@@ -1274,17 +1362,41 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
+    // Validar y calcular montos si es Pago Mixto
+    let deliveryFinalMontoEfectivo = 0;
+    let deliveryFinalMontoTarjeta = 0;
+    let deliveryFinalMontoYape = 0;
+    const itemsTotal = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
+    const shippingFee = parseFloat(deliveryMontoEnvio || 0);
+    const grandTotal = itemsTotal + shippingFee;
+
+    if (tipoDelivery !== 'PedidosYa' && deliveryMetodoPago === 'Mixto') {
+      const efecVal = parseFloat(deliveryMixtoEfectivo || 0);
+      const tarjVal = parseFloat(deliveryMixtoTarjeta || 0);
+      const yapeVal = parseFloat(deliveryMixtoYape || 0);
+
+      if (tarjVal + yapeVal > grandTotal) {
+        alert('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
+        return;
+      }
+
+      const restante = grandTotal - (tarjVal + yapeVal);
+      if (efecVal < restante) {
+        alert(`Monto insuficiente. Debes cubrir el total de S/ ${grandTotal.toFixed(2)}.\nFaltan S/ ${(restante - efecVal).toFixed(2)}`);
+        return;
+      }
+
+      deliveryFinalMontoEfectivo = restante;
+      deliveryFinalMontoTarjeta = tarjVal;
+      deliveryFinalMontoYape = yapeVal;
+    }
+
     setEnviandoDelivery(true);
     try {
-      const itemsTotal = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
-      const shippingFee = parseFloat(deliveryMontoEnvio || 0);
-      const grandTotal = itemsTotal + shippingFee;
-
       let codigoFormateado = '';
       const vueltoVal = (() => {
         const conC = parseFloat(deliveryConCuanto);
-        const tot = itemsTotal + shippingFee;
-        return (!isNaN(conC) && conC >= tot) ? (conC - tot).toFixed(2) : '0.00';
+        return (!isNaN(conC) && conC >= grandTotal) ? (conC - grandTotal).toFixed(2) : '0.00';
       })();
 
       if (tipoDelivery === 'PedidosYa') {
@@ -1303,6 +1415,9 @@ export default function CajaPage({ currentUser }) {
         tipoDelivery,
         tipoComprobante: tipoDelivery === 'PedidosYa' ? 'Ticket' : deliveryTipoComprobante,
         metodoPago: tipoDelivery === 'PedidosYa' ? 'PedidosYa' : deliveryMetodoPago,
+        montoEfectivo: deliveryFinalMontoEfectivo,
+        montoTarjeta: deliveryFinalMontoTarjeta,
+        montoYape: deliveryFinalMontoYape,
         numDocumento: tipoDelivery === 'PedidosYa' ? codigoFormateado : (deliveryNumDocumento || 'S/D'),
         nombreCliente: tipoDelivery === 'PedidosYa' ? 'PEDIDOS YA' : (deliveryClienteNombre || 'Consumidor Final'),
         clienteDireccion: tipoDelivery === 'DeliveryPropio' ? deliveryDireccion : (deliveryDireccion || ''),
@@ -1314,6 +1429,9 @@ export default function CajaPage({ currentUser }) {
 
       // Cerrar modal y recargar datos de Caja
       setDeliveryModal(false);
+      setDeliveryMixtoEfectivo('');
+      setDeliveryMixtoTarjeta('');
+      setDeliveryMixtoYape('');
       await fetchCajaData();
       
       // Si es Para Llevar o Delivery Propio con comprobante Boleta o Factura (o Ticket), activamos el ticket de impresión
@@ -1866,8 +1984,7 @@ export default function CajaPage({ currentUser }) {
 
           // Separar ingresos reales (caja) vs PedidosYa vs Cortesías
           const activeIngresosCaja = ventasFiltradas
-            .filter(v => v.metodoPago !== 'PedidosYa' && v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo')
-            .reduce((s, v) => s + v.total, 0);
+            .reduce((s, v) => s + (v.montoEfectivo || 0) + (v.montoTarjeta || 0) + (v.montoYape || 0), 0);
           const activeIngresosPedidosYa = ventasFiltradas
             .filter(v => v.metodoPago === 'PedidosYa')
             .reduce((s, v) => s + v.total, 0);
@@ -2025,13 +2142,14 @@ export default function CajaPage({ currentUser }) {
                 )}
                 <div>
                   <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Método de Pago:</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                     {[
                       { id: 'Efectivo', icon: Banknote, label: 'Efectivo' }, 
                       { id: 'Tarjeta', icon: CreditCard, label: 'Tarjeta' }, 
                       { id: 'Yape', icon: Wallet, label: 'Yape / Plin' },
                       { id: 'Consumo', icon: Users, label: '👤 Consumo' },
-                      { id: 'Cortesía', icon: Gift, label: '🎁 Cortesía' }
+                      { id: 'Cortesía', icon: Gift, label: '🎁 Cortesía' },
+                      { id: 'Mixto', icon: Layers, label: '➕ Mixto' }
                     ].map(item => {
                       const IconComp = item.icon;
                       const active = metodoPago === item.id;
@@ -2054,6 +2172,79 @@ export default function CajaPage({ currentUser }) {
                     })}
                   </div>
                 </div>
+
+                {metodoPago === 'Mixto' && (() => {
+                  const total = mesaSeleccionada.pedidoData.total;
+                  const efecVal = parseFloat(mixtoEfectivo || 0);
+                  const tarjVal = parseFloat(mixtoTarjeta || 0);
+                  const yapeVal = parseFloat(mixtoYape || 0);
+                  const ingresado = efecVal + tarjVal + yapeVal;
+                  const restante = Math.max(0, total - (tarjVal + yapeVal));
+                  const vuelto = efecVal > restante ? efecVal - restante : 0;
+                  const diferencia = total - ingresado;
+                  
+                  return (
+                    <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl shadow-sm space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex justify-between">
+                        <span>Desglose de Pago Mixto</span>
+                        <span>Total: S/ {total.toFixed(2)}</span>
+                      </h4>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">💵 Efectivo (S/)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={mixtoEfectivo}
+                            onChange={(e) => setMixtoEfectivo(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">💳 Tarjeta (S/)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={mixtoTarjeta}
+                            onChange={(e) => setMixtoTarjeta(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">📱 Yape/Plin (S/)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={mixtoYape}
+                            onChange={(e) => setMixtoYape(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="bg-white/80 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-600">
+                        <div className="flex justify-between">
+                          <span>Ingresado:</span>
+                          <span className="font-mono text-slate-800">S/ {ingresado.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Faltante:</span>
+                          <span className={`font-mono ${diferencia > 0 ? 'text-red-650' : 'text-emerald-600'}`}>
+                            S/ {Math.max(0, diferencia).toFixed(2)}
+                          </span>
+                        </div>
+                        {vuelto > 0 && (
+                          <div className="flex justify-between col-span-2 border-t border-slate-100 pt-1.5 mt-0.5 text-xs text-emerald-700 font-black">
+                            <span>💸 Vuelto a Entregar:</span>
+                            <span className="font-mono">S/ {vuelto.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {(metodoPago === 'Consumo' || metodoPago === 'Cortesía') && (
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm space-y-2">
@@ -2474,6 +2665,7 @@ export default function CajaPage({ currentUser }) {
                           <option value="Yape">Yape / Plin</option>
                           <option value="Consumo">👤 Consumo (Personal)</option>
                           <option value="Cortesía">🎁 Cortesía</option>
+                          <option value="Mixto">➕ Mixto</option>
                         </select>
                       </div>
                     </div>
@@ -2492,6 +2684,82 @@ export default function CajaPage({ currentUser }) {
                         />
                       </div>
                     )}
+
+                    {/* Pago Mixto para Delivery */}
+                    {deliveryMetodoPago === 'Mixto' && (() => {
+                      const itemsTotal = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
+                      const shippingFee = parseFloat(deliveryMontoEnvio || 0);
+                      const total = itemsTotal + shippingFee;
+                      const efecVal = parseFloat(deliveryMixtoEfectivo || 0);
+                      const tarjVal = parseFloat(deliveryMixtoTarjeta || 0);
+                      const yapeVal = parseFloat(deliveryMixtoYape || 0);
+                      const ingresado = efecVal + tarjVal + yapeVal;
+                      const restante = Math.max(0, total - (tarjVal + yapeVal));
+                      const vuelto = efecVal > restante ? efecVal - restante : 0;
+                      const diferencia = total - ingresado;
+
+                      return (
+                        <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-2xl shadow-sm space-y-3">
+                          <h4 className="text-[9px] font-black uppercase tracking-wider text-amber-600 flex justify-between">
+                            <span>Desglose de Pago Mixto</span>
+                            <span>Total: S/ {total.toFixed(2)}</span>
+                          </h4>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💵 Efec. (S/)</label>
+                              <input
+                                type="number"
+                                step="any"
+                                value={deliveryMixtoEfectivo}
+                                onChange={(e) => setDeliveryMixtoEfectivo(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💳 Tarj. (S/)</label>
+                              <input
+                                type="number"
+                                step="any"
+                                value={deliveryMixtoTarjeta}
+                                onChange={(e) => setDeliveryMixtoTarjeta(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">📱 Yape (S/)</label>
+                              <input
+                                type="number"
+                                step="any"
+                                value={deliveryMixtoYape}
+                                onChange={(e) => setDeliveryMixtoYape(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                          </div>
+                          <div className="bg-white/80 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-1 text-[9px] font-bold text-slate-500">
+                            <div className="flex justify-between">
+                              <span>Ingresado:</span>
+                              <span className="font-mono text-slate-700">S/ {ingresado.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Faltante:</span>
+                              <span className={`font-mono ${diferencia > 0 ? 'text-red-650' : 'text-emerald-600'}`}>
+                                S/ {Math.max(0, diferencia).toFixed(2)}
+                              </span>
+                            </div>
+                            {vuelto > 0 && (
+                              <div className="flex justify-between col-span-2 border-t border-slate-100 pt-1 mt-0.5 text-[10px] text-emerald-700 font-black">
+                                <span>💸 Vuelto:</span>
+                                <span className="font-mono">S/ {vuelto.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* DNI o RUC si es Boleta o Factura */}
                     {(deliveryTipoComprobante === 'Boleta' || deliveryTipoComprobante === 'Factura') && (
@@ -2832,9 +3100,9 @@ export default function CajaPage({ currentUser }) {
           ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
           : ventas;
 
-        const totalEfectivo = ventasFiltradas.filter(v => v.metodoPago === 'Efectivo').reduce((s, v) => s + v.total, 0);
-        const totalTarjeta = ventasFiltradas.filter(v => v.metodoPago === 'Tarjeta').reduce((s, v) => s + v.total, 0);
-        const totalYape = ventasFiltradas.filter(v => v.metodoPago === 'Yape').reduce((s, v) => s + v.total, 0);
+        const totalEfectivo = ventasFiltradas.reduce((s, v) => s + (v.montoEfectivo || 0), 0);
+        const totalTarjeta = ventasFiltradas.reduce((s, v) => s + (v.montoTarjeta || 0), 0);
+        const totalYape = ventasFiltradas.reduce((s, v) => s + (v.montoYape || 0), 0);
         const totalPedidosYa = ventasFiltradas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0);
         const totalConsumos = ventasFiltradas.filter(v => v.metodoPago === 'Consumo').reduce((s, v) => s + v.total, 0);
         // Total Caja = solo ingresos reales (sin PedidosYa ni Cortesías ni Consumo)
@@ -2985,27 +3253,103 @@ export default function CajaPage({ currentUser }) {
               {/* Nuevo método */}
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Nuevo Método de Pago</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo', 'Cortesía'].map(mp => (
+                <div className="grid grid-cols-4 gap-1.5">
+                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo', 'Cortesía', 'Mixto'].map(mp => (
                     <button
                       key={mp}
+                      type="button"
                       onClick={() => setCambioNuevoMetodo(mp)}
-                      className={`py-2.5 px-2 rounded-2xl text-[10px] font-black uppercase border-2 transition-all ${
+                      className={`py-2 px-1 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${
                         cambioNuevoMetodo === mp
                           ? mp === 'Efectivo' ? 'bg-emerald-500 border-emerald-600 text-white' :
                             mp === 'Tarjeta' ? 'bg-blue-500 border-blue-600 text-white' :
                             mp === 'Yape' ? 'bg-purple-500 border-purple-600 text-white' :
                             mp === 'Consumo' ? 'bg-slate-700 border-slate-800 text-white' :
                             mp === 'Cortesía' ? 'bg-amber-500 border-amber-600 text-slate-950' :
+                            mp === 'Mixto' ? 'bg-orange-500 border-orange-600 text-white' :
                             'bg-indigo-500 border-indigo-600 text-white'
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}
                     >
-                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : mp === 'Consumo' ? '👤' : mp === 'Cortesía' ? '🎁' : '🛵'} {mp === 'Consumo' ? 'Consumo' : mp === 'Cortesía' ? 'Corte.' : mp}
+                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : mp === 'Consumo' ? '👤' : mp === 'Cortesía' ? '🎁' : mp === 'Mixto' ? '➕' : '🛵'} {mp === 'Consumo' ? 'Consumo' : mp === 'Cortesía' ? 'Corte.' : mp}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Pago Mixto para Corrección */}
+              {cambioNuevoMetodo === 'Mixto' && (() => {
+                const total = ventaACambiar.total;
+                const efecVal = parseFloat(cambioMixtoEfectivo || 0);
+                const tarjVal = parseFloat(cambioMixtoTarjeta || 0);
+                const yapeVal = parseFloat(cambioMixtoYape || 0);
+                const ingresado = efecVal + tarjVal + yapeVal;
+                const restante = Math.max(0, total - (tarjVal + yapeVal));
+                const vuelto = efecVal > restante ? efecVal - restante : 0;
+                const diferencia = total - ingresado;
+
+                return (
+                  <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-2xl shadow-sm space-y-3">
+                    <h4 className="text-[9px] font-black uppercase tracking-wider text-amber-600 flex justify-between">
+                      <span>Desglose de Pago Mixto</span>
+                      <span>Total: S/ {total.toFixed(2)}</span>
+                    </h4>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💵 Efec. (S/)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={cambioMixtoEfectivo}
+                          onChange={(e) => setCambioMixtoEfectivo(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💳 Tarj. (S/)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={cambioMixtoTarjeta}
+                          onChange={(e) => setCambioMixtoTarjeta(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">📱 Yape (S/)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={cambioMixtoYape}
+                          onChange={(e) => setCambioMixtoYape(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="bg-white/80 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-1 text-[9px] font-bold text-slate-500">
+                      <div className="flex justify-between">
+                        <span>Ingresado:</span>
+                        <span className="font-mono text-slate-700">S/ {ingresado.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Faltante:</span>
+                        <span className={`font-mono ${diferencia > 0 ? 'text-red-650' : 'text-emerald-600'}`}>
+                          S/ {Math.max(0, diferencia).toFixed(2)}
+                        </span>
+                      </div>
+                      {vuelto > 0 && (
+                        <div className="flex justify-between col-span-2 border-t border-slate-100 pt-1 mt-0.5 text-[10px] text-emerald-700 font-black">
+                          <span>💸 Vuelto:</span>
+                          <span className="font-mono">S/ {vuelto.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* PIN Admin */}
               <div>
@@ -3503,9 +3847,24 @@ export default function CajaPage({ currentUser }) {
                 <strong>FORMA DE PAGO:</strong> <span className="uppercase">{
                   activeComprobante.metodoPago === 'Consumo' ? 'DESCUENTO PLANILLA (PERSONAL)' :
                   activeComprobante.metodoPago === 'Cortesía' ? 'CORTESÍA / CONSUMO INTERNO' :
+                  activeComprobante.metodoPago === 'Mixto' ? 'PAGO MIXTO' :
                   activeComprobante.metodoPago === 'Efectivo' ? 'CONTADO' : 'CONTADO (' + activeComprobante.metodoPago + ')'
                 }</span>
               </div>
+              
+              {activeComprobante.metodoPago === 'Mixto' && (
+                <div className="mt-1.5 border-t border-dashed border-black pt-1.5 space-y-0.5 text-[10px]">
+                  {activeComprobante.montoEfectivo > 0 && (
+                    <div className="flex justify-between"><span>- EFECTIVO:</span> <span>S/ {activeComprobante.montoEfectivo.toFixed(2)}</span></div>
+                  )}
+                  {activeComprobante.montoTarjeta > 0 && (
+                    <div className="flex justify-between"><span>- TARJETA:</span> <span>S/ {activeComprobante.montoTarjeta.toFixed(2)}</span></div>
+                  )}
+                  {activeComprobante.montoYape > 0 && (
+                    <div className="flex justify-between"><span>- YAPE/PLIN:</span> <span>S/ {activeComprobante.montoYape.toFixed(2)}</span></div>
+                  )}
+                </div>
+              )}
               
               {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' ? (
                 <div className="flex justify-center my-5">

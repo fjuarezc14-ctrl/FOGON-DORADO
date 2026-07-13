@@ -1287,7 +1287,6 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
 // DELIVERY / PEDIDOS YA
 // ============================================================
 
-// POST /api/pedidos/llevar → Crear pedido de delivery / para llevar / delivery propio
 app.post('/api/pedidos/llevar', async (req, res) => {
   const { 
     codigoPedidosYa, 
@@ -1301,7 +1300,10 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     nombreCliente, 
     clienteDireccion, 
     montoDelivery,
-    telefono
+    telefono,
+    montoEfectivo,
+    montoTarjeta,
+    montoYape
   } = req.body;
 
   try {
@@ -1353,6 +1355,22 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     const subtotal = parseFloat((grandTotal / 1.18).toFixed(2));
     const igv = parseFloat((grandTotal - subtotal).toFixed(2));
     
+    let finalMontoEfectivo = 0;
+    let finalMontoTarjeta = 0;
+    let finalMontoYape = 0;
+
+    if (finalMetodoPago === 'Mixto') {
+      finalMontoEfectivo = parseFloat(montoEfectivo || 0);
+      finalMontoTarjeta = parseFloat(montoTarjeta || 0);
+      finalMontoYape = parseFloat(montoYape || 0);
+    } else if (finalMetodoPago === 'Efectivo') {
+      finalMontoEfectivo = grandTotal;
+    } else if (finalMetodoPago === 'Tarjeta') {
+      finalMontoTarjeta = grandTotal;
+    } else if (finalMetodoPago === 'Yape') {
+      finalMontoYape = grandTotal;
+    }
+
     // Asignar nombres por defecto segun tipo
     let finalNombreCliente = nombreCliente;
     if (!finalNombreCliente) {
@@ -1387,6 +1405,9 @@ app.post('/api/pedidos/llevar', async (req, res) => {
         igv,
         subtotal,
         metodoPago: finalMetodoPago,
+        montoEfectivo: finalMontoEfectivo,
+        montoTarjeta: finalMontoTarjeta,
+        montoYape: finalMontoYape,
         estadoNubefact: initEstadoSunat,
         estadoSunat: initEstadoSunat,
         serie,
@@ -1814,9 +1835,9 @@ app.delete('/api/usuarios/:id', async (req, res) => {
 // PATCH /api/ventas/:ventaId/metodo-pago → Corregir método de pago (requiere PIN Administrador)
 app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
   const { ventaId } = req.params;
-  const { metodoPago, pin } = req.body;
+  const { metodoPago, pin, montoEfectivo, montoTarjeta, montoYape } = req.body;
 
-  const metodosPermitidos = ['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo', 'Cortesía'];
+  const metodosPermitidos = ['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo', 'Cortesía', 'Mixto'];
   if (!metodoPago || !metodosPermitidos.includes(metodoPago)) {
     return res.status(400).json({ error: `Método de pago inválido. Opciones: ${metodosPermitidos.join(', ')}` });
   }
@@ -1861,6 +1882,22 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
     const subtotal = parseFloat((nuevoTotal / 1.18).toFixed(2));
     const igv = parseFloat((nuevoTotal - subtotal).toFixed(2));
 
+    let finalMontoEfectivo = 0;
+    let finalMontoTarjeta = 0;
+    let finalMontoYape = 0;
+
+    if (metodoPago === 'Mixto') {
+      finalMontoEfectivo = parseFloat(montoEfectivo || 0);
+      finalMontoTarjeta = parseFloat(montoTarjeta || 0);
+      finalMontoYape = parseFloat(montoYape || 0);
+    } else if (metodoPago === 'Efectivo') {
+      finalMontoEfectivo = nuevoTotal;
+    } else if (metodoPago === 'Tarjeta') {
+      finalMontoTarjeta = nuevoTotal;
+    } else if (metodoPago === 'Yape') {
+      finalMontoYape = nuevoTotal;
+    }
+
     // Actualizar Venta
     const ventaActualizada = await prisma.venta.update({
       where: { id: parseInt(ventaId) },
@@ -1868,7 +1905,10 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
         metodoPago,
         total: nuevoTotal,
         subtotal,
-        igv
+        igv,
+        montoEfectivo: finalMontoEfectivo,
+        montoTarjeta: finalMontoTarjeta,
+        montoYape: finalMontoYape
       },
     });
 
@@ -1995,7 +2035,21 @@ app.patch('/api/ventas/:ventaId/tipo-entrega', async (req, res) => {
 
 // POST /api/ventas → Cobrar mesa (acepta pedidoIds array o pedidoId simple)
 app.post('/api/ventas', async (req, res) => {
-  const { pedidoId, pedidoIds, tipoComprobante, numDocumento, nombreCliente, total, metodoPago, clienteDireccion, ofertaDescripcion, descuentoAplicado } = req.body;
+  const { 
+    pedidoId, 
+    pedidoIds, 
+    tipoComprobante, 
+    numDocumento, 
+    nombreCliente, 
+    total, 
+    metodoPago, 
+    clienteDireccion, 
+    ofertaDescripcion, 
+    descuentoAplicado,
+    montoEfectivo,
+    montoTarjeta,
+    montoYape
+  } = req.body;
   const idsAPagar = pedidoIds || [pedidoId];
   const idPrincipal = idsAPagar[idsAPagar.length - 1]; // El más reciente como venta principal
 
@@ -2003,6 +2057,22 @@ app.post('/api/ventas', async (req, res) => {
     const finalTotal = metodoPago === 'Cortesía' ? 0.00 : total;
     const subtotal = parseFloat((finalTotal / 1.18).toFixed(2));
     const igv = parseFloat((finalTotal - subtotal).toFixed(2));
+
+    let finalMontoEfectivo = 0;
+    let finalMontoTarjeta = 0;
+    let finalMontoYape = 0;
+
+    if (metodoPago === 'Mixto') {
+      finalMontoEfectivo = parseFloat(montoEfectivo || 0);
+      finalMontoTarjeta = parseFloat(montoTarjeta || 0);
+      finalMontoYape = parseFloat(montoYape || 0);
+    } else if (metodoPago === 'Efectivo') {
+      finalMontoEfectivo = finalTotal;
+    } else if (metodoPago === 'Tarjeta') {
+      finalMontoTarjeta = finalTotal;
+    } else if (metodoPago === 'Yape') {
+      finalMontoYape = finalTotal;
+    }
 
     // Mover todos los items de los otros pedidos adicionales al pedido principal para que se consoliden en el detalle de la venta
     if (idsAPagar.length > 1) {
@@ -2038,6 +2108,9 @@ app.post('/api/ventas', async (req, res) => {
         igv, 
         subtotal, 
         metodoPago,
+        montoEfectivo: finalMontoEfectivo,
+        montoTarjeta: finalMontoTarjeta,
+        montoYape: finalMontoYape,
         estadoNubefact: initEstadoSunat,
         estadoSunat: initEstadoSunat,
         serie,
@@ -2226,9 +2299,7 @@ app.get('/api/ventas/resumen', async (req, res) => {
     const atendidas = ventas.length;
 
     // Desglose por tipo
-    const ingresosCaja = ventas
-      .filter(v => v.metodoPago !== 'PedidosYa' && v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo')
-      .reduce((s, v) => s + v.total, 0);
+    const ingresosCaja = ventas.reduce((s, v) => s + (v.montoEfectivo || 0) + (v.montoTarjeta || 0) + (v.montoYape || 0), 0);
     const ingresosPedidosYa = ventas
       .filter(v => v.metodoPago === 'PedidosYa')
       .reduce((s, v) => s + v.total, 0);
@@ -2239,11 +2310,11 @@ app.get('/api/ventas/resumen', async (req, res) => {
       .filter(v => v.metodoPago === 'Cortesía')
       .reduce((s, v) => s + v.total, 0);
 
-    // Desglose por método (solo ingresos reales de caja)
+    // Desglose por método (de todos los ingresos reales de caja distribuidos)
     const porMetodoPago = {
-      Efectivo: ventas.filter(v => v.metodoPago === 'Efectivo').reduce((s, v) => s + v.total, 0),
-      Tarjeta: ventas.filter(v => v.metodoPago === 'Tarjeta').reduce((s, v) => s + v.total, 0),
-      Yape: ventas.filter(v => v.metodoPago === 'Yape').reduce((s, v) => s + v.total, 0),
+      Efectivo: ventas.reduce((s, v) => s + (v.montoEfectivo || 0), 0),
+      Tarjeta: ventas.reduce((s, v) => s + (v.montoTarjeta || 0), 0),
+      Yape: ventas.reduce((s, v) => s + (v.montoYape || 0), 0),
       PedidosYa: ingresosPedidosYa,
       Consumo: totalConsumos,
       Cortesía: totalCortesias,
@@ -2697,9 +2768,34 @@ app.get('/api/reportes/rotacion', async (req, res) => {
 // ============================================================
 // INICIO DEL SERVIDOR
 // ============================================================
+async function ejecutarMigracionMontos() {
+  try {
+    console.log("⚡ Iniciando migración de montos de pago históricos...");
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Venta" 
+      SET "montoEfectivo" = "total" 
+      WHERE "metodoPago" = 'Efectivo' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0;
+    `);
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Venta" 
+      SET "montoTarjeta" = "total" 
+      WHERE "metodoPago" = 'Tarjeta' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0;
+    `);
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Venta" 
+      SET "montoYape" = "total" 
+      WHERE "metodoPago" = 'Yape' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0;
+    `);
+    console.log("✅ Migración de montos históricos completada exitosamente.");
+  } catch (err) {
+    console.error("❌ Error al ejecutar migración de montos históricos:", err);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Backend Fogón Dorado v3 corriendo en http://localhost:${PORT}`);
+  await ejecutarMigracionMontos();
 });
 
 

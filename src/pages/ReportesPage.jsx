@@ -171,6 +171,9 @@ export default function ReportesPage() {
       totalLetras,
       hashResumen: "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=",
       metodoPago: v.metodoPago,
+      montoEfectivo: v.montoEfectivo || 0,
+      montoTarjeta: v.montoTarjeta || 0,
+      montoYape: v.montoYape || 0,
       qrImageUrl,
       deliveryInfo: parsedDelivery,
     });
@@ -1091,9 +1094,24 @@ export default function ReportesPage() {
                 <strong>FORMA DE PAGO:</strong> <span className="uppercase">{
                   activeComprobante.metodoPago === 'Consumo' ? 'DESCUENTO PLANILLA (PERSONAL)' :
                   activeComprobante.metodoPago === 'Cortesía' ? 'CORTESÍA / CONSUMO INTERNO' :
+                  activeComprobante.metodoPago === 'Mixto' ? 'PAGO MIXTO' :
                   activeComprobante.metodoPago === 'Efectivo' ? 'CONTADO' : 'CONTADO (' + activeComprobante.metodoPago + ')'
                 }</span>
               </div>
+              
+              {activeComprobante.metodoPago === 'Mixto' && (
+                <div className="mt-1.5 border-t border-dashed border-black pt-1.5 space-y-0.5 text-[10px]">
+                  {activeComprobante.montoEfectivo > 0 && (
+                    <div className="flex justify-between"><span>- EFECTIVO:</span> <span>S/ {activeComprobante.montoEfectivo.toFixed(2)}</span></div>
+                  )}
+                  {activeComprobante.montoTarjeta > 0 && (
+                    <div className="flex justify-between"><span>- TARJETA:</span> <span>S/ {activeComprobante.montoTarjeta.toFixed(2)}</span></div>
+                  )}
+                  {activeComprobante.montoYape > 0 && (
+                    <div className="flex justify-between"><span>- YAPE/PLIN:</span> <span>S/ {activeComprobante.montoYape.toFixed(2)}</span></div>
+                  )}
+                </div>
+              )}
               
               {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' ? (
                 <div className="flex justify-center my-5">
