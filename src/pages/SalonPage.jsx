@@ -986,6 +986,16 @@ export default function SalonPage({ currentUser }) {
                   <span className="text-[8px] md:text-[9px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full mt-1.5 uppercase truncate max-w-[110px] text-center">
                     👤 {m.pedidoData.mesero}
                   </span>
+                  {m.pedidoData.estadoEnsalada === 'Pendiente' && (
+                    <span className="text-[8px] md:text-[9px] font-black text-emerald-700 bg-emerald-100 border border-emerald-250 px-2 py-0.5 rounded-full mt-1 uppercase animate-pulse text-center">
+                      🥗 Ensalada Pend.
+                    </span>
+                  )}
+                  {m.pedidoData.estadoEnsalada === 'Listo' && (
+                    <span className="text-[8px] md:text-[9px] font-black text-blue-700 bg-blue-100 border border-blue-250 px-2 py-0.5 rounded-full mt-1 uppercase text-center">
+                      🥗 Ensalada Lista
+                    </span>
+                  )}
                 </div>
               ) : (
                 <p className="text-[10px] md:text-xs mt-1 text-slate-400 font-medium">Disponible</p>
@@ -1137,7 +1147,15 @@ export default function SalonPage({ currentUser }) {
               <div className="w-full md:w-2/5 bg-white flex flex-col min-h-[40vh] md:min-h-0">
                 <div className="p-3 md:p-4 border-b border-slate-100 bg-amber-50 shrink-0 flex justify-between items-center">
                   <h3 className="font-black text-amber-800 uppercase text-xs flex items-center gap-2"><Receipt className="w-4 h-4" /> Pedido Actual</h3>
-                  <span className={`text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-slate-200 uppercase ${badgeEstado} ${mesaActual?.estado === 'Servido' ? 'animate-pulse' : ''}`}>{badgeTexto}</span>
+                  <div className="flex items-center gap-1.5">
+                    {mesaActual?.pedidoData?.estadoEnsalada === 'Pendiente' && (
+                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded uppercase animate-pulse">🥗 Ens: Pend.</span>
+                    )}
+                    {mesaActual?.pedidoData?.estadoEnsalada === 'Listo' && (
+                      <span className="text-[9px] font-black bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded uppercase">🥗 Ens: Listo</span>
+                    )}
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-slate-200 uppercase ${badgeEstado} ${mesaActual?.estado === 'Servido' ? 'animate-pulse' : ''}`}>{badgeTexto}</span>
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 md:p-4 custom-scrollbar bg-slate-50/50">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, CheckCheck, CheckCircle2, User, Truck, XCircle, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCheck, CheckCircle2, User, Truck, XCircle, AlertTriangle, Salad } from 'lucide-react';
 import { api } from '../api';
 
 const parseDeliveryInfo = (code) => {
@@ -215,8 +215,8 @@ export default function CocinaPage() {
                     )}
                   </div>
 
-                  {/* Info del pedido */}
-                  <div className="p-3 flex justify-between items-center text-xs font-black text-slate-500 border-b-2 border-slate-900 shrink-0 bg-slate-50">
+                   {/* Info del pedido */}
+                  <div className="p-3 flex justify-between items-center text-xs font-black text-slate-500 border-b border-slate-200 shrink-0 bg-slate-50">
                     <span className="flex items-center gap-1.5">
                       <User className="w-4 h-4 text-slate-400" />
                       {p.mesero}
@@ -226,6 +226,17 @@ export default function CocinaPage() {
                       {p.hora}
                     </span>
                   </div>
+
+                  {p.estadoEnsalada && p.estadoEnsalada !== 'No Aplica' && (
+                    <div className="px-3 py-1.5 bg-slate-50 border-b-2 border-slate-900 flex items-center justify-between text-[10px] font-black uppercase shrink-0">
+                      <span className="text-slate-500 flex items-center gap-1"><Salad className="w-3.5 h-3.5" /> Ensalada:</span>
+                      {p.estadoEnsalada === 'Pendiente' ? (
+                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 animate-pulse">Pendiente</span>
+                      ) : (
+                        <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Listo</span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Items (solo cocina, sin bebidas) */}
                   <div className="p-4 flex-1 bg-white min-h-[150px]">

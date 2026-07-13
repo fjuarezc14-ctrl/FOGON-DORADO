@@ -54,10 +54,11 @@ model Pedido {
   mesa      Mesa?        @relation(fields: [mesaId], references: [id])
   mesaId    Int?         // Opcional: null para pedidos de delivery
   mesero    String
-  estado    String       @default("Cocina") // "Cocina", "Servido", "Cobrado", "Cancelado"
-  total     Float
-  adicional Boolean      @default(false)
-  createdAt DateTime     @default(now())
+  estado          String       @default("Cocina") // "Cocina", "Servido", "Cobrado", "Cancelado"
+  estadoEnsalada  String       @default("No Aplica") // "Pendiente", "Listo", "No Aplica"
+  total           Float
+  adicional       Boolean      @default(false)
+  createdAt       DateTime     @default(now())
 
   // --- Delivery / PedidosYa ---
   tipoEntrega      String    @default("salon")  // "salon" | "llevar"

@@ -324,6 +324,26 @@ async function expandPedidoItemsForDb(itemsList) {
   return expandedList;
 }
 
+async function evaluarEstadoEnsalada(itemsList) {
+  const categoriasConEnsalada = ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
+  try {
+    for (const item of itemsList) {
+      const prodId = parseInt(item.id || item.productoId);
+      if (!prodId) continue;
+      const prod = await prisma.producto.findUnique({
+        where: { id: prodId },
+        select: { categoria: true }
+      });
+      if (prod && categoriasConEnsalada.includes(prod.categoria)) {
+        return 'Pendiente';
+      }
+    }
+  } catch (err) {
+    console.error('Error al evaluar estado de ensalada:', err);
+  }
+  return 'No Aplica';
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -474,6 +494,14 @@ app.get('/api/mesas', async (req, res) => {
       const primerPedido = pedidosActivos[0];
       const ultimoPedido = pedidosActivos[pedidosActivos.length - 1];
 
+      let consolidadoEstadoEnsalada = 'No Aplica';
+      const estadosEnsaladas = pedidosActivos.map(p => p.estadoEnsalada);
+      if (estadosEnsaladas.includes('Pendiente')) {
+        consolidadoEstadoEnsalada = 'Pendiente';
+      } else if (estadosEnsaladas.includes('Listo')) {
+        consolidadoEstadoEnsalada = 'Listo';
+      }
+
       return {
         num: m.numero,
         estado: m.estado,
@@ -488,6 +516,7 @@ app.get('/api/mesas', async (req, res) => {
           pedidoCreadoEn: ultimoPedido.createdAt.toISOString(),
           adicional: pedidosActivos.length > 1,
           items: todosLosItems,
+          estadoEnsalada: consolidadoEstadoEnsalada,
         },
       };
     });
@@ -660,6 +689,7 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
 
     const itemsNuevos = items.filter(i => !i.historial);
     const expandedItems = await expandPedidoItemsForDb(itemsNuevos);
+    const finalEstadoEnsalada = await evaluarEstadoEnsalada(itemsNuevos);
 
     const pedido = await prisma.pedido.create({
       data: {
@@ -668,6 +698,7 @@ app.post('/api/mesas/:num/pedido', async (req, res) => {
         total: parseFloat(total),
         adicional: adicional || false,
         estado: 'Cocina',
+        estadoEnsalada: finalEstadoEnsalada,
         items: {
           create: expandedItems.map(i => ({
             productoId: i.productoId,
@@ -726,6 +757,7 @@ app.get('/api/pedidos/cocina', async (req, res) => {
       codigoPedidosYa: p.codigoPedidosYa,
       mesero: p.mesero,
       adicional: p.adicional,
+      estadoEnsalada: p.estadoEnsalada,
       hora: p.createdAt.toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),
@@ -785,6 +817,70 @@ app.get('/api/pedidos/barra', async (req, res) => {
     })).filter(p => p.items.length > 0);
 
     res.json(formateados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/pedidos/ensaladas → Todos los pedidos con ensalada pendiente
+app.get('/api/pedidos/ensaladas', async (req, res) => {
+  try {
+    const pedidos = await prisma.pedido.findMany({
+      where: {
+        estadoEnsalada: 'Pendiente',
+        estado: { in: ['Cocina', 'Servido'] }
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        items: {
+          include: { producto: { select: { categoria: true } } },
+        },
+        mesa: true,
+      },
+    });
+
+    const categoriasConEnsalada = ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
+
+    const formateados = pedidos.map(p => ({
+      pedidoId: p.id,
+      mesaNum: p.mesa?.numero || null,
+      tipoEntrega: p.tipoEntrega,
+      codigoPedidosYa: p.codigoPedidosYa,
+      mesero: p.mesero,
+      adicional: p.adicional,
+      estadoCocina: p.estado,
+      hora: p.createdAt.toLocaleTimeString('es-PE', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
+      }),
+      items: p.items
+        .filter(i => {
+          const esBarra = BARRA_CATEGORIAS.includes(i.producto?.categoria);
+          const llevaEnsalada = categoriasConEnsalada.includes(i.producto?.categoria);
+          return llevaEnsalada && !esBarra && i.precio > 0;
+        })
+        .map(i => ({
+          nombre: i.nombre,
+          cant: i.cantidad,
+          precio: i.precio,
+          notas: i.notas || null,
+        })),
+    }));
+
+    res.json(formateados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/pedidos/:id/ensalada-lista → Marcar la ensalada del pedido como lista
+app.patch('/api/pedidos/:id/ensalada-lista', async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    const ped = await prisma.pedido.update({
+      where: { id },
+      data: { estadoEnsalada: 'Listo' },
+    });
+    res.json({ ok: true, estadoEnsalada: ped.estadoEnsalada });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1320,6 +1416,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     }
 
     const expandedItems = await expandPedidoItemsForDb(items);
+    const finalEstadoEnsalada = await evaluarEstadoEnsalada(items);
 
     const pedido = await prisma.pedido.create({
       data: {
@@ -1327,6 +1424,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
         mesero: String(cajero),
         total: grandTotal,
         estado: 'Cocina', // Todos van a Cocina primero para que la cocina/barra los prepare
+        estadoEnsalada: finalEstadoEnsalada,
         tipoEntrega: isOwnDelivery ? 'delivery' : 'llevar',
         codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null,
         items: {
@@ -2795,10 +2893,28 @@ async function ejecutarMigracionMontos() {
   }
 }
 
+async function ejecutarMigracionEnsaladas() {
+  try {
+    console.log("⚡ Iniciando migración de estado de ensaladas histórico...");
+    await prisma.pedido.updateMany({
+      where: {
+        NOT: {
+          estado: 'Cocina'
+        }
+      },
+      data: { estadoEnsalada: 'No Aplica' }
+    });
+    console.log("✅ Migración de ensaladas completada.");
+  } catch (err) {
+    console.error("❌ Error al ejecutar migración de ensaladas:", err);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`🚀 Backend Fogón Dorado v3 corriendo en http://localhost:${PORT}`);
   await ejecutarMigracionMontos();
+  await ejecutarMigracionEnsaladas();
 });
 
 

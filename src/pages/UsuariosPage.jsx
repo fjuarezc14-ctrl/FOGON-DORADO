@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, X, Trash2, Edit, Eye, EyeOff, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, UsersRound, Save } from 'lucide-react';
+import { UserPlus, X, Trash2, Edit, Eye, EyeOff, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, UsersRound, Save, Salad } from 'lucide-react';
 import { api } from '../api';
 
 export default function UsuariosPage() {
@@ -28,11 +28,12 @@ export default function UsuariosPage() {
 
   const handleRolChange = (rol) => {
     let permisos = [];
-    if (rol === 'Administrador') permisos = ['Dashboard', 'Salon', 'Cocina', 'Barra', 'Caja', 'Reportes', 'Usuarios'];
+    if (rol === 'Administrador') permisos = ['Dashboard', 'Salon', 'Cocina', 'Barra', 'Caja', 'Reportes', 'Usuarios', 'Ensaladas'];
     else if (rol === 'Mozo') permisos = ['Salon', 'Barra'];
-    else if (rol === 'Cocinero') permisos = ['Cocina'];
+    else if (rol === 'Cocinero') permisos = ['Cocina', 'Ensaladas'];
     else if (rol === 'Cajero') permisos = ['Dashboard', 'Salon', 'Caja'];
     else if (rol === 'Contador') permisos = ['Dashboard', 'Reportes'];
+    else if (rol === 'Ensaladero') permisos = ['Ensaladas'];
     setNewUser({ ...newUser, rol, permisos });
   };
 
@@ -104,6 +105,7 @@ export default function UsuariosPage() {
     { id: 'Salon', icon: LayoutGrid, label: 'Salón/Mesas' },
     { id: 'Cocina', icon: ChefHat, label: 'Cocina/Pedidos' },
     { id: 'Barra', icon: GlassWater, label: 'Barra/Bebidas' },
+    { id: 'Ensaladas', icon: Salad, label: 'Ensaladas/Fríos' },
     { id: 'Caja', icon: Calculator, label: 'Caja/Cobros' },
     { id: 'Reportes', icon: PieChart, label: 'Reportes' },
     { id: 'Usuarios', icon: UsersRound, label: 'Usuarios' },
@@ -226,6 +228,7 @@ export default function UsuariosPage() {
                     <option value="Cajero">Cajero / Recepción</option>
                     <option value="Mozo">Mozo / Mesero</option>
                     <option value="Cocinero">Jefe de Cocina</option>
+                    <option value="Ensaladero">Encargado de Ensaladas</option>
                     <option value="Contador">Contador</option>
                   </select>
                 </div>

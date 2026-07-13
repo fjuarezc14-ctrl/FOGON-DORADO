@@ -35,6 +35,10 @@ export const api = {
     method: 'PATCH',
   }).then(r => r.json()),
 
+  // Ensaladas
+  getPedidosEnsaladas: () => fetch(`${API_BASE}/api/pedidos/ensaladas`).then(r => r.json()),
+  prepararEnsalada: (pedidoId) => fetch(`${API_BASE}/api/pedidos/${pedidoId}/ensalada-lista`, { method: 'PATCH' }).then(r => r.json()),
+
   // Cancelación de pedidos (mozo)
   cancelarPedido: (id, body) => fetch(`${API_BASE}/api/pedidos/${id}/cancelar`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

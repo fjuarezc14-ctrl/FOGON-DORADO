@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, LogOut, Lock } from 'lucide-react';
+import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, LogOut, Lock, Salad } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import logoUrl from './assets/logo.jpg';
 import { api } from './api';
@@ -12,6 +12,7 @@ import ComprasPage from './pages/ComprasPage';
 import ReportesPage from './pages/ReportesPage';
 import CartaPage from './pages/CartaPage';
 import UsuariosPage from './pages/UsuariosPage';
+import EnsaladasPage from './pages/EnsaladasPage';
 
 // === PROTECTED ROUTE NAVIGATION GUARD ===
 const ProtectedRoute = ({ children, permission, currentUser }) => {
@@ -24,6 +25,7 @@ const ProtectedRoute = ({ children, permission, currentUser }) => {
       firstPermitted === 'Salon' ? '/salon' :
       firstPermitted === 'Cocina' ? '/cocina' :
       firstPermitted === 'Barra' ? '/barra' :
+      firstPermitted === 'Ensaladas' ? '/ensaladas' :
       firstPermitted === 'Caja' ? '/caja' :
       firstPermitted === 'Reportes' ? '/reportes' : '/salon';
     return <Navigate to={pathToRedirect} replace />;
@@ -155,6 +157,7 @@ const Sidebar = ({ isOpen, toggleSidebar, currentUser, onLogout }) => {
     { path: '/salon', icon: LayoutGrid, label: 'Salón / Mesas', permission: 'Salon' },
     { path: '/cocina', icon: ChefHat, label: 'Cocina / Pedidos', permission: 'Cocina' },
     { path: '/barra', icon: GlassWater, label: 'Barra / Bebidas', permission: 'Barra' },
+    { path: '/ensaladas', icon: Salad, label: 'Ensaladas / Fríos', permission: 'Ensaladas' },
     { path: '/caja', icon: Calculator, label: 'Caja / Cobros', permission: 'Caja' },
     { path: '/compras', icon: BookOpen, label: 'Compras / Gastos', permission: 'Caja' },
     { path: '/reportes', icon: PieChart, label: 'Reportes (Contador)', permission: 'Reportes' },
@@ -313,6 +316,7 @@ function App() {
         <Route path="/salon" element={<Layout title="Gestión de Salón" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Salon" currentUser={currentUser}><SalonPage currentUser={currentUser} /></ProtectedRoute></Layout>} />
         <Route path="/cocina" element={<Layout title="Monitor de Preparación" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Cocina" currentUser={currentUser}><CocinaPage /></ProtectedRoute></Layout>} />
         <Route path="/barra" element={<Layout title="Monitor de Barra" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Barra" currentUser={currentUser}><BarraPage /></ProtectedRoute></Layout>} />
+        <Route path="/ensaladas" element={<Layout title="Monitor de Ensaladas" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Ensaladas" currentUser={currentUser}><EnsaladasPage /></ProtectedRoute></Layout>} />
         <Route path="/caja" element={<Layout title="Punto de Cobro" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Caja" currentUser={currentUser}><CajaPage currentUser={currentUser} /></ProtectedRoute></Layout>} />
         <Route path="/compras" element={<Layout title="Registro de Compras" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Caja" currentUser={currentUser}><ComprasPage currentUser={currentUser} /></ProtectedRoute></Layout>} />
         <Route path="/reportes" element={<Layout title="Panel Contable" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Reportes" currentUser={currentUser}><ReportesPage /></ProtectedRoute></Layout>} />
