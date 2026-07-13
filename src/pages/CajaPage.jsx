@@ -1551,7 +1551,19 @@ export default function CajaPage({ currentUser }) {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-slate-900 text-amber-400 rounded-xl flex items-center justify-center font-black shadow-sm">{m.num}</div>
-                          <span className="font-black text-slate-800 uppercase tracking-tight">Mesa {m.num}</span>
+                          <div className="flex flex-col">
+                            <span className="font-black text-slate-800 uppercase tracking-tight">Mesa {m.num}</span>
+                            {m.pedidoData?.estadoEnsalada === 'Pendiente' && (
+                              <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-250 px-1.5 py-0.5 rounded mt-0.5 uppercase w-fit animate-pulse">
+                                🥗 Ens. Pendiente
+                              </span>
+                            )}
+                            {m.pedidoData?.estadoEnsalada === 'Listo' && (
+                              <span className="text-[9px] font-black text-blue-700 bg-blue-50 border border-blue-250 px-1.5 py-0.5 rounded mt-0.5 uppercase w-fit">
+                                🥗 Ens. Lista
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
