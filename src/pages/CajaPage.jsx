@@ -651,6 +651,11 @@ export default function CajaPage({ currentUser }) {
       const tarjVal = parseFloat(mixtoTarjeta || 0);
       const yapeVal = parseFloat(mixtoYape || 0);
 
+      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0) {
+        alert('Los montos de pago no pueden ser valores negativos.');
+        return;
+      }
+
       if (tarjVal + yapeVal > total) {
         alert('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
         return;
@@ -744,6 +749,11 @@ export default function CajaPage({ currentUser }) {
       const efecVal = parseFloat(cambioMixtoEfectivo || 0);
       const tarjVal = parseFloat(cambioMixtoTarjeta || 0);
       const yapeVal = parseFloat(cambioMixtoYape || 0);
+
+      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0) {
+        setCambioError('Los montos de pago no pueden ser valores negativos.');
+        return;
+      }
 
       if (tarjVal + yapeVal > total) {
         setCambioError('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
@@ -1374,6 +1384,11 @@ export default function CajaPage({ currentUser }) {
       const efecVal = parseFloat(deliveryMixtoEfectivo || 0);
       const tarjVal = parseFloat(deliveryMixtoTarjeta || 0);
       const yapeVal = parseFloat(deliveryMixtoYape || 0);
+
+      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0) {
+        alert('Los montos de pago no pueden ser valores negativos.');
+        return;
+      }
 
       if (tarjVal + yapeVal > grandTotal) {
         alert('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
@@ -2194,6 +2209,7 @@ export default function CajaPage({ currentUser }) {
                           <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">💵 Efectivo (S/)</label>
                           <input
                             type="number"
+                            min="0"
                             step="any"
                             value={mixtoEfectivo}
                             onChange={(e) => setMixtoEfectivo(e.target.value)}
@@ -2205,6 +2221,7 @@ export default function CajaPage({ currentUser }) {
                           <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">💳 Tarjeta (S/)</label>
                           <input
                             type="number"
+                            min="0"
                             step="any"
                             value={mixtoTarjeta}
                             onChange={(e) => setMixtoTarjeta(e.target.value)}
@@ -2216,6 +2233,7 @@ export default function CajaPage({ currentUser }) {
                           <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">📱 Yape/Plin (S/)</label>
                           <input
                             type="number"
+                            min="0"
                             step="any"
                             value={mixtoYape}
                             onChange={(e) => setMixtoYape(e.target.value)}
@@ -2709,6 +2727,7 @@ export default function CajaPage({ currentUser }) {
                               <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💵 Efec. (S/)</label>
                               <input
                                 type="number"
+                                min="0"
                                 step="any"
                                 value={deliveryMixtoEfectivo}
                                 onChange={(e) => setDeliveryMixtoEfectivo(e.target.value)}
@@ -2720,6 +2739,7 @@ export default function CajaPage({ currentUser }) {
                               <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💳 Tarj. (S/)</label>
                               <input
                                 type="number"
+                                min="0"
                                 step="any"
                                 value={deliveryMixtoTarjeta}
                                 onChange={(e) => setDeliveryMixtoTarjeta(e.target.value)}
@@ -2731,6 +2751,7 @@ export default function CajaPage({ currentUser }) {
                               <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">📱 Yape (S/)</label>
                               <input
                                 type="number"
+                                min="0"
                                 step="any"
                                 value={deliveryMixtoYape}
                                 onChange={(e) => setDeliveryMixtoYape(e.target.value)}
@@ -3299,6 +3320,7 @@ export default function CajaPage({ currentUser }) {
                         <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💵 Efec. (S/)</label>
                         <input
                           type="number"
+                          min="0"
                           step="any"
                           value={cambioMixtoEfectivo}
                           onChange={(e) => setCambioMixtoEfectivo(e.target.value)}
@@ -3310,6 +3332,7 @@ export default function CajaPage({ currentUser }) {
                         <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💳 Tarj. (S/)</label>
                         <input
                           type="number"
+                          min="0"
                           step="any"
                           value={cambioMixtoTarjeta}
                           onChange={(e) => setCambioMixtoTarjeta(e.target.value)}
@@ -3321,6 +3344,7 @@ export default function CajaPage({ currentUser }) {
                         <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">📱 Yape (S/)</label>
                         <input
                           type="number"
+                          min="0"
                           step="any"
                           value={cambioMixtoYape}
                           onChange={(e) => setCambioMixtoYape(e.target.value)}
