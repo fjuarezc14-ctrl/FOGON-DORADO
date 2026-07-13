@@ -17,9 +17,10 @@ import EnsaladasPage from './pages/EnsaladasPage';
 // === PROTECTED ROUTE NAVIGATION GUARD ===
 const ProtectedRoute = ({ children, permission, currentUser }) => {
   const userPermissions = currentUser?.permisos || [];
-  if (!userPermissions.includes(permission)) {
+  const isAdmin = currentUser?.rol === 'Administrador';
+  if (!isAdmin && !userPermissions.includes(permission)) {
     // Redireccionar al primer módulo permitido del usuario
-    const firstPermitted = userPermissions.find(p => p !== 'Usuarios') || userPermissions[0];
+    const firstPermitted = userPermissions.find(p => p !== 'Usuarios') || userPermissions[0] || 'Salon';
     const pathToRedirect = 
       firstPermitted === 'Dashboard' ? '/' :
       firstPermitted === 'Salon' ? '/salon' :
@@ -164,9 +165,10 @@ const Sidebar = ({ isOpen, toggleSidebar, currentUser, onLogout }) => {
     { path: '/carta', icon: BookOpen, label: 'Carta e Inventario', permission: 'Dashboard' },
   ];
 
-  // Filtrar ítems según permisos del usuario activo
+  // Filtrar ítems según permisos del usuario activo o si es administrador
   const userPermissions = currentUser?.permisos || [];
-  const filteredItems = menuItems.filter(item => userPermissions.includes(item.permission));
+  const isAdmin = currentUser?.rol === 'Administrador';
+  const filteredItems = menuItems.filter(item => isAdmin || userPermissions.includes(item.permission));
 
   return (
     <>
