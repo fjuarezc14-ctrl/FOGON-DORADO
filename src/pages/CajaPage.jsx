@@ -1859,7 +1859,7 @@ export default function CajaPage({ currentUser }) {
 
         {/* RESUMEN LATERAL */}
         {(() => {
-          const ventasFiltradas = (ultimoCierre && !mostrarTodoElDia)
+          const ventasFiltradas = ultimoCierre
             ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
             : ventas;
           const activeAtendidas = ventasFiltradas.length;
@@ -2943,6 +2943,7 @@ export default function CajaPage({ currentUser }) {
                     const nowISO = new Date().toISOString();
                     localStorage.setItem('ultimoCierre', nowISO);
                     setUltimoCierre(nowISO);
+                    setMostrarTodoElDia(false);
                     alert(`✅ ¡Cierre de Turno exitoso!\n\nTotal en Caja (real): S/ ${totalCalculado.toFixed(2)}\n${totalPedidosYa > 0 ? `PedidosYa (cobro semanal): S/ ${totalPedidosYa.toFixed(2)}\n` : ''}El turno ha sido archivado e inicializado.`);
                     setCierreModalOpen(false);
                   }}
