@@ -1897,43 +1897,54 @@ export default function CajaPage({ currentUser }) {
                           <td className="px-6 py-4">
                             {(() => {
                               let method = v.metodoPago;
-                              if (method === 'PedidosYa' && v.codigoPedidosYa) {
-                                if (v.codigoPedidosYa.startsWith('DELIVERY -') || v.codigoPedidosYa.startsWith('LLEVAR -')) {
-                                  method = 'Efectivo';
-                                }
-                              }
                               const editable = true;
                               return (
-                                <div className="flex items-center gap-1.5">
-                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
-                                    method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                                    method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                                    method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
-                                    method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
-                                    method === 'Consumo' ? 'bg-violet-100 border-violet-300 text-violet-700' :
-                                    'bg-indigo-50 border-indigo-200 text-indigo-700'
-                                  }`}>{method}</span>
-                                  {editable && (
-                                    <button
-                                      title="Corregir método de pago (requiere PIN Administrador)"
-                                      onClick={() => {
-                                        setVentaACambiar(v);
-                                        setCambioNuevoMetodo(v.metodoPago);
-                                        setCambioPin('');
-                                        setCambioError('');
-                                        setCambioMetodoModal(true);
-                                      }}
-                                      className="p-1 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-400 hover:text-amber-600 border border-slate-200 hover:border-amber-300 transition-all"
-                                    >
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-                                    </button>
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+                                      method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                                      method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                      method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                                      method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
+                                      method === 'Consumo' ? 'bg-violet-100 border-violet-300 text-violet-700' :
+                                      method === 'Mixto' ? 'bg-amber-100 border-amber-250 text-amber-900 font-black' :
+                                      'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                    }`}>{method}</span>
+                                    {editable && (
+                                      <button
+                                        title="Corregir método de pago (requiere PIN Administrador)"
+                                        onClick={() => {
+                                          setVentaACambiar(v);
+                                          setCambioNuevoMetodo(v.metodoPago);
+                                          setCambioPin('');
+                                          setCambioError('');
+                                          setCambioMetodoModal(true);
+                                        }}
+                                        className="p-1 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-400 hover:text-amber-600 border border-slate-200 hover:border-amber-300 transition-all"
+                                      >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                  {method === 'Mixto' && (
+                                    <div className="text-[9px] font-mono text-slate-500 bg-slate-50 p-1.5 rounded-lg border border-slate-150 space-y-0.5 mt-0.5 leading-none shadow-sm min-w-[100px]">
+                                      {(v.montoEfectivo || 0) > 0 && <div className="flex justify-between gap-2"><span>💵 Efec:</span><span className="font-bold">S/ {v.montoEfectivo.toFixed(2)}</span></div>}
+                                      {(v.montoTarjeta || 0) > 0 && <div className="flex justify-between gap-2"><span>💳 Tarj:</span><span className="font-bold">S/ {v.montoTarjeta.toFixed(2)}</span></div>}
+                                      {(v.montoYape || 0) > 0 && <div className="flex justify-between gap-2"><span>📱 Yape:</span><span className="font-bold">S/ {v.montoYape.toFixed(2)}</span></div>}
+                                    </div>
                                   )}
                                 </div>
                               );
                             })()}
                           </td>
-                          <td className="px-6 py-4 max-w-xs truncate text-xs font-bold text-slate-500 uppercase" title={v.itemsResumen}>
-                            {v.itemsResumen}
+                          <td className="px-6 py-4 text-xs font-bold text-slate-600 uppercase">
+                             <div className="flex flex-col gap-1 max-w-xs">
+                               {v.itemsResumen ? v.itemsResumen.split(', ').map((it, idx) => (
+                                 <span key={idx} className="bg-slate-100/80 px-2 py-0.5 rounded text-[10px] text-slate-700 leading-tight block w-fit border border-slate-200/40">
+                                   {it}
+                                 </span>
+                               )) : 'Sin ítems'}
+                             </div>
                           </td>
                           <td className="px-6 py-4 text-right font-mono font-black text-slate-900 text-base">
                             S/ {v.total.toFixed(2)}
@@ -2013,6 +2024,10 @@ export default function CajaPage({ currentUser }) {
             .filter(v => v.metodoPago === 'Consumo')
             .reduce((s, v) => s + v.total, 0);
 
+          const activeEfectivo = ventasFiltradas.reduce((s, v) => s + (v.montoEfectivo || 0), 0);
+          const activeTarjeta = ventasFiltradas.reduce((s, v) => s + (v.montoTarjeta || 0), 0);
+          const activeYape = ventasFiltradas.reduce((s, v) => s + (v.montoYape || 0), 0);
+
           return (
             <div className="bg-slate-900 rounded-3xl shadow-xl p-5 text-white flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
               <div className="flex flex-col gap-3 mb-4 border-b border-slate-800 pb-4">
@@ -2047,6 +2062,20 @@ export default function CajaPage({ currentUser }) {
                   <div className="flex items-center gap-2.5 mt-1.5 relative z-10">
                     <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center"><Banknote className="w-4.5 h-4.5" /></div>
                     <p className="text-2xl lg:text-3xl font-black font-mono tracking-tighter">S/ {activeIngresosCaja.toFixed(2)}</p>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-white/20 grid grid-cols-3 gap-1 text-[9px] font-bold text-emerald-100">
+                    <div className="flex flex-col">
+                      <span className="opacity-85 text-[8px] uppercase tracking-wider">Efectivo</span>
+                      <span className="font-mono text-xs text-white">S/ {activeEfectivo.toFixed(2)}</span>
+                    </div>
+                    <div className="flex flex-col border-l border-white/10 pl-1.5">
+                      <span className="opacity-85 text-[8px] uppercase tracking-wider">Tarjeta</span>
+                      <span className="font-mono text-xs text-white">S/ {activeTarjeta.toFixed(2)}</span>
+                    </div>
+                    <div className="flex flex-col border-l border-white/10 pl-1.5">
+                      <span className="opacity-85 text-[8px] uppercase tracking-wider">Yape</span>
+                      <span className="font-mono text-xs text-white">S/ {activeYape.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
 
