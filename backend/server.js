@@ -2251,6 +2251,9 @@ app.get('/api/ventas', async (req, res) => {
       igv: v.igv,
       subtotal: v.subtotal,
       metodoPago: v.metodoPago,
+      montoEfectivo: v.montoEfectivo,
+      montoTarjeta: v.montoTarjeta,
+      montoYape: v.montoYape,
       hora: v.createdAt.toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),
