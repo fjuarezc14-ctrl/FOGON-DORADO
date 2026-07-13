@@ -1539,6 +1539,7 @@ export default function CajaPage({ currentUser }) {
                   <tr>
                     <th className="px-6 py-4">Mesa</th>
                     <th className="px-6 py-4">Mesero / Hora</th>
+                    <th className="px-6 py-4">Consumo</th>
                     <th className="px-6 py-4">Estado</th>
                     <th className="px-6 py-4 text-right">Total</th>
                     <th className="px-6 py-4 text-center">Acción</th>
@@ -1559,6 +1560,17 @@ export default function CajaPage({ currentUser }) {
                           <span className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
                             <Clock className="w-3 h-3" /> {m.pedidoData?.hora}
                           </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold text-slate-600 uppercase">
+                        <div className="flex flex-col gap-1 max-w-xs max-h-[100px] overflow-y-auto custom-scrollbar pr-1">
+                          {m.pedidoData?.items
+                            ?.filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria))))
+                            ?.map((item, idx) => (
+                              <span key={idx} className="bg-slate-100/90 px-2 py-0.5 rounded text-[10px] text-slate-700 leading-tight block w-fit border border-slate-200/40">
+                                {item.cant}x {item.nombre}
+                              </span>
+                            )) || 'Sin consumos'}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -1584,7 +1596,7 @@ export default function CajaPage({ currentUser }) {
                       </td>
                     </tr>
                   )) : (
-                    <tr><td colSpan="5" className="text-center py-12 text-slate-400 font-bold uppercase tracking-wider text-xs">No hay mesas pendientes por cobrar.</td></tr>
+                    <tr><td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase tracking-wider text-xs">No hay mesas pendientes por cobrar.</td></tr>
                   )}
                 </tbody>
               </table>
