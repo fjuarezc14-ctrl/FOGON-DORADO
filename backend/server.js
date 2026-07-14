@@ -319,6 +319,59 @@ async function expandPedidoItemsForDb(itemsList) {
         entregado: i.entregado || false,
         notas: i.notas ? String(i.notas) : null,
       });
+
+      // Si el item tiene notas que contienen selección de bebida, lo agregamos como bebida incluida S/ 0
+      if (i.notas) {
+        const parsedNotes = parseSelectionsFromNotes(i.notas);
+        const drinkKeys = [
+          "Elige la Bebida (1.5 Litros)",
+          "Elige la Bebida (1 Litro)",
+          "Elige la Bebida",
+          "Bebida",
+          "Bebida 1",
+          "Bebida 2"
+        ];
+        const selectedDrinkNames = [];
+        for (const key of drinkKeys) {
+          const val = parsedNotes[key];
+          if (val && val !== "Sin Bebida" && val !== "Omitir (Sin Bebida)" && val !== "Sin refresco") {
+            selectedDrinkNames.push(val);
+          }
+        }
+
+        for (const drinkName of selectedDrinkNames) {
+          let lookupName = drinkName;
+          let displayName = drinkName;
+
+          if (drinkName === "Gaseosa Chiki") {
+            lookupName = "Gaseosa Mediana";
+            displayName = "Gaseosa Chiki";
+          } else if (drinkName === "Gaseosa 1.5 Litros" || drinkName === "Gaseosa 1 1/2 Lt") {
+            lookupName = "Gaseosa 1 1/2 Lt";
+            displayName = "Gaseosa 1.5 Litros";
+          } else if (drinkName === "Chicha Morada 1.5 Litros" || drinkName === "Chicha Morada - 1 1/2 Lt") {
+            lookupName = "Chicha Morada - 1 1/2 Lt";
+            displayName = "Chicha Morada 1.5 Litros";
+          } else if (drinkName === "Limonada 1.5 Litros" || drinkName === "Limonada - 1 1/2 Lt") {
+            lookupName = "Limonada - 1 1/2 Lt";
+            displayName = "Limonada 1.5 Litros";
+          }
+
+          const drinkProd = await prisma.producto.findFirst({
+            where: { nombre: { contains: lookupName, mode: 'insensitive' } }
+          });
+
+          expandedList.push({
+            productoId: drinkProd ? drinkProd.id : 213, // por defecto vino o similar
+            nombre: drinkProd ? drinkProd.nombre : displayName,
+            precio: 0,
+            cantidad: parseInt(i.cant || i.cantidad),
+            historial: false, // Va para la barra
+            entregado: false,
+            notas: "(Bebida Incluida en Combo - S/ 0.00)",
+          });
+        }
+      }
     }
   }
   return expandedList;

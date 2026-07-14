@@ -959,6 +959,16 @@ export default function CajaPage({ currentUser }) {
             { label: "Ensalada", value: "Ensalada" },
             { label: "Omitir (Sin Entrada)", value: "Sin Entrada" }
           ]
+        },
+        {
+          name: "Elige la Bebida",
+          key: "bebida",
+          options: [
+            { label: "Chicha Morada - Vaso", value: "Chicha Morada - Vaso" },
+            { label: "Limonada - Vaso", value: "Limonada - Vaso" },
+            { label: "Gaseosa Chiki", value: "Gaseosa Mediana" },
+            { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
+          ]
         }
       ];
     }
@@ -994,6 +1004,18 @@ export default function CajaPage({ currentUser }) {
         name: "Sopa o Ensalada",
         key: "entrada",
         options: ["Sopa", "Ensalada"].map(opt => ({ label: opt, value: opt }))
+      });
+
+      // Paso 3: Bebida
+      baseSteps.push({
+        name: "Elige la Bebida",
+        key: "bebida",
+        options: [
+          { label: "Chicha Morada - Vaso", value: "Chicha Morada - Vaso" },
+          { label: "Limonada - Vaso", value: "Limonada - Vaso" },
+          { label: "Gaseosa Chiki", value: "Gaseosa Mediana" },
+          { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
+        ]
       });
       
       return baseSteps;
@@ -1122,6 +1144,41 @@ export default function CajaPage({ currentUser }) {
       ];
     }
 
+    // 4.5. Pollos a la Brasa (Enteros y Medios que no sean "Solo")
+    const isPolloEntero = prodId === 10 || prodId === 16;
+    const isMedioPollo = prodId === 11 || prodId === 17;
+
+    if (isPolloEntero) {
+      return [
+        {
+          name: "Elige la Bebida (1.5 Litros)",
+          key: "bebida",
+          options: [
+            { label: "Inca Kola 1.5L", value: "Inca Kola 1.5L" },
+            { label: "Coca Cola 1.5 Litros", value: "Gaseosa 1 1/2 Lt" },
+            { label: "Chicha Morada 1.5 Litros", value: "Chicha Morada - 1 1/2 Lt" },
+            { label: "Limonada 1.5 Litros", value: "Limonada - 1 1/2 Lt" },
+            { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
+          ]
+        }
+      ];
+    }
+
+    if (isMedioPollo) {
+      return [
+        {
+          name: "Elige la Bebida (1 Litro)",
+          key: "bebida",
+          options: [
+            { label: "Gaseosa 1 Litro", value: "Gaseosa 1 Lt" },
+            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" },
+            { label: "Limonada 1 Litro", value: "Limonada - 1 Lt" },
+            { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
+          ]
+        }
+      ];
+    }
+
     // 5. Guarniciones genéricas para carnes y pollos (SIN Pollos a la Brasa)
     const requiereGuarnicion = 
       ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
@@ -1152,10 +1209,12 @@ export default function CajaPage({ currentUser }) {
     const requiereGuarnicion = 
       ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
       !prod.nombre.toLowerCase().includes('solo');
+
+    const prodId = parseInt(prod.id);
+    const isPolloEntero = prodId === 10 || prodId === 16;
+    const isMedioPollo = prodId === 11 || prodId === 17;
     
-    const steps = getProductSteps(prod, selections);
-    
-    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory) {
+    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo) {
       setSelectedProduct(prod);
       setSelections({});
       setCurrentStepIdx(0);
