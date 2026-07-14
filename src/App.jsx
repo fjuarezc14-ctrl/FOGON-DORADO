@@ -299,6 +299,23 @@ function App() {
     localStorage.removeItem('currentUser');
   };
 
+  // Validar si el usuario activo ha sido eliminado de la DB
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.checkUserStatus(currentUser.id);
+        if (res && res.exists === false) {
+          handleLogout();
+          alert('⚠️ Tu usuario ha sido eliminado o desactivado. Sesión cerrada.');
+        }
+      } catch (err) {
+        console.error('Error validando sesión:', err);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   if (loading) {
     return (
       <div className="h-screen w-screen bg-slate-950 flex items-center justify-center">

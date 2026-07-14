@@ -1635,7 +1635,10 @@ app.get('/api/pedidos/llevar', async (req, res) => {
     const pedidos = await prisma.pedido.findMany({
       where: { tipoEntrega: { in: ['llevar', 'delivery'] }, estado: { in: ['Cocina', 'Servido'] } },
       orderBy: { createdAt: 'asc' },
-      include: { items: true },
+      include: { 
+        items: true,
+        Venta: true
+      },
     });
 
     const formateados = pedidos.map(p => ({
@@ -1647,10 +1650,180 @@ app.get('/api/pedidos/llevar', async (req, res) => {
       hora: p.createdAt.toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),
-      items: p.items.map(i => ({ nombre: i.nombre, cant: i.cantidad, precio: i.precio })),
+      // Excluir items expandidos con precio 0 para evitar duplicidad al modificar en el frontend
+      items: p.items.filter(i => i.precio > 0).map(i => ({ 
+        id: String(i.productoId), 
+        nombre: i.nombre, 
+        cant: i.cantidad, 
+        precio: i.precio, 
+        notas: i.notas 
+      })),
+      ventaData: p.Venta ? {
+        id: p.Venta.id,
+        tipoComprobante: p.Venta.tipoComprobante,
+        nombreCliente: p.Venta.nombreCliente,
+        numDocumento: p.Venta.numDocumento,
+        metodoPago: p.Venta.metodoPago,
+        montoEfectivo: p.Venta.montoEfectivo,
+        montoTarjeta: p.Venta.montoTarjeta,
+        montoYape: p.Venta.montoYape
+      } : null
     }));
 
     res.json(formateados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/pedidos/llevar/:id → Modificar un pedido de llevar/delivery activo
+app.put('/api/pedidos/llevar/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { 
+    codigoPedidosYa, 
+    cajero, 
+    items, 
+    total, 
+    tipoDelivery, 
+    montoDelivery,
+    telefono,
+    nombreCliente,
+    clienteDireccion,
+    metodoPago,
+    montoEfectivo,
+    montoTarjeta,
+    montoYape
+  } = req.body;
+
+  try {
+    const isTakeout = tipoDelivery === 'ParaLlevar';
+    const isOwnDelivery = tipoDelivery === 'DeliveryPropio';
+    
+    const shippingFee = parseFloat(montoDelivery || 0);
+    const itemsTotal = parseFloat(total);
+    const finalMetodoPago = metodoPago || (tipoDelivery === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
+    
+    let grandTotal = itemsTotal + shippingFee;
+    if (finalMetodoPago === 'Cortesía') {
+      grandTotal = 0.00;
+    }
+
+    const expandedItems = await expandPedidoItemsForDb(items);
+    const finalEstadoEnsalada = await evaluarEstadoEnsalada(items);
+
+    // 1. Obtener pedido actual
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ error: 'Pedido no encontrado.' });
+    }
+
+    if (pedido.estado !== 'Cocina' && pedido.estado !== 'Servido') {
+      return res.status(400).json({ error: 'No se puede modificar un pedido que ya fue cobrado o cancelado.' });
+    }
+
+    // 2. Ejecutar actualización en una transacción
+    await prisma.$transaction(async (tx) => {
+      // Devolver stock de productos limitados antiguos para evitar pérdidas/errores
+      const oldItems = pedido.items;
+      for (const oldItem of oldItems) {
+        if (oldItem.productoId) {
+          await tx.producto.updateMany({
+            where: { id: oldItem.productoId, tipoStock: 'limitado' },
+            data: { stock: { increment: oldItem.cantidad } }
+          });
+        }
+      }
+
+      // Eliminar ítems antiguos
+      await tx.itemPedido.deleteMany({
+        where: { pedidoId: id }
+      });
+
+      // Crear nuevos ítems expandidos
+      await tx.itemPedido.createMany({
+        data: expandedItems.map(i => ({
+          pedidoId: id,
+          productoId: i.productoId,
+          nombre: i.nombre,
+          precio: i.precio,
+          cantidad: i.cantidad,
+          historial: i.historial,
+          entregado: i.entregado || false,
+          notas: i.notas,
+        }))
+      });
+
+      // Descontar stock de productos limitados nuevos
+      const itemsNuevos = items.filter(i => !i.historial);
+      for (const item of itemsNuevos) {
+        await tx.producto.updateMany({
+          where: { id: parseInt(item.id), tipoStock: 'limitado' },
+          data: { stock: { decrement: item.cant || item.cantidad } }
+        });
+      }
+
+      // Actualizar pedido
+      await tx.pedido.update({
+        where: { id },
+        data: {
+          mesero: String(cajero),
+          total: grandTotal,
+          estadoEnsalada: finalEstadoEnsalada,
+          tipoEntrega: isOwnDelivery ? 'delivery' : 'llevar',
+          codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null,
+          metodoPago: finalMetodoPago,
+          montoEfectivo: montoEfectivo ? parseFloat(montoEfectivo) : null,
+          montoTarjeta: montoTarjeta ? parseFloat(montoTarjeta) : null,
+          montoYape: montoYape ? parseFloat(montoYape) : null
+        }
+      });
+
+      // Calcular subtotal e IGV para actualizar la Venta asociada
+      const subtotal = parseFloat((grandTotal / 1.18).toFixed(2));
+      const igv = parseFloat((grandTotal - subtotal).toFixed(2));
+      let finalMontoEfectivo = 0;
+      let finalMontoTarjeta = 0;
+      let finalMontoYape = 0;
+
+      if (finalMetodoPago === 'Mixto') {
+        finalMontoEfectivo = parseFloat(montoEfectivo || 0);
+        finalMontoTarjeta = parseFloat(montoTarjeta || 0);
+        finalMontoYape = parseFloat(montoYape || 0);
+      } else if (finalMetodoPago === 'Efectivo') {
+        finalMontoEfectivo = grandTotal;
+      } else if (finalMetodoPago === 'Tarjeta') {
+        finalMontoTarjeta = grandTotal;
+      } else if (finalMetodoPago === 'Yape') {
+        finalMontoYape = grandTotal;
+      }
+
+      let finalNombreCliente = nombreCliente;
+      if (!finalNombreCliente) {
+        if (tipoDelivery === 'PedidosYa') finalNombreCliente = 'PEDIDOS YA';
+        else finalNombreCliente = 'CONSUMIDOR FINAL';
+      }
+
+      await tx.venta.updateMany({
+        where: { pedidoId: id },
+        data: {
+          nombreCliente: finalNombreCliente,
+          numDocumento: numDocumento || codigoPedidosYa || 'S/D',
+          total: grandTotal,
+          subtotal,
+          igv,
+          metodoPago: finalMetodoPago,
+          montoEfectivo: finalMontoEfectivo,
+          montoTarjeta: finalMontoTarjeta,
+          montoYape: finalMontoYape
+        }
+      });
+    });
+
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1961,6 +2134,22 @@ app.post('/api/usuarios/validate-auth', async (req, res) => {
     res.json({ ok: true, nombre: user.nombre, rol: user.rol });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/usuarios/check/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.json({ exists: false });
+    const user = await prisma.usuario.findUnique({
+      where: { id }
+    });
+    if (!user || !user.activo) {
+      return res.json({ exists: false });
+    }
+    res.json({ exists: true, activo: user.activo });
+  } catch (err) {
+    res.json({ exists: false, error: err.message });
   }
 });
 

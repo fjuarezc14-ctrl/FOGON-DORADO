@@ -146,4 +146,10 @@ export const api = {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activa }),
   }).then(r => r.json()),
   eliminarOferta: (id) => fetch(`${API_BASE}/api/ofertas/${id}`, { method: 'DELETE' }).then(r => r.json()),
+
+  // Nuevas funciones
+  checkUserStatus: (id) => fetch(`${API_BASE}/api/usuarios/check/${id}`).then(r => r.json()),
+  actualizarDelivery: (id, body) => fetch(`${API_BASE}/api/pedidos/llevar/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
 };

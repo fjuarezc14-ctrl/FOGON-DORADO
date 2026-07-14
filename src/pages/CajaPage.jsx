@@ -251,6 +251,7 @@ export default function CajaPage({ currentUser }) {
 
   const [productosMenu, setProductosMenu] = useState([]);
   const [itemsDelivery, setItemsDelivery] = useState([]);
+  const [editingPedidoId, setEditingPedidoId] = useState(null);
   const [enviandoDelivery, setEnviandoDelivery] = useState(false);
   const [tipoDelivery, setTipoDelivery] = useState('PedidosYa'); // 'PedidosYa' | 'ParaLlevar'
   const [toasts, setToasts] = useState([]);
@@ -906,6 +907,7 @@ export default function CajaPage({ currentUser }) {
       const prods = await api.getProductos();
       setProductosMenu(prods);
     }
+    setEditingPedidoId(null);
     setItemsDelivery([]);
     setCodigoPY('');
     setDeliverySearchQuery('');
@@ -918,6 +920,86 @@ export default function CajaPage({ currentUser }) {
     setDeliveryClienteNombre('');
     setDeliveryNumDocumento('');
     setTipoDelivery('PedidosYa');
+    setPinAdminDelivery('');
+    setDeliveryModal(true);
+  };
+
+  const iniciarModificarDelivery = async (p) => {
+    if (productosMenu.length === 0) {
+      const prods = await api.getProductos();
+      setProductosMenu(prods);
+    }
+    setEditingPedidoId(p.pedidoId);
+    setItemsDelivery(p.items || []);
+    setDeliverySearchQuery('');
+    
+    // Identificar el tipo de delivery
+    let calculatedTipo = 'PedidosYa';
+    let codePY = p.codigoPedidosYa || '';
+    if (p.codigoPedidosYa?.startsWith('DELIVERY -')) {
+      calculatedTipo = 'DeliveryPropio';
+    } else if (p.codigoPedidosYa?.startsWith('LLEVAR -')) {
+      calculatedTipo = 'ParaLlevar';
+    }
+    setTipoDelivery(calculatedTipo);
+
+    // Poblar campos según tipo
+    if (calculatedTipo === 'DeliveryPropio') {
+      const parsed = parseDeliveryInfo(p.codigoPedidosYa);
+      if (parsed) {
+        setDeliveryClienteNombre(parsed.nombre);
+        setDeliveryTelefono(parsed.telefono);
+        setDeliveryDireccion(parsed.direccion);
+        setDeliveryConCuanto(parsed.conCuanto || '');
+      } else {
+        setDeliveryClienteNombre(p.codigoPedidosYa.replace('DELIVERY - ', ''));
+        setDeliveryTelefono('');
+        setDeliveryDireccion('');
+        setDeliveryConCuanto('');
+      }
+      setCodigoPY('');
+    } else if (calculatedTipo === 'ParaLlevar') {
+      setCodigoPY(p.codigoPedidosYa.replace('LLEVAR - ', ''));
+      setDeliveryClienteNombre(p.codigoPedidosYa.replace('LLEVAR - ', ''));
+      setDeliveryTelefono('');
+      setDeliveryDireccion('');
+      setDeliveryConCuanto('');
+    } else {
+      setCodigoPY(codePY);
+      setDeliveryClienteNombre('PEDIDOS YA');
+      setDeliveryTelefono('');
+      setDeliveryDireccion('');
+      setDeliveryConCuanto('');
+    }
+
+    // Costo de delivery
+    const itemsTotal = (p.items || []).reduce((s, i) => s + i.cant * i.precio, 0);
+    const shippingFee = Math.max(0, p.total - itemsTotal);
+    setDeliveryMontoEnvio(shippingFee > 0 ? String(shippingFee) : '');
+
+    // Métodos de pago y comprobantes
+    if (p.ventaData) {
+      setDeliveryTipoComprobante(p.ventaData.tipoComprobante || 'Ticket');
+      setDeliveryMetodoPago(p.ventaData.metodoPago || 'Efectivo');
+      setDeliveryNumDocumento(p.ventaData.numDocumento || '');
+      if (p.ventaData.metodoPago === 'Mixto') {
+        setDeliveryMixtoEfectivo(p.ventaData.montoEfectivo ? String(p.ventaData.montoEfectivo) : '');
+        setDeliveryMixtoTarjeta(p.ventaData.montoTarjeta ? String(p.ventaData.montoTarjeta) : '');
+        setDeliveryMixtoYape(p.ventaData.montoYape ? String(p.ventaData.montoYape) : '');
+      } else {
+        setDeliveryMixtoEfectivo('');
+        setDeliveryMixtoTarjeta('');
+        setDeliveryMixtoYape('');
+      }
+    } else {
+      setDeliveryTipoComprobante('Ticket');
+      setDeliveryMetodoPago(calculatedTipo === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
+      setDeliveryNumDocumento('');
+      setDeliveryMixtoEfectivo('');
+      setDeliveryMixtoTarjeta('');
+      setDeliveryMixtoYape('');
+    }
+
     setPinAdminDelivery('');
     setDeliveryModal(true);
   };
@@ -1481,7 +1563,7 @@ export default function CajaPage({ currentUser }) {
         codigoFormateado = `DELIVERY - ${deliveryClienteNombre.trim().toUpperCase()} | TEL: ${deliveryTelefono.trim()} | DIR: ${deliveryDireccion.trim()} | PAGA: ${deliveryConCuanto || '0.00'} | VUELTO: ${vueltoVal}`;
       }
 
-      const result = await api.crearPedidoLlevar({
+      const payload = {
         codigoPedidosYa: codigoFormateado,
         cajero: cajeroNombre,
         items: itemsDelivery,
@@ -1497,12 +1579,17 @@ export default function CajaPage({ currentUser }) {
         clienteDireccion: tipoDelivery === 'DeliveryPropio' ? deliveryDireccion : (deliveryDireccion || ''),
         montoDelivery: shippingFee,
         telefono: deliveryTelefono || null,
-      });
+      };
+
+      const result = editingPedidoId 
+        ? await api.actualizarDelivery(editingPedidoId, payload)
+        : await api.crearPedidoLlevar(payload);
 
       if (result.error) throw new Error(result.error);
 
       // Cerrar modal y recargar datos de Caja
       setDeliveryModal(false);
+      setEditingPedidoId(null);
       setDeliveryMixtoEfectivo('');
       setDeliveryMixtoTarjeta('');
       setDeliveryMixtoYape('');
@@ -1754,27 +1841,39 @@ export default function CajaPage({ currentUser }) {
                           S/ {p.total.toFixed(2)}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {p.estado === 'Servido' ? (
-                            <button
-                              onClick={() => confirmarEntregaDelivery(p.pedidoId, p.codigoPedidosYa)}
-                              className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md hover:bg-blue-700 active:scale-95"
-                            >Confirmar Entrega</button>
-                          ) : (
-                            <div className="flex flex-col items-center gap-1.5">
-                              <span className="text-[10px] text-slate-400 font-medium">En cocina...</span>
+                          <div className="flex flex-col items-center gap-1.5 justify-center">
+                            {p.estado === 'Servido' ? (
                               <button
-                                onClick={() => {
-                                  setPedidoACancelarLlevar(p);
-                                  setPinCancelLlevar('');
-                                  setErrorCancelLlevar('');
-                                  setCancelLlevarModalOpen(true);
-                                }}
-                                className="px-3 py-1.5 bg-red-100 hover:bg-red-655 text-red-700 hover:text-white border border-red-300 hover:border-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                                onClick={() => confirmarEntregaDelivery(p.pedidoId, p.codigoPedidosYa)}
+                                className="w-full max-w-[130px] px-3 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:bg-blue-700 active:scale-95 animate-pulse"
+                              >Confirmar Entrega</button>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-medium">En cocina...</span>
+                            )}
+                            
+                            <div className="flex gap-1.5 mt-0.5">
+                              <button
+                                onClick={() => iniciarModificarDelivery(p)}
+                                className="px-2.5 py-1 bg-amber-100 hover:bg-amber-500 text-amber-700 hover:text-white border border-amber-300 hover:border-amber-500 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
                               >
-                                🗑 Cancelar
+                                ✏️ Modificar
                               </button>
+                              
+                              {p.estado !== 'Servido' && (
+                                <button
+                                  onClick={() => {
+                                    setPedidoACancelarLlevar(p);
+                                    setPinCancelLlevar('');
+                                    setErrorCancelLlevar('');
+                                    setCancelLlevarModalOpen(true);
+                                  }}
+                                  className="px-2.5 py-1 bg-red-100 hover:bg-red-655 text-red-700 hover:text-white border border-red-300 hover:border-red-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                                >
+                                  🗑 Cancelar
+                                </button>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2511,11 +2610,15 @@ export default function CajaPage({ currentUser }) {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center"><Truck className="w-5 h-5" /></div>
                 <div>
-                  <h2 className="font-black text-lg uppercase tracking-tight leading-none">Nuevo Pedido para Llevar / Delivery</h2>
-                  <p className="text-xs text-blue-200">Registrar comanda de venta directa o canal externo</p>
+                  <h2 className="font-black text-lg uppercase tracking-tight leading-none">
+                    {editingPedidoId ? 'Modificar Pedido Llevar / Delivery' : 'Nuevo Pedido para Llevar / Delivery'}
+                  </h2>
+                  <p className="text-xs text-blue-200">
+                    {editingPedidoId ? 'Actualizar detalles y productos de la comanda' : 'Registrar comanda de venta directa o canal externo'}
+                  </p>
                 </div>
               </div>
-              <button onClick={() => { setDeliveryModal(false); setCodigoPY(''); setItemsDelivery([]); }} className="bg-blue-800 p-2 rounded-xl hover:bg-blue-900 transition-colors"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setDeliveryModal(false); setCodigoPY(''); setItemsDelivery([]); setEditingPedidoId(null); }} className="bg-blue-800 p-2 rounded-xl hover:bg-blue-900 transition-colors"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="flex flex-col md:flex-row flex-1 min-h-0">
@@ -2990,7 +3093,11 @@ export default function CajaPage({ currentUser }) {
                     onClick={enviarDeliveryACocina}
                     disabled={enviandoDelivery}
                     className={`w-full py-4 text-white font-black uppercase tracking-widest rounded-2xl text-sm transition-all shadow-lg flex justify-center items-center gap-2 disabled:opacity-50 ${
-                      tipoDelivery === 'ParaLlevar' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
+                      editingPedidoId 
+                        ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
+                        : tipoDelivery === 'ParaLlevar' 
+                          ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20' 
+                          : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
                     }`}
                   >
                     {enviandoDelivery ? (
@@ -2998,7 +3105,11 @@ export default function CajaPage({ currentUser }) {
                     ) : (
                       <>
                         {tipoDelivery === 'ParaLlevar' ? <Banknote className="w-5 h-5" /> : <Truck className="w-5 h-5" />}
-                        {tipoDelivery === 'ParaLlevar' ? 'Cobrar y Enviar a Cocina' : 'Registrar y Enviar a Cocina'}
+                        {editingPedidoId 
+                          ? 'Actualizar y Enviar a Cocina'
+                          : tipoDelivery === 'ParaLlevar' 
+                            ? 'Cobrar y Enviar a Cocina' 
+                            : 'Registrar y Enviar a Cocina'}
                       </>
                     )}
                   </button>

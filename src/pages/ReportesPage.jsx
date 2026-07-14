@@ -37,7 +37,7 @@ export default function ReportesPage() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const [fechaDesde, setFechaDesde] = useState(getPrimerDiaMes());
+  const [fechaDesde, setFechaDesde] = useState(getHoyString());
   const [fechaHasta, setFechaHasta] = useState(getHoyString());
   const [resumen, setResumen] = useState({ 
     ventasTotal: 0, 
@@ -327,6 +327,67 @@ export default function ReportesPage() {
         
         {/* Controles del Rango de Fechas */}
         <div className="flex flex-wrap items-end gap-3 sm:gap-4 z-10">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl h-[38px] shrink-0 border border-slate-200/50">
+            <button
+              onClick={() => {
+                const hoy = getHoyString();
+                setFechaDesde(hoy);
+                setFechaHasta(hoy);
+                fetchReportes(hoy, hoy);
+              }}
+              className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                fechaDesde === getHoyString() && fechaHasta === getHoyString()
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Hoy
+            </button>
+            <button
+              onClick={() => {
+                const ayerDate = new Date();
+                ayerDate.setDate(ayerDate.getDate() - 1);
+                const yyyy = ayerDate.getFullYear();
+                const mm = String(ayerDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(ayerDate.getDate()).padStart(2, '0');
+                const ayerStr = `${yyyy}-${mm}-${dd}`;
+                setFechaDesde(ayerStr);
+                setFechaHasta(ayerStr);
+                fetchReportes(ayerStr, ayerStr);
+              }}
+              className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                fechaDesde !== getHoyString() && fechaDesde === fechaHasta && (() => {
+                  const ayerDate = new Date();
+                  ayerDate.setDate(ayerDate.getDate() - 1);
+                  const yyyy = ayerDate.getFullYear();
+                  const mm = String(ayerDate.getMonth() + 1).padStart(2, '0');
+                  const dd = String(ayerDate.getDate()).padStart(2, '0');
+                  return fechaDesde === `${yyyy}-${mm}-${dd}`;
+                })()
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Ayer
+            </button>
+            <button
+              onClick={() => {
+                const primerDia = getPrimerDiaMes();
+                const hoy = getHoyString();
+                setFechaDesde(primerDia);
+                setFechaHasta(hoy);
+                fetchReportes(primerDia, hoy);
+              }}
+              className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                fechaDesde === getPrimerDiaMes() && fechaHasta === getHoyString()
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Este Mes
+            </button>
+          </div>
+
           <div>
             <label className="block text-[9px] font-black uppercase text-slate-400 tracking-wider mb-1 flex items-center gap-1"><Calendar className="w-3 h-3"/> Desde:</label>
             <input 
