@@ -2627,14 +2627,20 @@ app.get('/api/ventas', async (req, res) => {
 // GET /api/ventas/resumen → Estadísticas del día (hora Perú)
 app.get('/api/ventas/resumen', async (req, res) => {
   try {
-    // Inicio del día en UTC-5
-    const ahora = new Date();
-    const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
-    hoyPeru.setHours(0, 0, 0, 0);
-    const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+    const { desde } = req.query;
+    let filterDate;
+    if (desde) {
+      filterDate = new Date(desde);
+    } else {
+      // Inicio del día en UTC-5
+      const ahora = new Date();
+      const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+      hoyPeru.setHours(0, 0, 0, 0);
+      filterDate = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+    }
 
     const ventas = await prisma.venta.findMany({
-      where: { createdAt: { gte: inicioUTC } },
+      where: { createdAt: { gte: filterDate } },
     });
 
     const totalVentas = ventas.reduce((s, v) => s + v.total, 0);
@@ -3058,7 +3064,12 @@ app.get('/api/reportes/rotacion', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
+      const gteDate = desde.length === 10 ? new Date(desde + 'T00:00:00.000-05:00') : new Date(desde);
+      const lteDate = hasta.length === 10 ? new Date(hasta + 'T23:59:59.999-05:00') : new Date(hasta);
+      filtroFecha = { gte: gteDate, lte: lteDate };
+    } else if (desde) {
+      const gteDate = desde.length === 10 ? new Date(desde + 'T00:00:00.000-05:00') : new Date(desde);
+      filtroFecha = { gte: gteDate };
     } else {
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));

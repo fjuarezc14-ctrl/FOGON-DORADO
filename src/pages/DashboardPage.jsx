@@ -10,17 +10,18 @@ export default function DashboardPage() {
   useEffect(() => {
     const updateStats = async () => {
       try {
+        const savedCierre = localStorage.getItem('ultimoCierre');
         const [mesas, resumen, rotacion] = await Promise.all([
           api.getMesas(),
-          api.getResumenVentas(),
-          api.getRotacion(),
+          api.getResumenVentas(savedCierre || null),
+          api.getRotacion(savedCierre || null),
         ]);
         setStats({
           ocupadas: mesas.filter(m => m.estado !== 'Libre').length,
           totalMesas: mesas.length,
           enCocina: mesas.filter(m => m.estado === 'Cocina').length,
           atendidas: resumen.atendidas || 0,
-          ingresos: resumen.ingresos || 0,
+          ingresos: resumen.ingresosCaja || 0, // Usar ingresos reales de caja en vez de total ventas contables brutas
         });
         const categoriasExcluidas = ['Bebidas y Refrescos', 'Cervezas', 'Bar y Cocteles', 'Postres'];
         const platosFiltrados = rotacion.filter(p => !categoriasExcluidas.includes(p.categoria));

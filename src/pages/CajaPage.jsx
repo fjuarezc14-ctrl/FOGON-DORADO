@@ -41,6 +41,12 @@ const PRODUCT_OPTIONS_CONFIG = {
   }
 };
 
+const getComboConfig = (nombre) => {
+  if (!nombre) return null;
+  const key = Object.keys(PRODUCT_OPTIONS_CONFIG).find(k => k.toLowerCase() === nombre.toLowerCase());
+  return key ? { config: PRODUCT_OPTIONS_CONFIG[key], key } : null;
+};
+
 const SINONIMOS = {
   gaseosa: ['cola', 'inca', 'coca', 'refresco', 'sprite', 'fanta', 'gaseosa'],
   bebida: ['chicha', 'limonada', 'gaseosa', 'cerveza', 'pisco', 'trago', 'coctel', 'jugo', 'agua'],
@@ -1056,9 +1062,10 @@ export default function CajaPage({ currentUser }) {
     }
     
     // 3. Combos configurados
-    if (PRODUCT_OPTIONS_CONFIG[prod.nombre]) {
+    const combo = getComboConfig(prod.nombre);
+    if (combo) {
       const baseSteps = [];
-      const config = PRODUCT_OPTIONS_CONFIG[prod.nombre];
+      const config = combo.config;
       const fondoOptions = config.fondoOptions || [];
       
       // Paso 1: Plato de Fondo (primero)
@@ -1286,7 +1293,7 @@ export default function CajaPage({ currentUser }) {
 
   const agregarItemDelivery = (prod) => {
     const isMenuCategory = prod.categoria === 'Menú';
-    const hasComboConfig = PRODUCT_OPTIONS_CONFIG[prod.nombre];
+    const hasComboConfig = !!getComboConfig(prod.nombre);
     const isVirtualGroup = prod.esAgrupado;
     const requiereGuarnicion = 
       ['Parrillas y Cortes', 'Parrilladas Mixtas', 'Porciones y Piqueos'].includes(prod.categoria) && 
@@ -3160,11 +3167,12 @@ export default function CajaPage({ currentUser }) {
             }
             const finalNotes = notesArray.join(' · ');
             agregarItemDeliveryDirecto(selectedProduct, finalNotes);
-          } else if (PRODUCT_OPTIONS_CONFIG[selectedProduct.nombre]) {
+          } else if (getComboConfig(selectedProduct.nombre)) {
             const notesArray = [];
             const fondo = selections["fondo"];
             const proteina = selections["proteina"];
             const entrada = selections["entrada"];
+            const bebida = selections["bebida"];
             
             if (fondo) {
               if (proteina) {
@@ -3180,6 +3188,10 @@ export default function CajaPage({ currentUser }) {
             
             // Refresco y Postre automáticos (más cortos)
             notesArray.push(`+ Refresco + Postre`);
+
+            if (bebida) {
+              notesArray.push(`[Elige la Bebida: ${bebida}]`);
+            }
             
             if (additionalNotes.trim()) {
               notesArray.push(`(Nota: ${additionalNotes.trim()})`);

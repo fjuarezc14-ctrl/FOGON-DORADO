@@ -98,7 +98,7 @@ export const api = {
   cobrar: (body) => fetch(`${API_BASE}/api/ventas`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
-  getResumenVentas: () => fetch(`${API_BASE}/api/ventas/resumen`).then(r => r.json()),
+  getResumenVentas: (desde = null) => fetch(`${API_BASE}/api/ventas/resumen${desde ? `?desde=${desde}` : ''}`).then(r => r.json()),
   getHistorialVentas: (desde, hasta) => fetch(`${API_BASE}/api/ventas${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
   cambiarMetodoPago: (ventaId, metodoPago, pin, montos = {}) => fetch(`${API_BASE}/api/ventas/${ventaId}/metodo-pago`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ metodoPago, pin, ...montos }),
@@ -124,7 +124,14 @@ export const api = {
   getReporteContable: (desde, hasta) => fetch(`${API_BASE}/api/reportes/contable${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
   getCancelaciones: (desde, hasta) => fetch(`${API_BASE}/api/reportes/cancelaciones${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
   getReporteMozos: (desde, hasta) => fetch(`${API_BASE}/api/reportes/mozos${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
-  getRotacion: (desde, hasta) => fetch(`${API_BASE}/api/reportes/rotacion${desde && hasta ? `?desde=${desde}&hasta=${hasta}` : ''}`).then(r => r.json()),
+  getRotacion: (desde = null, hasta = null) => {
+    let url = `${API_BASE}/api/reportes/rotacion`;
+    const params = [];
+    if (desde) params.push(`desde=${desde}`);
+    if (hasta) params.push(`hasta=${hasta}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return fetch(url).then(r => r.json());
+  },
 
   // Consulta DNI/RUC segura
   consultarCliente: (doc) => fetch(`${API_BASE}/api/clientes/consulta/${doc}`).then(r => r.json()),
