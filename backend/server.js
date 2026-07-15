@@ -379,18 +379,25 @@ async function expandPedidoItemsForDb(itemsList) {
 }
 
 async function evaluarEstadoEnsalada(itemsList) {
-  const categoriasConEnsalada = ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
   try {
+    let tieneEnsaladaPendiente = false;
     for (const item of itemsList) {
       const prodId = parseInt(item.id || item.productoId);
       if (!prodId) continue;
       const prod = await prisma.producto.findUnique({
         where: { id: prodId },
-        select: { categoria: true }
+        select: { requiereGuarnicion: true }
       });
-      if (prod && categoriasConEnsalada.includes(prod.categoria)) {
-        return 'Pendiente';
+      if (prod && prod.requiereGuarnicion) {
+        const notasStr = item.notas || '';
+        if (notasStr.includes('Sin Ensalada')) {
+          continue;
+        }
+        tieneEnsaladaPendiente = true;
       }
+    }
+    if (tieneEnsaladaPendiente) {
+      return 'Pendiente';
     }
   } catch (err) {
     console.error('Error al evaluar estado de ensalada:', err);
@@ -887,13 +894,11 @@ app.get('/api/pedidos/ensaladas', async (req, res) => {
       orderBy: { createdAt: 'asc' },
       include: {
         items: {
-          include: { producto: { select: { categoria: true } } },
+          include: { producto: { select: { requiereGuarnicion: true, categoria: true } } },
         },
         mesa: true,
       },
     });
-
-    const categoriasConEnsalada = ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
 
     const formateados = pedidos.map(p => ({
       pedidoId: p.id,
@@ -909,7 +914,7 @@ app.get('/api/pedidos/ensaladas', async (req, res) => {
       items: p.items
         .filter(i => {
           const esBarra = BARRA_CATEGORIAS.includes(i.producto?.categoria);
-          const llevaEnsalada = categoriasConEnsalada.includes(i.producto?.categoria);
+          const llevaEnsalada = i.producto?.requiereGuarnicion;
           return llevaEnsalada && !esBarra && i.precio > 0;
         })
         .map(i => ({
@@ -3164,11 +3169,26 @@ async function ejecutarMigracionEnsaladas() {
   }
 }
 
+async function ejecutarMigracionRequiereGuarnicion() {
+  try {
+    const count = await prisma.producto.updateMany({
+      where: {
+        categoria: { in: ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos'] }
+      },
+      data: { requiereGuarnicion: true }
+    });
+    console.log(`✅ Sincronizado requiereGuarnicion para ${count.count} productos.`);
+  } catch (err) {
+    console.error("❌ Error en migración requiereGuarnicion:", err);
+  }
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`🚀 Backend Fogón Dorado v3 corriendo en http://localhost:${PORT}`);
   await ejecutarMigracionMontos();
   await ejecutarMigracionEnsaladas();
+  await ejecutarMigracionRequiereGuarnicion();
 });
 
 

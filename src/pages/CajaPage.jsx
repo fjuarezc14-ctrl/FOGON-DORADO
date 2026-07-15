@@ -1012,6 +1012,24 @@ export default function CajaPage({ currentUser }) {
   };
 
   const getProductSteps = (prod, currentSelections = {}) => {
+    const steps = getProductStepsBase(prod, currentSelections);
+    if (prod && prod.requiereGuarnicion) {
+      steps.push({
+        name: "Cantidad de Ensaladas",
+        key: "cantidad_ensaladas",
+        options: [
+          { label: "Sin Ensalada", value: "Sin Ensalada" },
+          { label: "1 Ensalada", value: "1 Ensalada" },
+          { label: "2 Ensaladas", value: "2 Ensaladas" },
+          { label: "3 Ensaladas", value: "3 Ensaladas" },
+          { label: "4 Ensaladas", value: "4 Ensaladas" }
+        ]
+      });
+    }
+    return steps;
+  };
+
+  const getProductStepsBase = (prod, currentSelections = {}) => {
     if (!prod) return [];
     
     // 1. Variantes de Tallarines Verdes
@@ -3192,6 +3210,11 @@ export default function CajaPage({ currentUser }) {
 
             if (bebida) {
               notesArray.push(`[Elige la Bebida: ${bebida}]`);
+            }
+
+            const cantidadEnsaladas = selections["cantidad_ensaladas"];
+            if (cantidadEnsaladas) {
+              notesArray.push(`[Cantidad de Ensaladas: ${cantidadEnsaladas}]`);
             }
             
             if (additionalNotes.trim()) {

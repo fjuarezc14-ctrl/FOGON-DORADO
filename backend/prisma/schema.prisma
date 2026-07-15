@@ -33,6 +33,7 @@ model Producto {
   tipoStock String   @default("ilimitado") // "ilimitado" | "limitado"
   stock     Int      @default(0)
   activo    Boolean  @default(true)
+  requiereGuarnicion Boolean @default(false)
   creadoEn  DateTime @default(now())
   
   ItemPedido ItemPedido[]
