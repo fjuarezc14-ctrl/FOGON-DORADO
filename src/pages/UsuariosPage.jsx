@@ -190,13 +190,22 @@ export default function UsuariosPage() {
                         >
                           <Edit className="w-4.5 h-4.5" />
                         </button>
-                        <button 
-                          onClick={() => eliminarUsuario(u.id)} 
-                          title="Eliminar usuario"
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all font-bold"
-                        >
-                          <Trash2 className="w-4.5 h-4.5" />
-                        </button>
+                        {(() => {
+                          const nombresInmutables = ['admin principal', 'eusebio diaz', 'bruno diaz'];
+                          const isInmutable = nombresInmutables.includes(u.nombre.toLowerCase().trim());
+                          if (!isInmutable) {
+                            return (
+                              <button 
+                                onClick={() => eliminarUsuario(u.id)} 
+                                title="Eliminar usuario"
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all font-bold"
+                              >
+                                <Trash2 className="w-4.5 h-4.5" />
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </td>
                   </tr>
@@ -216,22 +225,42 @@ export default function UsuariosPage() {
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Nombre completo</label>
-                  <input type="text" value={newUser.nombre} onChange={e => setNewUser({ ...newUser, nombre: e.target.value })} placeholder="Ej. Juan Pérez" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200" />
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Rol Asignado</label>
-                  <select value={newUser.rol} onChange={e => handleRolChange(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 bg-white">
-                    <option value="">Selecciona un rol...</option>
-                    <option value="Administrador">Administrador</option>
-                    <option value="Cajero">Cajero / Recepción</option>
-                    <option value="Mozo">Mozo / Mesero</option>
-                    <option value="Cocinero">Jefe de Cocina</option>
-                    <option value="Ensaladero">Encargado de Ensaladas</option>
-                    <option value="Contador">Contador</option>
-                  </select>
-                </div>
+                {(() => {
+                  const nombresInmutables = ['admin principal', 'eusebio diaz', 'bruno diaz'];
+                  const isEditingInmutable = editingUser && nombresInmutables.includes(editingUser.nombre.toLowerCase().trim());
+                  return (
+                    <>
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Nombre completo</label>
+                        <input 
+                          type="text" 
+                          value={newUser.nombre} 
+                          onChange={e => setNewUser({ ...newUser, nombre: e.target.value })} 
+                          disabled={isEditingInmutable}
+                          placeholder="Ej. Juan Pérez" 
+                          className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed" 
+                        />
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Rol Asignado</label>
+                        <select 
+                          value={newUser.rol} 
+                          onChange={e => handleRolChange(e.target.value)} 
+                          disabled={isEditingInmutable}
+                          className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 bg-white disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+                        >
+                          <option value="">Selecciona un rol...</option>
+                          <option value="Administrador">Administrador</option>
+                          <option value="Cajero">Cajero / Recepción</option>
+                          <option value="Mozo">Mozo / Mesero</option>
+                          <option value="Cocinero">Jefe de Cocina</option>
+                          <option value="Ensaladero">Encargado de Ensaladas</option>
+                          <option value="Contador">Contador</option>
+                        </select>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">PIN de Acceso (4 dígitos únicos)</label>
@@ -253,15 +282,25 @@ export default function UsuariosPage() {
               <div className="border-t border-slate-100 pt-4">
                 <label className="block text-xs font-black text-slate-800 uppercase tracking-wide mb-4">Permisos de Acceso</label>
                 <div className="grid grid-cols-2 gap-3">
-                  {permisosDisponibles.map(p => {
-                    const Icon = p.icon;
-                    return (
-                      <label key={p.id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
-                        <input type="checkbox" checked={newUser.permisos.includes(p.id)} onChange={() => handlePermisoToggle(p.id)} className="w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer animate-pulse" />
-                        <span className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Icon className="w-4 h-4 text-slate-400" /> {p.label}</span>
-                      </label>
-                    );
-                  })}
+                  {(() => {
+                    const nombresInmutables = ['admin principal', 'eusebio diaz', 'bruno diaz'];
+                    const isEditingInmutable = editingUser && nombresInmutables.includes(editingUser.nombre.toLowerCase().trim());
+                    return permisosDisponibles.map(p => {
+                      const Icon = p.icon;
+                      return (
+                        <label key={p.id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
+                          <input 
+                            type="checkbox" 
+                            checked={newUser.permisos.includes(p.id)} 
+                            onChange={() => handlePermisoToggle(p.id)} 
+                            disabled={isEditingInmutable}
+                            className="w-4 h-4 text-amber-500 rounded focus:ring-amber-500 cursor-pointer animate-pulse disabled:opacity-50 disabled:cursor-not-allowed" 
+                          />
+                          <span className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Icon className="w-4 h-4 text-slate-400" /> {p.label}</span>
+                        </label>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>

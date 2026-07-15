@@ -2081,6 +2081,14 @@ app.post('/api/usuarios', async (req, res) => {
 app.put('/api/usuarios/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   try {
+    const target = await prisma.usuario.findUnique({ where: { id } });
+    if (!target) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const nombresInmutables = ['admin principal', 'eusebio diaz', 'bruno diaz'];
+    const isInmutableOriginal = nombresInmutables.includes(target.nombre.toLowerCase().trim());
+
     if (req.body.pin) {
       const duplicate = await prisma.usuario.findFirst({
         where: { pin: String(req.body.pin), activo: true, id: { not: id } }
@@ -2096,6 +2104,22 @@ app.put('/api/usuarios/:id', async (req, res) => {
     if (req.body.pin !== undefined) data.pin = String(req.body.pin);
     if (req.body.permisos !== undefined) data.permisos = Array.isArray(req.body.permisos) ? req.body.permisos.map(String) : [];
     if (req.body.activo !== undefined) data.activo = Boolean(req.body.activo);
+
+    if (isInmutableOriginal) {
+      if (req.body.rol !== undefined && req.body.rol !== 'Administrador') {
+        return res.status(400).json({ error: '⚠️ No puedes cambiar el rol de este administrador principal.' });
+      }
+      if (req.body.nombre !== undefined && req.body.nombre.toLowerCase().trim() !== target.nombre.toLowerCase().trim()) {
+        return res.status(400).json({ error: '⚠️ No puedes cambiar el nombre de este administrador principal.' });
+      }
+      if (req.body.activo !== undefined && !req.body.activo) {
+        return res.status(400).json({ error: '⚠️ No puedes desactivar a este administrador principal.' });
+      }
+      // Forzar valores correctos para asegurar la inmutabilidad y permisos de administración completos
+      data.rol = 'Administrador';
+      data.activo = true;
+      data.permisos = ['Dashboard', 'Salon', 'Cocina', 'Barra', 'Caja', 'Reportes', 'Usuarios', 'Ensaladas'];
+    }
 
     const user = await prisma.usuario.update({
       where: { id },
@@ -2162,8 +2186,18 @@ app.get('/api/usuarios/check/:id', async (req, res) => {
 app.delete('/api/usuarios/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const admins = await prisma.usuario.count({ where: { rol: 'Administrador', activo: true } });
     const target = await prisma.usuario.findUnique({ where: { id } });
+    if (!target) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const nombresInmutables = ['admin principal', 'eusebio diaz', 'bruno diaz'];
+    const isInmutable = nombresInmutables.includes(target.nombre.toLowerCase().trim());
+    if (isInmutable) {
+      return res.status(400).json({ error: '⚠️ Este usuario administrador es una cuenta principal del sistema y no puede ser eliminado.' });
+    }
+
+    const admins = await prisma.usuario.count({ where: { rol: 'Administrador', activo: true } });
     if (target.rol === 'Administrador' && admins <= 1) {
       return res.status(400).json({ error: '¡No puedes eliminar al único Administrador!' });
     }
