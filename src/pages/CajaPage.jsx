@@ -194,7 +194,13 @@ export default function CajaPage({ currentUser }) {
   // Historial de Ventas y Arqueo/Cierre de Caja
   const [ventas, setVentas] = useState([]);
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
-  const [ultimoCierre, setUltimoCierre] = useState(localStorage.getItem('ultimoCierre') || null);
+  const [ultimoCierre, setUltimoCierre] = useState(() => {
+    const stored = localStorage.getItem('ultimoCierre');
+    if (stored) return stored;
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  });
   const [filtroMetodoPago, setFiltroMetodoPago] = useState('Todos');
   const [consumoPin, setConsumoPin] = useState('');
   const [consumoPinError, setConsumoPinError] = useState('');
