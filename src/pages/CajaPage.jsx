@@ -63,6 +63,7 @@ const SINONIMOS = {
 
 const BARRA_CATEGORIAS = [
   'Bebidas y Refrescos',
+  'Bebidas',
   'Cervezas',
   'Bar y Cocteles',
   'Postres',

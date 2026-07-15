@@ -65,7 +65,7 @@ const matchProductSemantic = (prod, query) => {
 };
 
 // Categorías de Barra (el resto va a Cocina)
-const BARRA_CATEGORIAS = ['Bebidas y Refrescos', 'Cervezas', 'Bar y Cocteles', 'Postres'];
+const BARRA_CATEGORIAS = ['Bebidas y Refrescos', 'Bebidas', 'Cervezas', 'Bar y Cocteles', 'Postres'];
 
 // Ícono y color por categoría
 function getCatStyle(cat) {

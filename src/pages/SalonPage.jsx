@@ -74,6 +74,7 @@ const matchProductSemantic = (prod, query) => {
 
 const BARRA_CATEGORIAS = [
   'Bebidas y Refrescos',
+  'Bebidas',
   'Cervezas',
   'Bar y Cocteles',
   'Postres',
