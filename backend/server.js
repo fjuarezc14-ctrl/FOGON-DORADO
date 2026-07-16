@@ -1907,6 +1907,9 @@ app.get('/api/productos', async (req, res) => {
 app.post('/api/productos', async (req, res) => {
   try {
     const { nombre, categoria, precio, tipoStock, stock } = req.body;
+    const categoriasGuarnicion = ['Pollos', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
+    const requiereGuarnicion = categoriasGuarnicion.includes(categoria);
+
     const prod = await prisma.producto.create({
       data: {
         nombre: String(nombre),
@@ -1914,6 +1917,7 @@ app.post('/api/productos', async (req, res) => {
         precio: parseFloat(precio),
         tipoStock: tipoStock ? String(tipoStock) : 'ilimitado',
         stock: stock ? parseInt(stock) : 0,
+        requiereGuarnicion: requiereGuarnicion,
       }
     });
     res.json(prod);
@@ -1926,7 +1930,11 @@ app.put('/api/productos/:id', async (req, res) => {
   try {
     const data = {};
     if (req.body.nombre !== undefined) data.nombre = String(req.body.nombre);
-    if (req.body.categoria !== undefined) data.categoria = String(req.body.categoria);
+    if (req.body.categoria !== undefined) {
+      data.categoria = String(req.body.categoria);
+      const categoriasGuarnicion = ['Pollos', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
+      data.requiereGuarnicion = categoriasGuarnicion.includes(data.categoria);
+    }
     if (req.body.precio !== undefined) data.precio = parseFloat(req.body.precio);
     if (req.body.tipoStock !== undefined) data.tipoStock = String(req.body.tipoStock);
     if (req.body.stock !== undefined) data.stock = parseInt(req.body.stock);
