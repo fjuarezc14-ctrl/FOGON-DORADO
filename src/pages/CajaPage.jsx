@@ -3494,9 +3494,13 @@ export default function CajaPage({ currentUser }) {
                       return;
                     }
 
-                    const nowISO = new Date().toISOString();
-                    localStorage.setItem('ultimoCierre', nowISO);
-                    setUltimoCierre(nowISO);
+                    const maxSaleTime = ventasFiltradas.length > 0
+                      ? Math.max(...ventasFiltradas.map(v => new Date(v.createdAt).getTime()))
+                      : new Date().getTime();
+                    const newCierreISO = new Date(maxSaleTime + 1000).toISOString();
+
+                    localStorage.setItem('ultimoCierre', newCierreISO);
+                    setUltimoCierre(newCierreISO);
                     setMostrarTodoElDia(false);
                     alert(`✅ ¡Cierre de Turno exitoso!\n\nTotal en Caja (real): S/ ${totalCalculado.toFixed(2)}\n${totalPedidosYa > 0 ? `PedidosYa (cobro semanal): S/ ${totalPedidosYa.toFixed(2)}\n` : ''}El turno ha sido archivado e inicializado.`);
                     setCierreModalOpen(false);
