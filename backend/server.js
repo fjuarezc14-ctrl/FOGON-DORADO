@@ -3207,7 +3207,7 @@ async function ejecutarMigracionRequiereGuarnicion() {
   try {
     const count = await prisma.producto.updateMany({
       where: {
-        categoria: { in: ['Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos'] }
+        categoria: { in: ['Pollos', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'] }
       },
       data: { requiereGuarnicion: true }
     });

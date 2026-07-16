@@ -1259,8 +1259,8 @@ export default function CajaPage({ currentUser }) {
     }
 
     // 4.5. Pollos a la Brasa (Enteros y Medios que no sean "Solo")
-    const isPolloEntero = prodId === 10 || prodId === 16;
-    const isMedioPollo = prodId === 11 || prodId === 17;
+    const isPolloEntero = prodId === 1 || prodId === 10 || prodId === 16;
+    const isMedioPollo = prodId === 2 || prodId === 11 || prodId === 17;
 
     if (isPolloEntero) {
       return [
@@ -1325,8 +1325,8 @@ export default function CajaPage({ currentUser }) {
       !prod.nombre.toLowerCase().includes('solo');
 
     const prodId = parseInt(prod.id);
-    const isPolloEntero = prodId === 10 || prodId === 16;
-    const isMedioPollo = prodId === 11 || prodId === 17;
+    const isPolloEntero = prodId === 1 || prodId === 10 || prodId === 16;
+    const isMedioPollo = prodId === 2 || prodId === 11 || prodId === 17;
     
     if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo) {
       setSelectedProduct(prod);
