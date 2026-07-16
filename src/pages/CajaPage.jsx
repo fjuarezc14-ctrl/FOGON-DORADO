@@ -1353,7 +1353,7 @@ export default function CajaPage({ currentUser }) {
 
     if (idx >= 0) {
       const nuevo = [...itemsDelivery];
-      nuevo[idx].cant++;
+      nuevo[idx] = { ...nuevo[idx], cant: nuevo[idx].cant + 1 };
       setItemsDelivery(nuevo);
     } else {
       setItemsDelivery([...itemsDelivery, { 
@@ -1376,10 +1376,14 @@ export default function CajaPage({ currentUser }) {
         alert(`⚠️ Stock agotado. Solo quedan ${prodOriginal.stock} unidades de "${prodOriginal.nombre}".`);
         return;
       }
-      nuevo[idx].cant++;
+      nuevo[idx] = { ...nuevo[idx], cant: nuevo[idx].cant + 1 };
     } else {
-      nuevo[idx].cant--;
-      if (nuevo[idx].cant <= 0) nuevo.splice(idx, 1);
+      const nuevaCant = nuevo[idx].cant - 1;
+      if (nuevaCant <= 0) {
+        nuevo.splice(idx, 1);
+      } else {
+        nuevo[idx] = { ...nuevo[idx], cant: nuevaCant };
+      }
     }
     setItemsDelivery(nuevo);
   };

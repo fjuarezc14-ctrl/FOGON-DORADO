@@ -661,7 +661,10 @@ export default function SalonPage({ currentUser }) {
       const precioFinal = prod.precioOferta !== null && prod.precioOferta !== undefined ? prod.precioOferta : prod.precio;
       
       if (index >= 0) {
-        nuevosItems[index].cant++;
+        nuevosItems[index] = {
+          ...nuevosItems[index],
+          cant: nuevosItems[index].cant + 1
+        };
       } else {
         nuevosItems.push({ 
           id: String(prod.id), 
@@ -689,10 +692,14 @@ export default function SalonPage({ currentUser }) {
         alert(`⚠️ Stock agotado. Solo quedan ${prodOriginal.stock} unidades de "${prodOriginal.nombre}".`);
         return;
       }
-      nuevos[index].cant++;
+      nuevos[index] = { ...nuevos[index], cant: nuevos[index].cant + 1 };
     } else {
-      nuevos[index].cant--;
-      if (nuevos[index].cant <= 0) nuevos.splice(index, 1);
+      const nuevaCant = nuevos[index].cant - 1;
+      if (nuevaCant <= 0) {
+        nuevos.splice(index, 1);
+      } else {
+        nuevos[index] = { ...nuevos[index], cant: nuevaCant };
+      }
     }
     setTicketActual(nuevos);
   };
