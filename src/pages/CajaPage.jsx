@@ -1028,7 +1028,13 @@ export default function CajaPage({ currentUser }) {
           { label: "1 Ensalada", value: "1 Ensalada" },
           { label: "2 Ensaladas", value: "2 Ensaladas" },
           { label: "3 Ensaladas", value: "3 Ensaladas" },
-          { label: "4 Ensaladas", value: "4 Ensaladas" }
+          { label: "4 Ensaladas", value: "4 Ensaladas" },
+          { label: "5 Ensaladas", value: "5 Ensaladas" },
+          { label: "6 Ensaladas", value: "6 Ensaladas" },
+          { label: "7 Ensaladas", value: "7 Ensaladas" },
+          { label: "8 Ensaladas", value: "8 Ensaladas" },
+          { label: "9 Ensaladas", value: "9 Ensaladas" },
+          { label: "10 Ensaladas", value: "10 Ensaladas" }
         ]
       });
     }
