@@ -1780,11 +1780,7 @@ app.put('/api/pedidos/llevar/:id', async (req, res) => {
           total: grandTotal,
           estadoEnsalada: finalEstadoEnsalada,
           tipoEntrega: isOwnDelivery ? 'delivery' : 'llevar',
-          codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null,
-          metodoPago: finalMetodoPago,
-          montoEfectivo: montoEfectivo ? parseFloat(montoEfectivo) : null,
-          montoTarjeta: montoTarjeta ? parseFloat(montoTarjeta) : null,
-          montoYape: montoYape ? parseFloat(montoYape) : null
+          codigoPedidosYa: codigoPedidosYa ? String(codigoPedidosYa) : null
         }
       });
 
