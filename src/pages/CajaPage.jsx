@@ -1333,8 +1333,7 @@ export default function CajaPage({ currentUser }) {
     const prodId = parseInt(prod.id);
     const isPolloEntero = prodId === 1 || prodId === 10 || prodId === 16;
     const isMedioPollo = prodId === 2 || prodId === 11 || prodId === 17;
-    
-    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo) {
+    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo || prod.requiereGuarnicion) {
       setSelectedProduct(prod);
       setSelections({});
       setCurrentStepIdx(0);
