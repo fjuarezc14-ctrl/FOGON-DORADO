@@ -1696,6 +1696,7 @@ app.put('/api/pedidos/llevar/:id', async (req, res) => {
     nombreCliente,
     clienteDireccion,
     metodoPago,
+    numDocumento,
     montoEfectivo,
     montoTarjeta,
     montoYape
