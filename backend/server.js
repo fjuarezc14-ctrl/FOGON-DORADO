@@ -2608,7 +2608,7 @@ app.get('/api/ventas', async (req, res) => {
       const ahora = new Date();
       const ayerPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
       ayerPeru.setDate(ayerPeru.getDate() - 1);
-      ayerPeru.setHours(0, 0, 0, 0);
+      ayerPeru.setHours(3, 0, 0, 0);
       const inicioUTC = new Date(ayerPeru.getTime() + 5 * 60 * 60 * 1000);
       filtroFecha = { gte: inicioUTC };
     }
@@ -2677,10 +2677,13 @@ app.get('/api/ventas/resumen', async (req, res) => {
     if (desde) {
       filterDate = new Date(desde);
     } else {
-      // Inicio del día en UTC-5
+      // Inicio del día operativo a las 3:00 AM en UTC-5
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
-      hoyPeru.setHours(0, 0, 0, 0);
+      if (hoyPeru.getHours() < 3) {
+        hoyPeru.setDate(hoyPeru.getDate() - 1);
+      }
+      hoyPeru.setHours(3, 0, 0, 0);
       filterDate = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
     }
 
@@ -3118,7 +3121,10 @@ app.get('/api/reportes/rotacion', async (req, res) => {
     } else {
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
-      hoyPeru.setHours(0, 0, 0, 0);
+      if (hoyPeru.getHours() < 3) {
+        hoyPeru.setDate(hoyPeru.getDate() - 1);
+      }
+      hoyPeru.setHours(3, 0, 0, 0);
       const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
       filtroFecha = { gte: inicioUTC };
     }
