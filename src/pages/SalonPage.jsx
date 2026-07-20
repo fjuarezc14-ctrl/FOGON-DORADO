@@ -316,7 +316,12 @@ export default function SalonPage({ currentUser }) {
 
   const getProductSteps = (prod, currentSelections = {}) => {
     const steps = getProductStepsBase(prod, currentSelections);
-    if (prod && prod.requiereGuarnicion) {
+    const nameNorm = (prod && prod.nombre || '').toLowerCase();
+    const isCuartoOOctavo = 
+      nameNorm.includes('1/4') || nameNorm.includes('cuarto') || 
+      nameNorm.includes('1/8') || nameNorm.includes('octavo');
+
+    if (prod && prod.requiereGuarnicion && !isCuartoOOctavo) {
       steps.push({
         name: "Cantidad de Ensaladas",
         key: "cantidad_ensaladas",
@@ -640,7 +645,12 @@ export default function SalonPage({ currentUser }) {
     const isPolloEntero = prodId === 1 || prodId === 10 || prodId === 16;
     const isMedioPollo = prodId === 2 || prodId === 11 || prodId === 17;
 
-    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo || prod.requiereGuarnicion) {
+    const nameNorm = (prod.nombre || '').toLowerCase();
+    const isCuartoOOctavo = 
+      nameNorm.includes('1/4') || nameNorm.includes('cuarto') || 
+      nameNorm.includes('1/8') || nameNorm.includes('octavo');
+
+    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo || (prod.requiereGuarnicion && !isCuartoOOctavo)) {
       setSelectedProduct(prod);
       setCurrentStepIdx(0);
       setSelections({});

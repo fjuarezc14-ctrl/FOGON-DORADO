@@ -1040,7 +1040,12 @@ export default function CajaPage({ currentUser }) {
 
   const getProductSteps = (prod, currentSelections = {}) => {
     const steps = getProductStepsBase(prod, currentSelections);
-    if (prod && prod.requiereGuarnicion) {
+    const nameNorm = (prod && prod.nombre || '').toLowerCase();
+    const isCuartoOOctavo = 
+      nameNorm.includes('1/4') || nameNorm.includes('cuarto') || 
+      nameNorm.includes('1/8') || nameNorm.includes('octavo');
+
+    if (prod && prod.requiereGuarnicion && !isCuartoOOctavo) {
       steps.push({
         name: "Cantidad de Ensaladas",
         key: "cantidad_ensaladas",
@@ -1354,7 +1359,13 @@ export default function CajaPage({ currentUser }) {
     const prodId = parseInt(prod.id);
     const isPolloEntero = prodId === 1 || prodId === 10 || prodId === 16;
     const isMedioPollo = prodId === 2 || prodId === 11 || prodId === 17;
-    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo || prod.requiereGuarnicion) {
+
+    const nameNorm = (prod.nombre || '').toLowerCase();
+    const isCuartoOOctavo = 
+      nameNorm.includes('1/4') || nameNorm.includes('cuarto') || 
+      nameNorm.includes('1/8') || nameNorm.includes('octavo');
+
+    if (hasComboConfig || isVirtualGroup || requiereGuarnicion || isMenuCategory || isPolloEntero || isMedioPollo || (prod.requiereGuarnicion && !isCuartoOOctavo)) {
       setSelectedProduct(prod);
       setSelections({});
       setCurrentStepIdx(0);
@@ -1921,19 +1932,17 @@ export default function CajaPage({ currentUser }) {
                                 ✏️ Modificar
                               </button>
                               
-                              {p.estado !== 'Servido' && (
-                                <button
-                                  onClick={() => {
-                                    setPedidoACancelarLlevar(p);
-                                    setPinCancelLlevar('');
-                                    setErrorCancelLlevar('');
-                                    setCancelLlevarModalOpen(true);
-                                  }}
-                                  className="px-2.5 py-1 bg-red-100 hover:bg-red-655 text-red-700 hover:text-white border border-red-300 hover:border-red-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
-                                >
-                                  🗑 Cancelar
-                                </button>
-                              )}
+                              <button
+                                onClick={() => {
+                                  setPedidoACancelarLlevar(p);
+                                  setPinCancelLlevar('');
+                                  setErrorCancelLlevar('');
+                                  setCancelLlevarModalOpen(true);
+                                }}
+                                className="px-2.5 py-1 bg-red-100 hover:bg-red-655 text-red-700 hover:text-white border border-red-300 hover:border-red-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                              >
+                                🗑 Cancelar
+                              </button>
                             </div>
                           </div>
                         </td>
