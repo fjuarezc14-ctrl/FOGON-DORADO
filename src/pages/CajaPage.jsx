@@ -3280,25 +3280,25 @@ export default function CajaPage({ currentUser }) {
             if (fondo) {
               if (proteina) {
                 const cleanFondoName = fondo.replace(' (pollo o carne)', '');
-                notesArray.push(`[Fondo: ${cleanFondoName} de ${proteina}]`);
+                notesArray.push(`Fondo: ${cleanFondoName} de ${proteina}`);
               } else {
-                notesArray.push(`[Fondo: ${fondo}]`);
+                notesArray.push(`Fondo: ${fondo}`);
               }
             }
             if (entrada) {
-              notesArray.push(`[Entrada: ${entrada}]`);
+              notesArray.push(`Entrada: ${entrada}`);
             }
             
             // Refresco y Postre automáticos (más cortos)
             notesArray.push(`+ Refresco + Postre`);
 
-            if (bebida) {
-              notesArray.push(`[Elige la Bebida: ${bebida}]`);
+            if (bebida && !bebida.toLowerCase().includes('sin bebida') && !bebida.toLowerCase().includes('omitir')) {
+              notesArray.push(`Bebida: ${bebida}`);
             }
 
             const cantidadEnsaladas = selections["cantidad_ensaladas"];
-            if (cantidadEnsaladas) {
-              notesArray.push(`[Cantidad de Ensaladas: ${cantidadEnsaladas}]`);
+            if (cantidadEnsaladas && !cantidadEnsaladas.toLowerCase().includes('sin ensalada')) {
+              notesArray.push(cantidadEnsaladas);
             }
             
             if (additionalNotes.trim()) {
@@ -3311,7 +3311,24 @@ export default function CajaPage({ currentUser }) {
             steps.forEach(step => {
               const val = selections[step.key];
               if (val) {
-                notesArray.push(`[${step.name}: ${val}]`);
+                const valLower = val.toLowerCase();
+                if (valLower.includes('sin bebida') || valLower.includes('sin ensalada') || valLower.includes('omitir') || valLower.includes('sin acompañamiento') || valLower.includes('sin guarnicion')) {
+                  return;
+                }
+                const stepLower = step.name.toLowerCase();
+                if (stepLower.includes('bebida')) {
+                  notesArray.push(`Bebida: ${val}`);
+                } else if (stepLower.includes('ensalada')) {
+                  notesArray.push(val);
+                } else if (stepLower.includes('guarnicion') || stepLower.includes('acompañamiento')) {
+                  notesArray.push(`Guarnición: ${val}`);
+                } else if (stepLower.includes('fondo')) {
+                  notesArray.push(`Fondo: ${val}`);
+                } else if (stepLower.includes('entrada')) {
+                  notesArray.push(`Entrada: ${val}`);
+                } else {
+                  notesArray.push(`${step.name}: ${val}`);
+                }
               }
             });
             if (additionalNotes.trim()) {

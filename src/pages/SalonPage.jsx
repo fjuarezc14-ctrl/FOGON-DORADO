@@ -1561,25 +1561,25 @@ export default function SalonPage({ currentUser }) {
             if (fondo) {
               if (proteina) {
                 const cleanFondoName = fondo.replace(' (pollo o carne)', '');
-                notesArray.push(`[Fondo: ${cleanFondoName} de ${proteina}]`);
+                notesArray.push(`Fondo: ${cleanFondoName} de ${proteina}`);
               } else {
-                notesArray.push(`[Fondo: ${fondo}]`);
+                notesArray.push(`Fondo: ${fondo}`);
               }
             }
             if (entrada) {
-              notesArray.push(`[Entrada: ${entrada}]`);
+              notesArray.push(`Entrada: ${entrada}`);
             }
             
             // Refresco y Postre automáticos (más cortos)
             notesArray.push(`+ refresco + postre`);
 
-            if (bebida) {
-              notesArray.push(`[Elige la Bebida: ${bebida}]`);
+            if (bebida && !bebida.toLowerCase().includes('sin bebida') && !bebida.toLowerCase().includes('omitir')) {
+              notesArray.push(`Bebida: ${bebida}`);
             }
 
             const cantidadEnsaladas = selections["cantidad_ensaladas"];
-            if (cantidadEnsaladas) {
-              notesArray.push(`[Cantidad de Ensaladas: ${cantidadEnsaladas}]`);
+            if (cantidadEnsaladas && !cantidadEnsaladas.toLowerCase().includes('sin ensalada')) {
+              notesArray.push(cantidadEnsaladas);
             }
             
             if (additionalNotes.trim()) {
@@ -1594,37 +1594,52 @@ export default function SalonPage({ currentUser }) {
 
             if (isParrilla2P) {
               const guarn = selections["guarnicion"];
-              if (guarn) notesArray.push(`[Acompañamiento: ${guarn}]`);
+              if (guarn && !guarn.toLowerCase().includes('sin')) notesArray.push(`Guarnición: ${guarn}`);
               
               const b1 = selections["bebida_1"];
               const b2 = selections["bebida_2"];
               const b_adic = selections["bebida_adicional"];
               
-              if (b1 && b2) {
+              if (b1 && b2 && !b1.toLowerCase().includes('sin') && !b2.toLowerCase().includes('sin')) {
                 if (b1 === b2) {
                   // Agrupar dos de 1/2 Lt iguales en un solo litro para la Barra (ej: Gaseosa 1/2 Lt + Gaseosa 1/2 Lt => Gaseosa 1 Lt)
                   const cleanName = b1.replace(" 1/2 Lt", " 1 Lt").replace(" - 1/2 Lt", " - 1 Lt");
-                  notesArray.push(`[Bebida: ${cleanName}]`);
+                  notesArray.push(`Bebida: ${cleanName}`);
                 } else {
-                  notesArray.push(`[Bebida 1: ${b1}]`);
-                  notesArray.push(`[Bebida 2: ${b2}]`);
+                  notesArray.push(`Bebida 1: ${b1}`);
+                  notesArray.push(`Bebida 2: ${b2}`);
                 }
               } else {
-                if (b1) notesArray.push(`[Bebida 1: ${b1}]`);
-                if (b2) notesArray.push(`[Bebida 2: ${b2}]`);
+                if (b1 && !b1.toLowerCase().includes('sin')) notesArray.push(`Bebida 1: ${b1}`);
+                if (b2 && !b2.toLowerCase().includes('sin')) notesArray.push(`Bebida 2: ${b2}`);
               }
               
               if (b_adic && b_adic !== "Sin Bebida Adicional") {
                 // Buscamos el producto en la lista de productos cargada de la base de datos
                 additionalDrinkProduct = productos.find(p => p.nombre === b_adic);
-                // No lo agregamos como nota de texto para evitar duplicidad visual en cocina/barra, 
-                // ya que se ingresará como un producto de línea pagado e independiente en el ticket.
               }
             } else {
               steps.forEach(step => {
                 const val = selections[step.key];
                 if (val) {
-                  notesArray.push(`[${step.name}: ${val}]`);
+                  const valLower = val.toLowerCase();
+                  if (valLower.includes('sin bebida') || valLower.includes('sin ensalada') || valLower.includes('omitir') || valLower.includes('sin acompañamiento') || valLower.includes('sin guarnicion')) {
+                    return;
+                  }
+                  const stepLower = step.name.toLowerCase();
+                  if (stepLower.includes('bebida')) {
+                    notesArray.push(`Bebida: ${val}`);
+                  } else if (stepLower.includes('ensalada')) {
+                    notesArray.push(val);
+                  } else if (stepLower.includes('guarnicion') || stepLower.includes('acompañamiento')) {
+                    notesArray.push(`Guarnición: ${val}`);
+                  } else if (stepLower.includes('fondo')) {
+                    notesArray.push(`Fondo: ${val}`);
+                  } else if (stepLower.includes('entrada')) {
+                    notesArray.push(`Entrada: ${val}`);
+                  } else {
+                    notesArray.push(`${step.name}: ${val}`);
+                  }
                 }
               });
             }
