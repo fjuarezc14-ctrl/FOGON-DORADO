@@ -118,7 +118,7 @@ export default function EnsaladasPage() {
                     {/* Alerta animada si el plato principal ya salió de la cocina */}
                     {cocinaLista && (
                       <div className="absolute -top-3 -right-2 bg-rose-600 text-white text-[9px] font-black px-2.5 py-1 rounded-lg shadow-lg animate-bounce border border-white tracking-widest z-10 uppercase">
-                        🔥 Caliente Listo
+                        🔥 Listo en Cocina
                       </div>
                     )}
                     {esDelivery ? (

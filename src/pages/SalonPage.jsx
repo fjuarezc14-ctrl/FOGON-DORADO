@@ -659,7 +659,7 @@ export default function SalonPage({ currentUser }) {
       return;
     }
     
-    agregarAlTicketDirecto(prod, isCuartoOOctavo ? '[Cantidad de Ensaladas: 1 Ensalada]' : '');
+    agregarAlTicketDirecto(prod, isCuartoOOctavo ? '1 Ensalada' : '');
   };
 
   const agregarAlTicketDirecto = (prod, notas = '') => {
