@@ -2433,97 +2433,141 @@ app.post('/api/ventas', async (req, res) => {
     descuentoAplicado,
     montoEfectivo,
     montoTarjeta,
-    montoYape
+    montoYape,
+    cortesiaItemIds
   } = req.body;
   const idsAPagar = pedidoIds || [pedidoId];
   const idPrincipal = idsAPagar[idsAPagar.length - 1]; // El más reciente como venta principal
 
   try {
-    const finalTotal = metodoPago === 'Cortesía' ? 0.00 : total;
-    const subtotal = parseFloat((finalTotal / 1.18).toFixed(2));
-    const igv = parseFloat((finalTotal - subtotal).toFixed(2));
+    const venta = await prisma.$transaction(async (tx) => {
+      // Mover todos los items de los otros pedidos adicionales al pedido principal para que se consoliden en el detalle de la venta
+      if (idsAPagar.length > 1) {
+        const otrosIds = idsAPagar.filter(id => id !== idPrincipal);
+        await tx.itemPedido.updateMany({
+          where: { pedidoId: { in: otrosIds } },
+          data: { pedidoId: idPrincipal },
+        });
+      }
 
-    let finalMontoEfectivo = 0;
-    let finalMontoTarjeta = 0;
-    let finalMontoYape = 0;
+      // Procesar cortesías individuales por ítem
+      let itemsCortesiaDescuento = 0;
+      if (cortesiaItemIds && Array.isArray(cortesiaItemIds) && cortesiaItemIds.length > 0) {
+        const itemIds = cortesiaItemIds.map(id => parseInt(id)).filter(id => !isNaN(id));
+        const itemsAActualizar = await tx.itemPedido.findMany({
+          where: { id: { in: itemIds } }
+        });
 
-    if (metodoPago === 'Mixto') {
-      finalMontoEfectivo = parseFloat(montoEfectivo || 0);
-      finalMontoTarjeta = parseFloat(montoTarjeta || 0);
-      finalMontoYape = parseFloat(montoYape || 0);
-    } else if (metodoPago === 'Efectivo') {
-      finalMontoEfectivo = finalTotal;
-    } else if (metodoPago === 'Tarjeta') {
-      finalMontoTarjeta = finalTotal;
-    } else if (metodoPago === 'Yape') {
-      finalMontoYape = finalTotal;
-    }
+        for (const item of itemsAActualizar) {
+          itemsCortesiaDescuento += item.precio * item.cantidad;
+          let nuevaNota = item.notas ? `${item.notas} [CORTESÍA]` : '[CORTESÍA]';
+          await tx.itemPedido.update({
+            where: { id: item.id },
+            data: {
+              precio: 0.00,
+              notas: nuevaNota
+            }
+          });
+        }
+      }
 
-    // Mover todos los items de los otros pedidos adicionales al pedido principal para que se consoliden en el detalle de la venta
-    if (idsAPagar.length > 1) {
-      const otrosIds = idsAPagar.filter(id => id !== idPrincipal);
-      await prisma.itemPedido.updateMany({
-        where: { pedidoId: { in: otrosIds } },
-        data: { pedidoId: idPrincipal },
+      // Recalcular el total consolidado del pedido principal en la DB
+      const todosLosItemsPrincipal = await tx.itemPedido.findMany({
+        where: { pedidoId: idPrincipal }
       });
-    }
+      const nuevoTotalPedido = todosLosItemsPrincipal.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
 
-    // Calcular correlativo para apisunat.pe si es Boleta o Factura
-    let serie = null;
-    let numero = null;
-    if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
-      const ultimaVenta = await prisma.venta.findFirst({
-        where: { tipoComprobante, numero: { not: null } },
-        orderBy: { numero: 'desc' }
+      await tx.pedido.update({
+        where: { id: idPrincipal },
+        data: { total: nuevoTotalPedido }
       });
-      serie = tipoComprobante === 'Factura' ? 'F001' : 'B001';
-      numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
-    }
 
-    // Crear Venta principal (inicialmente PENDIENTE si es factura/boleta)
-    const initEstadoSunat = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
+      const finalTotal = metodoPago === 'Cortesía' ? 0.00 : nuevoTotalPedido;
+      const subtotal = parseFloat((finalTotal / 1.18).toFixed(2));
+      const igv = parseFloat((finalTotal - subtotal).toFixed(2));
 
-    const venta = await prisma.venta.create({
-      data: { 
-        pedidoId: idPrincipal, 
-        tipoComprobante, 
-        numDocumento, 
-        nombreCliente: metodoPago === 'Cortesía' ? (nombreCliente || 'CONSUMO PERSONAL / CORTESÍA') : nombreCliente, 
-        total: finalTotal, 
-        igv, 
-        subtotal, 
-        metodoPago,
-        montoEfectivo: finalMontoEfectivo,
-        montoTarjeta: finalMontoTarjeta,
-        montoYape: finalMontoYape,
-        estadoNubefact: initEstadoSunat,
-        estadoSunat: initEstadoSunat,
-        serie,
-        numero,
-        ofertaDescripcion: ofertaDescripcion ? String(ofertaDescripcion) : null,
-        descuentoAplicado: descuentoAplicado ? parseFloat(descuentoAplicado) : 0,
-      },
+      let finalMontoEfectivo = 0;
+      let finalMontoTarjeta = 0;
+      let finalMontoYape = 0;
+
+      if (metodoPago === 'Mixto') {
+        finalMontoEfectivo = parseFloat(montoEfectivo || 0);
+        finalMontoTarjeta = parseFloat(montoTarjeta || 0);
+        finalMontoYape = parseFloat(montoYape || 0);
+      } else if (metodoPago === 'Efectivo') {
+        finalMontoEfectivo = finalTotal;
+      } else if (metodoPago === 'Tarjeta') {
+        finalMontoTarjeta = finalTotal;
+      } else if (metodoPago === 'Yape') {
+        finalMontoYape = finalTotal;
+      }
+
+      // Calcular correlativo para apisunat.pe si es Boleta o Factura
+      let serie = null;
+      let numero = null;
+      if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
+        const ultimaVenta = await tx.venta.findFirst({
+          where: { tipoComprobante, numero: { not: null } },
+          orderBy: { numero: 'desc' }
+        });
+        serie = tipoComprobante === 'Factura' ? 'F001' : 'B001';
+        numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
+      }
+
+      // Crear Venta principal (inicialmente PENDIENTE si es factura/boleta)
+      const initEstadoSunat = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
+
+      let descAplicado = descuentoAplicado ? parseFloat(descuentoAplicado) : 0;
+      let descDescrip = ofertaDescripcion ? String(ofertaDescripcion) : null;
+      if (itemsCortesiaDescuento > 0) {
+        descAplicado += itemsCortesiaDescuento;
+        descDescrip = descDescrip ? `${descDescrip} + Cortesía de ítems` : 'Cortesía de ítems';
+      }
+
+      const ventaCreada = await tx.venta.create({
+        data: { 
+          pedidoId: idPrincipal, 
+          tipoComprobante, 
+          numDocumento, 
+          nombreCliente: metodoPago === 'Cortesía' ? (nombreCliente || 'CONSUMO PERSONAL / CORTESÍA') : nombreCliente, 
+          total: finalTotal, 
+          igv, 
+          subtotal, 
+          metodoPago,
+          montoEfectivo: finalMontoEfectivo,
+          montoTarjeta: finalMontoTarjeta,
+          montoYape: finalMontoYape,
+          estadoNubefact: initEstadoSunat,
+          estadoSunat: initEstadoSunat,
+          serie,
+          numero,
+          ofertaDescripcion: descDescrip,
+          descuentoAplicado: descAplicado,
+        },
+      });
+
+      // Marcar TODOS los pedidos de la mesa como Cobrado
+      await tx.pedido.updateMany({
+        where: { id: { in: idsAPagar } },
+        data: { estado: 'Cobrado' },
+      });
+
+      // Liberar la mesa
+      const pedidoPrincipal = await tx.pedido.findUnique({ where: { id: idsAPagar[0] } });
+      if (pedidoPrincipal?.mesaId) {
+        const mObj = await tx.mesa.update({
+          where: { id: pedidoPrincipal.mesaId },
+          data: { estado: 'Libre' },
+        });
+        // Liberar automáticamente las mesas que estaban unidas a esta
+        await tx.mesa.updateMany({
+          where: { estado: `Unida a Mesa ${mObj.numero}` },
+          data: { estado: 'Libre' },
+        });
+      }
+
+      return ventaCreada;
     });
-
-    // Marcar TODOS los pedidos de la mesa como Cobrado
-    await prisma.pedido.updateMany({
-      where: { id: { in: idsAPagar } },
-      data: { estado: 'Cobrado' },
-    });
-
-    // Liberar la mesa
-    const pedidoPrincipal = await prisma.pedido.findUnique({ where: { id: idsAPagar[0] } });
-    if (pedidoPrincipal?.mesaId) {
-      const mObj = await prisma.mesa.update({
-        where: { id: pedidoPrincipal.mesaId },
-        data: { estado: 'Libre' },
-      });
-      // Liberar automáticamente las mesas que estaban unidas a esta
-      await prisma.mesa.updateMany({
-        where: { estado: `Unida a Mesa ${mObj.numero}` },
-        data: { estado: 'Libre' },
-      });
-    }
 
     // Si es Boleta o Factura, intentamos enviar a apisunat.pe
     if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {

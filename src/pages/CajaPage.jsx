@@ -176,6 +176,7 @@ export default function CajaPage({ currentUser }) {
   const [cobrando, setCobrando] = useState(false);
   const [activeComprobante, setActiveComprobante] = useState(null);
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
+  const [cortesiaItemIds, setCortesiaItemIds] = useState([]);
 
   // Campos para Delivery Propio y Para Llevar en modal
   const [deliveryTelefono, setDeliveryTelefono] = useState('');
@@ -641,10 +642,15 @@ export default function CajaPage({ currentUser }) {
       return;
     }
 
-    // Si es Consumo o Cortesía, requerir PIN de supervisor/cajero en el modal
-    if (metodoPago === 'Consumo' || metodoPago === 'Cortesía') {
+    const items = mesaSeleccionada.pedidoData.items || [];
+    const itemsNormales = items.filter(i => !cortesiaItemIds.includes(i.itemId));
+    const total = itemsNormales.reduce((s, i) => s + (i.cant * i.precio), 0);
+    const tieneCortesiasIndividuales = cortesiaItemIds.length > 0;
+
+    // Si es Consumo o Cortesía (total o individual), requerir PIN de supervisor/cajero en el modal
+    if (metodoPago === 'Consumo' || metodoPago === 'Cortesía' || tieneCortesiasIndividuales) {
       if (!consumoPin.trim()) {
-        setConsumoPinError(`El PIN es requerido para autorizar la ${metodoPago === 'Cortesía' ? 'Cortesía' : 'Consumo Personal'}.`);
+        setConsumoPinError(`El PIN es requerido para autorizar la Cortesía / Consumo.`);
         return;
       }
       
@@ -661,7 +667,6 @@ export default function CajaPage({ currentUser }) {
     let finalMontoEfectivo = 0;
     let finalMontoTarjeta = 0;
     let finalMontoYape = 0;
-    const total = mesaSeleccionada.pedidoData.total;
 
     if (metodoPago === 'Mixto') {
       const efecVal = parseFloat(mixtoEfectivo || 0);
@@ -702,6 +707,7 @@ export default function CajaPage({ currentUser }) {
         montoTarjeta: finalMontoTarjeta,
         montoYape: finalMontoYape,
         clienteDireccion: clienteDireccion || '',
+        cortesiaItemIds: cortesiaItemIds
       });
 
       setModalOpen(false);
@@ -713,9 +719,21 @@ export default function CajaPage({ currentUser }) {
       setMixtoEfectivo('');
       setMixtoTarjeta('');
       setMixtoYape('');
+      setCortesiaItemIds([]);
 
       // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
       if (metodoPago !== 'Consumo') {
+        const itemsParaImpresion = items.map(item => {
+          if (cortesiaItemIds.includes(item.itemId)) {
+            return {
+              ...item,
+              precio: 0,
+              notas: item.notas ? `${item.notas} [CORTESÍA]` : '[CORTESÍA]'
+            };
+          }
+          return item;
+        });
+
         abrirTicketImpresionDirecto(
           total,
           response,
@@ -723,7 +741,7 @@ export default function CajaPage({ currentUser }) {
           numDocumento || null,
           clienteNombre || 'Consumidor Final',
           clienteDireccion || '',
-          mesaSeleccionada.pedidoData.items,
+          itemsParaImpresion,
           mesaSeleccionada.num
         );
       } else {
@@ -1792,7 +1810,7 @@ export default function CajaPage({ currentUser }) {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
-                          onClick={() => { setMesaSeleccionada(m); setModalOpen(true); }}
+                          onClick={() => { setMesaSeleccionada(m); setCortesiaItemIds([]); setModalOpen(true); }}
                           className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md group-hover:scale-105 active:scale-95 group-hover:bg-amber-500 group-hover:text-slate-900"
                         >Cobrar</button>
                       </td>
@@ -2353,9 +2371,17 @@ export default function CajaPage({ currentUser }) {
       </div>
 
       {/* MODAL DE COBRO (MESAS) */}
-      {modalOpen && mesaSeleccionada && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[110] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full h-[95vh] md:h-auto md:max-h-[95vh] max-w-3xl rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+      {modalOpen && mesaSeleccionada && (() => {
+        const totalConCortesias = (mesaSeleccionada.pedidoData.items || [])
+          .filter(i => !cortesiaItemIds.includes(i.itemId))
+          .reduce((s, i) => s + (i.cant * i.precio), 0);
+        const subtotalConCortesias = parseFloat((totalConCortesias / 1.18).toFixed(2));
+        const igvConCortesias = parseFloat((totalConCortesias - subtotalConCortesias).toFixed(2));
+        const tieneCortesiasIndividuales = cortesiaItemIds.length > 0;
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[110] flex items-end md:items-center justify-center p-0 md:p-4">
+            <div className="bg-white w-full h-[95vh] md:h-auto md:max-h-[95vh] max-w-3xl rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
             <div className="p-4 md:p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-900"><Banknote className="w-5 h-5" /></div>
@@ -2444,7 +2470,7 @@ export default function CajaPage({ currentUser }) {
                 </div>
 
                 {metodoPago === 'Mixto' && (() => {
-                  const total = mesaSeleccionada.pedidoData.total;
+                  const total = totalConCortesias;
                   const efecVal = parseFloat(mixtoEfectivo || 0);
                   const tarjVal = parseFloat(mixtoTarjeta || 0);
                   const yapeVal = parseFloat(mixtoYape || 0);
@@ -2519,27 +2545,38 @@ export default function CajaPage({ currentUser }) {
                   );
                 })()}
 
-                {(metodoPago === 'Consumo' || metodoPago === 'Cortesía') && (
-                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm space-y-2">
-                    <label className="block text-slate-550 font-bold text-[10px] tracking-widest uppercase">🔐 PIN DE AUTORIZACIÓN (ADMINISTRADOR):</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={consumoPin}
-                      onChange={(e) => {
-                        setConsumoPin(e.target.value);
-                        setConsumoPinError('');
-                      }}
-                      placeholder="INGRESA PIN DE ADMIN"
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-center text-lg font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
-                      style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
-                      autoComplete="off"
-                      name="consumo-pin-auth"
-                    />
-                    {consumoPinError && (
-                      <p className="text-red-650 text-[10px] font-black uppercase tracking-wider">{consumoPinError}</p>
+                {(metodoPago === 'Consumo' || metodoPago === 'Cortesía' || tieneCortesiasIndividuales) && (
+                  <div className="space-y-4">
+                    {tieneCortesiasIndividuales && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-[10px] text-emerald-800 font-bold flex items-start gap-2.5">
+                        <Gift className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-black uppercase tracking-wider mb-0.5">🎁 Cortesía Parcial Seleccionada</p>
+                          <p className="font-semibold text-slate-650 leading-normal">Se ha(n) marcado {cortesiaItemIds.length} producto(s) como cortesía. El valor de estos productos ha sido reducido a S/ 0.00. Se requiere PIN de Supervisor para proceder.</p>
+                        </div>
+                      </div>
                     )}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm space-y-2">
+                      <label className="block text-slate-550 font-bold text-[10px] tracking-widest uppercase">🔐 PIN DE AUTORIZACIÓN (ADMINISTRADOR):</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={consumoPin}
+                        onChange={(e) => {
+                          setConsumoPin(e.target.value);
+                          setConsumoPinError('');
+                        }}
+                        placeholder="INGRESA PIN DE ADMIN"
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-center text-lg font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
+                        style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
+                        autoComplete="off"
+                        name="consumo-pin-auth"
+                      />
+                      {consumoPinError && (
+                        <p className="text-red-650 text-[10px] font-black uppercase tracking-wider">{consumoPinError}</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -2558,16 +2595,35 @@ export default function CajaPage({ currentUser }) {
                       const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
                       return (
                         <li key={idx} className="flex flex-col border-b border-dashed border-slate-100 pb-1.5 last:border-0 last:pb-0">
-                          <div className="flex justify-between items-start text-xs">
-                            <span className="text-slate-800 font-medium">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-800 font-medium flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={cortesiaItemIds.includes(item.itemId)}
+                                onChange={() => {
+                                  if (cortesiaItemIds.includes(item.itemId)) {
+                                    setCortesiaItemIds(prev => prev.filter(id => id !== item.itemId));
+                                  } else {
+                                    setCortesiaItemIds(prev => [...prev, item.itemId]);
+                                  }
+                                }}
+                                className="w-3.5 h-3.5 rounded border-slate-350 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
+                                title="Marcar como Cortesía (S/ 0.00)"
+                              />
                               <span className="font-black text-slate-900 mr-1.5">{item.cant}x</span>
-                              <span className="uppercase">{item.nombre}</span>
+                              <span className={`uppercase ${cortesiaItemIds.includes(item.itemId) ? 'line-through text-slate-400' : ''}`}>{item.nombre}</span>
                             </span>
                             <span className="font-mono text-slate-600 font-bold shrink-0 flex items-center gap-1.5">
-                              {tieneDescuento && (
-                                <span className="line-through text-slate-400 font-semibold text-[10px]">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                              {cortesiaItemIds.includes(item.itemId) ? (
+                                <span className="text-emerald-600 font-black uppercase text-[10px] tracking-wider bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-250">🎁 Cortesía</span>
+                              ) : (
+                                <>
+                                  {tieneDescuento && (
+                                    <span className="line-through text-slate-400 font-semibold text-[10px]">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                                  )}
+                                  <span>S/ {(item.cant * item.precio).toFixed(2)}</span>
+                                </>
                               )}
-                              <span>S/ {(item.cant * item.precio).toFixed(2)}</span>
                             </span>
                           </div>
                           
@@ -2615,11 +2671,11 @@ export default function CajaPage({ currentUser }) {
                   <div className="space-y-2 mb-4 border-b border-slate-800 pb-4">
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Subtotal (Sin IGV)</span>
-                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData.total / 1.18).toFixed(2)}</span>
+                      <span className="font-mono">S/ {subtotalConCortesias.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>IGV (18%)</span>
-                      <span className="font-mono">S/ {(mesaSeleccionada.pedidoData.total - (mesaSeleccionada.pedidoData.total / 1.18)).toFixed(2)}</span>
+                      <span className="font-mono">S/ {igvConCortesias.toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="flex justify-between items-end">
@@ -2629,7 +2685,7 @@ export default function CajaPage({ currentUser }) {
                     </div>
                     <div>
                       <p className="text-3xl font-black text-white font-mono tracking-tighter text-right">
-                        <span className="text-lg text-slate-500 mr-1 font-sans">S/</span>{mesaSeleccionada.pedidoData.total.toFixed(2)}
+                        <span className="text-lg text-slate-500 mr-1 font-sans">S/</span>{totalConCortesias.toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -2642,9 +2698,10 @@ export default function CajaPage({ currentUser }) {
                 {cobrando ? <span className="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></span> : <><CheckCircle className="w-5 h-5" /> Emitir {tipoComprobante} y Liberar Mesa</>}
               </button>
             </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL PEDIDOS YA */}
       {deliveryModal && (
