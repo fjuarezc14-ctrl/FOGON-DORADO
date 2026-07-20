@@ -2603,7 +2603,13 @@ app.get('/api/ventas', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
+      const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      filtroFecha = {
+        gte: new Date(desde + 'T03:00:00.000-05:00'),
+        lte: new Date(nextDayStr + 'T02:59:59.999-05:00')
+      };
     } else {
       const ahora = new Date();
       const ayerPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
@@ -2741,7 +2747,13 @@ app.get('/api/compras', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
+      const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      filtroFecha = {
+        gte: new Date(desde + 'T03:00:00.000-05:00'),
+        lte: new Date(nextDayStr + 'T02:59:59.999-05:00')
+      };
     } else {
       const ahora = new Date();
       const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
@@ -2993,7 +3005,13 @@ app.get('/api/reportes/cancelaciones', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
+      const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      filtroFecha = {
+        gte: new Date(desde + 'T03:00:00.000-05:00'),
+        lte: new Date(nextDayStr + 'T02:59:59.999-05:00')
+      };
     } else {
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
@@ -3034,7 +3052,13 @@ app.get('/api/reportes/mozos', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
+      const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      filtroFecha = {
+        gte: new Date(desde + 'T03:00:00.000-05:00'),
+        lte: new Date(nextDayStr + 'T02:59:59.999-05:00')
+      };
     } else {
       const ahora = new Date();
       const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
@@ -3077,7 +3101,13 @@ app.get('/api/reportes/contable', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      filtroFecha = { gte: new Date(desde + 'T00:00:00.000-05:00'), lte: new Date(hasta + 'T23:59:59.999-05:00') };
+      const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      filtroFecha = {
+        gte: new Date(desde + 'T03:00:00.000-05:00'),
+        lte: new Date(nextDayStr + 'T02:59:59.999-05:00')
+      };
     } else {
       const ahora = new Date();
       const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
@@ -3112,11 +3142,14 @@ app.get('/api/reportes/rotacion', async (req, res) => {
   try {
     let filtroFecha = {};
     if (desde && hasta) {
-      const gteDate = desde.length === 10 ? new Date(desde + 'T00:00:00.000-05:00') : new Date(desde);
-      const lteDate = hasta.length === 10 ? new Date(hasta + 'T23:59:59.999-05:00') : new Date(hasta);
+      const gteDate = desde.length === 10 ? new Date(desde + 'T03:00:00.000-05:00') : new Date(desde);
+      const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      const lteDate = hasta.length === 10 ? new Date(nextDayStr + 'T02:59:59.999-05:00') : new Date(hasta);
       filtroFecha = { gte: gteDate, lte: lteDate };
     } else if (desde) {
-      const gteDate = desde.length === 10 ? new Date(desde + 'T00:00:00.000-05:00') : new Date(desde);
+      const gteDate = desde.length === 10 ? new Date(desde + 'T03:00:00.000-05:00') : new Date(desde);
       filtroFecha = { gte: gteDate };
     } else {
       const ahora = new Date();
