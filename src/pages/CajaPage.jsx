@@ -4155,26 +4155,27 @@ export default function CajaPage({ currentUser }) {
               
               {/* Items Table Header */}
               <div className="flex font-bold border-b border-dashed border-slate-350 pb-1 mb-1">
-                <span className="w-16 shrink-0">Cant.</span>
-                <span className="flex-1">DESCRIPCIÓN</span>
-                <span className="w-16 text-right shrink-0">P.Unit</span>
-                <span className="w-20 text-right shrink-0">TOTAL</span>
+                <span className="w-8 shrink-0">Cant</span>
+                <span className="flex-1 pl-1">DESCRIPCIÓN</span>
+                <span className="w-14 text-right shrink-0">P.Unit</span>
+                <span className="w-18 text-right shrink-0">TOTAL</span>
               </div>
               
               {activeComprobante.items
                 .filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria))))
                 .map((item, idx) => {
                 const subTotalItem = item.cant * item.precio;
+                const cantStr = item.cant % 1 === 0 ? item.cant.toFixed(0) : item.cant.toFixed(2);
                 return (
                   <div key={idx} className="flex flex-col mb-1.5">
                     <div className="flex items-start">
-                      <span className="w-16 shrink-0">{item.cant.toFixed(2)} NIU</span>
-                      <span className="flex-1 uppercase">{item.nombre}</span>
-                      <span className="w-16 text-right shrink-0">{item.precio.toFixed(2)}</span>
-                      <span className="w-20 text-right shrink-0">{subTotalItem.toFixed(2)}</span>
+                      <span className="w-8 shrink-0 font-bold">{cantStr}x</span>
+                      <span className="flex-1 uppercase pl-1">{item.nombre}</span>
+                      <span className="w-14 text-right shrink-0">{item.precio.toFixed(2)}</span>
+                      <span className="w-18 text-right shrink-0">{subTotalItem.toFixed(2)}</span>
                     </div>
                     {item.notas && (
-                      <div className="pl-16 text-[9px] text-slate-500 font-bold leading-tight uppercase text-left break-all">
+                      <div className="pl-8 text-[9px] text-slate-500 font-bold leading-tight uppercase text-left break-all">
                         {item.notas}
                       </div>
                     )}
@@ -4299,6 +4300,10 @@ export default function CajaPage({ currentUser }) {
       )}
 
       <style>{`
+        @page {
+          size: auto;
+          margin: 0mm;
+        }
         @media print {
           /* Ocultar elementos de navegación y fondos */
           aside, header, #sidebar-menu, #sidebar-backdrop, button, nav, .shrink-0 {
@@ -4319,12 +4324,12 @@ export default function CajaPage({ currentUser }) {
             height: auto !important;
             width: auto !important;
           }
-          /* Formatear el contenedor del ticket en 80mm en la esquina superior izquierda */
+          /* Formatear el contenedor del ticket en 74mm en la esquina superior izquierda */
           #modal-comprobante-sunat-print-container {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 80mm !important;
+            width: 74mm !important;
             height: auto !important;
             display: block !important;
             background: white !important;
@@ -4335,8 +4340,8 @@ export default function CajaPage({ currentUser }) {
           #modal-comprobante-sunat-print-container > div {
             border-radius: 0 !important;
             box-shadow: none !important;
-            max-width: 80mm !important;
-            width: 80mm !important;
+            max-width: 74mm !important;
+            width: 74mm !important;
             height: auto !important;
             padding: 0 !important;
             margin: 0 !important;
@@ -4346,13 +4351,17 @@ export default function CajaPage({ currentUser }) {
             display: none !important;
           }
           #comprobante-sunat-ticket-print {
-            width: 80mm !important;
-            padding: 10px !important;
+            width: 74mm !important;
+            padding: 6px !important;
             margin: 0 !important;
             font-family: 'Courier New', Courier, monospace !important;
             font-size: 11px !important;
             line-height: 1.3 !important;
             color: black !important;
+          }
+          #comprobante-sunat-ticket-print div,
+          #comprobante-sunat-ticket-print blockquote {
+            page-break-inside: avoid !important;
           }
           
           /* Cierre de Caja en impresión */
@@ -4360,7 +4369,7 @@ export default function CajaPage({ currentUser }) {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 80mm !important;
+            width: 74mm !important;
             height: auto !important;
             display: block !important;
             background: white !important;
@@ -4371,8 +4380,8 @@ export default function CajaPage({ currentUser }) {
           #modal-cierre > div {
             border-radius: 0 !important;
             box-shadow: none !important;
-            max-width: 80mm !important;
-            width: 80mm !important;
+            max-width: 74mm !important;
+            width: 74mm !important;
             height: auto !important;
             padding: 0 !important;
             margin: 0 !important;
@@ -4382,13 +4391,16 @@ export default function CajaPage({ currentUser }) {
             display: none !important;
           }
           #cierre-imprimible {
-            width: 80mm !important;
-            padding: 10px !important;
+            width: 74mm !important;
+            padding: 6px !important;
             margin: 0 !important;
             font-family: 'Courier New', Courier, monospace !important;
             font-size: 11px !important;
             line-height: 1.3 !important;
             color: black !important;
+          }
+          #cierre-imprimible div {
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
