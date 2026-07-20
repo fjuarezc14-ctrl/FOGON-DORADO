@@ -1372,7 +1372,7 @@ export default function CajaPage({ currentUser }) {
       setAdditionalNotes('');
       setOptionsModalOpen(true);
     } else {
-      agregarItemDeliveryDirecto(prod);
+      agregarItemDeliveryDirecto(prod, isCuartoOOctavo ? '[Cantidad de Ensaladas: 1 Ensalada]' : null);
     }
   };
 
