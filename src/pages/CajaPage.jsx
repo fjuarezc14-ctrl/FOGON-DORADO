@@ -1796,7 +1796,7 @@ export default function CajaPage({ currentUser }) {
                       <td className="px-6 py-4 text-xs font-bold text-slate-600 uppercase">
                         <div className="flex flex-col gap-1 max-w-xs max-h-[100px] overflow-y-auto custom-scrollbar pr-1">
                           {m.pedidoData?.items
-                            ?.filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria))))
+                            ?.filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria)) || (item.notas && item.notas.includes('CORTESÍA')) || (item.nombre && item.nombre.includes('CORTESÍA'))))
                             ?.map((item, idx) => (
                               <span key={idx} className="bg-slate-100/90 px-2 py-0.5 rounded text-[10px] text-slate-700 leading-tight block w-fit border border-slate-200/40">
                                 {item.cant}x {item.nombre}
@@ -2598,7 +2598,7 @@ export default function CajaPage({ currentUser }) {
                   </h3>
                   <ul className="space-y-1.5">
                     {mesaSeleccionada.pedidoData?.items
-                      ?.filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria))))
+                      ?.filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria)) || (item.notas && item.notas.includes('CORTESÍA')) || (item.nombre && item.nombre.includes('CORTESÍA'))))
                       ?.map((item, idx) => {
                       const prodOriginal = productosMenu && productosMenu.find(p => p && String(p.id) === String(item.id));
                       const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
@@ -3485,16 +3485,16 @@ export default function CajaPage({ currentUser }) {
         const totalTarjeta = ventasFiltradas.reduce((s, v) => s + (v.montoTarjeta || 0), 0);
         const totalYape = ventasFiltradas.reduce((s, v) => s + (v.montoYape || 0), 0);
         const totalPedidosYa = ventasFiltradas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0);
-        const totalConsumos = ventasFiltradas.filter(v => v.metodoPago === 'Consumo').reduce((s, v) => s + v.total, 0);
+        const totalConsumos = ventasFiltradas.filter(v => v.metodoPago === 'Consumo').reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
         // Total Caja = solo ingresos reales (sin PedidosYa ni Cortesías ni Consumo)
         const totalCalculado = totalEfectivo + totalTarjeta + totalYape;
 
-        const totalCortesias = ventasFiltradas
-          .filter(v => v.metodoPago === 'Cortesía')
-          .reduce((sum, v) => {
-            const itemsVal = v.items?.reduce((s, i) => s + (i.cant * i.precio), 0) || 0;
-            return sum + itemsVal;
-          }, 0);
+        const totalCortesias = ventasFiltradas.reduce((sum, v) => {
+          if (v.metodoPago === 'Cortesía') {
+            return sum + (v.descuentoAplicado || v.total);
+          }
+          return sum + (v.descuentoAplicado || 0);
+        }, 0);
 
         return (
           <div id="modal-cierre" className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
@@ -4188,7 +4188,7 @@ export default function CajaPage({ currentUser }) {
               </div>
               
               {activeComprobante.items
-                .filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria))))
+                .filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria)) || (item.notas && item.notas.includes('CORTESÍA')) || (item.nombre && item.nombre.includes('CORTESÍA'))))
                 .map((item, idx) => {
                 const subTotalItem = item.cant * item.precio;
                 const cantStr = item.cant % 1 === 0 ? item.cant.toFixed(0) : item.cant.toFixed(2);

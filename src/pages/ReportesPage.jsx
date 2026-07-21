@@ -828,7 +828,7 @@ export default function ReportesPage() {
                 const porMozo = {};
                 consumos.forEach(v => {
                   const mName = v.mesero || v.nombreCliente || 'Sin Nombre';
-                  porMozo[mName] = (porMozo[mName] || 0) + v.total;
+                  porMozo[mName] = (porMozo[mName] || 0) + (v.descuentoAplicado || v.total);
                 });
                 const entries = Object.entries(porMozo);
                 return entries.length > 0 ? entries.map(([mozo, total]) => (
@@ -855,7 +855,7 @@ export default function ReportesPage() {
               {(() => {
                 const totalC = ventas
                   .filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía')
-                  .reduce((s, v) => s + v.total, 0);
+                  .reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
                 return (
                   <span className="bg-violet-100 text-violet-850 text-xs font-black px-4 py-2 rounded-full uppercase tracking-wider">
                     Total Consumos: S/ {totalC.toFixed(2)}
@@ -889,7 +889,7 @@ export default function ReportesPage() {
                           {v.metodoPago === 'Cortesía' && <span className="ml-2 bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">Cortesía</span>}
                         </td>
                         <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
-                        <td className="px-6 py-4 text-right font-mono font-black text-violet-700">S/ {v.total.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-right font-mono font-black text-violet-700">S/ {(v.descuentoAplicado || v.total).toFixed(2)}</td>
                         <td className="px-6 py-4 text-center">
                           <button
                             onClick={() => {

@@ -2519,7 +2519,10 @@ app.post('/api/ventas', async (req, res) => {
 
       let descAplicado = descuentoAplicado ? parseFloat(descuentoAplicado) : 0;
       let descDescrip = ofertaDescripcion ? String(ofertaDescripcion) : null;
-      if (itemsCortesiaDescuento > 0) {
+      if (metodoPago === 'Cortesía' || metodoPago === 'Consumo') {
+        descAplicado = nuevoTotalPedido;
+        descDescrip = metodoPago === 'Cortesía' ? 'Cortesía total del pedido' : 'Consumo de personal';
+      } else if (itemsCortesiaDescuento > 0) {
         descAplicado += itemsCortesiaDescuento;
         descDescrip = descDescrip ? `${descDescrip} + Cortesía de ítems` : 'Cortesía de ítems';
       }
@@ -2701,11 +2704,11 @@ app.get('/api/ventas', async (req, res) => {
       serie: v.serie,
       numero: v.numero,
       itemsResumen: v.pedido?.items
-        ?.filter(i => i.precio > 0 || BARRA_CATEGORIAS.includes(i.producto?.categoria))
+        ?.filter(i => i.precio > 0 || BARRA_CATEGORIAS.includes(i.producto?.categoria) || i.notas?.includes('CORTESÍA') || i.nombre?.includes('CORTESÍA'))
         ?.map(i => `${i.cantidad}x ${i.nombre}`).join(', ') || '',
 
       items: v.pedido?.items
-        ?.filter(i => i.precio > 0 || BARRA_CATEGORIAS.includes(i.producto?.categoria))
+        ?.filter(i => i.precio > 0 || BARRA_CATEGORIAS.includes(i.producto?.categoria) || i.notas?.includes('CORTESÍA') || i.nombre?.includes('CORTESÍA'))
         ?.map(i => ({
           nombre: i.nombre,
           cant: i.cantidad,
@@ -2752,10 +2755,13 @@ app.get('/api/ventas/resumen', async (req, res) => {
       .reduce((s, v) => s + v.total, 0);
     const totalConsumos = ventas
       .filter(v => v.metodoPago === 'Consumo')
-      .reduce((s, v) => s + v.total, 0);
-    const totalCortesias = ventas
-      .filter(v => v.metodoPago === 'Cortesía')
-      .reduce((s, v) => s + v.total, 0);
+      .reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
+    const totalCortesias = ventas.reduce((s, v) => {
+      if (v.metodoPago === 'Cortesía') {
+        return s + (v.descuentoAplicado || v.total);
+      }
+      return s + (v.descuentoAplicado || 0);
+    }, 0);
 
     // Desglose por método (de todos los ingresos reales de caja distribuidos)
     const porMetodoPago = {
