@@ -1295,34 +1295,11 @@ export default function CajaPage({ currentUser }) {
     const isMedioPollo = prodId === 2 || prodId === 11 || prodId === 17;
 
     if (isPolloEntero) {
-      return [
-        {
-          name: "Elige la Bebida (1.5 Litros)",
-          key: "bebida",
-          options: [
-            { label: "Inca Kola 1.5L", value: "Inca Kola 1.5L" },
-            { label: "Coca Cola 1.5 Litros", value: "Gaseosa 1 1/2 Lt" },
-            { label: "Chicha Morada 1.5 Litros", value: "Chicha Morada - 1 1/2 Lt" },
-            { label: "Limonada 1.5 Litros", value: "Limonada - 1 1/2 Lt" },
-            { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
-          ]
-        }
-      ];
+      return [];
     }
 
     if (isMedioPollo) {
-      return [
-        {
-          name: "Elige la Bebida (1 Litro)",
-          key: "bebida",
-          options: [
-            { label: "Gaseosa 1 Litro", value: "Gaseosa 1 Lt" },
-            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" },
-            { label: "Limonada 1 Litro", value: "Limonada - 1 Lt" },
-            { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
-          ]
-        }
-      ];
+      return [];
     }
 
     // 5. Guarniciones genéricas para carnes y pollos (SIN Pollos a la Brasa)
@@ -1467,7 +1444,7 @@ export default function CajaPage({ currentUser }) {
     
     let serie = response.serie || (tipoComprobante === 'Factura' ? 'F001' : (tipoComprobante === 'Ticket' ? 'T001' : 'B001'));
     let correlativoStr = String(response.numero || 1).padStart(4, '0');
-    let subtotal = total / 1.18;
+    let subtotal = total / 1.105;
     let igv = total - subtotal;
     let totalLetras = numeroALetras(total);
     let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
@@ -2384,7 +2361,7 @@ export default function CajaPage({ currentUser }) {
         const totalConCortesias = (mesaSeleccionada.pedidoData.items || [])
           .filter(i => !cortesiaItemIds.includes(i.itemId))
           .reduce((s, i) => s + (i.cant * i.precio), 0);
-        const subtotalConCortesias = parseFloat((totalConCortesias / 1.18).toFixed(2));
+        const subtotalConCortesias = parseFloat((totalConCortesias / 1.105).toFixed(2));
         const igvConCortesias = parseFloat((totalConCortesias - subtotalConCortesias).toFixed(2));
         const tieneCortesiasIndividuales = cortesiaItemIds.length > 0;
 
@@ -2683,7 +2660,7 @@ export default function CajaPage({ currentUser }) {
                       <span className="font-mono">S/ {subtotalConCortesias.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400">
-                      <span>IGV (18%)</span>
+                      <span>IGV (10.5%)</span>
                       <span className="font-mono">S/ {igvConCortesias.toFixed(2)}</span>
                     </div>
                   </div>
@@ -3477,9 +3454,9 @@ export default function CajaPage({ currentUser }) {
       {/* MODAL DE CIERRE DE CAJA (ARQUEO DE TURNO) */}
       {cierreModalOpen && (() => {
         // Consolidación reactiva de montos del turno actual
-        const ventasFiltradas = ultimoCierre 
+        const ventasFiltradas = (ultimoCierre 
           ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
-          : ventas;
+          : ventas).filter(v => v.estadoPedido !== 'Cancelado');
 
         const totalEfectivo = ventasFiltradas.reduce((s, v) => s + (v.montoEfectivo || 0), 0);
         const totalTarjeta = ventasFiltradas.reduce((s, v) => s + (v.montoTarjeta || 0), 0);
@@ -4213,7 +4190,7 @@ export default function CajaPage({ currentUser }) {
               
               <div className="space-y-1 text-right font-bold" style={{ fontSize: '11px' }}>
                 <div className="flex justify-between"><span>SUBTOTAL</span> <span>S/ {activeComprobante.subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>I.G.V (18%)</span> <span>S/ {activeComprobante.igv.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>I.G.V (10.5%)</span> <span>S/ {activeComprobante.igv.toFixed(2)}</span></div>
                 <div className="flex justify-between" style={{ fontSize: '12px', fontWeight: '900' }}><span>TOTAL</span> <span>S/ {activeComprobante.total.toFixed(2)}</span></div>
               </div>
               
@@ -4380,10 +4357,15 @@ export default function CajaPage({ currentUser }) {
             width: 74mm !important;
             padding: 6px !important;
             margin: 0 !important;
-            font-family: 'Courier New', Courier, monospace !important;
+            font-family: 'Arial', 'Helvetica', sans-serif !important;
             font-size: 11px !important;
             line-height: 1.3 !important;
-            color: black !important;
+            color: #000000 !important;
+            font-weight: 850 !important;
+          }
+          #comprobante-sunat-ticket-print * {
+            color: #000000 !important;
+            font-weight: 850 !important;
           }
           #comprobante-sunat-ticket-print div,
           #comprobante-sunat-ticket-print blockquote {
@@ -4420,10 +4402,15 @@ export default function CajaPage({ currentUser }) {
             width: 74mm !important;
             padding: 6px !important;
             margin: 0 !important;
-            font-family: 'Courier New', Courier, monospace !important;
+            font-family: 'Arial', 'Helvetica', sans-serif !important;
             font-size: 11px !important;
             line-height: 1.3 !important;
-            color: black !important;
+            color: #000000 !important;
+            font-weight: 850 !important;
+          }
+          #cierre-imprimible * {
+            color: #000000 !important;
+            font-weight: 850 !important;
           }
           #cierre-imprimible div {
             page-break-inside: avoid !important;

@@ -580,34 +580,11 @@ export default function SalonPage({ currentUser }) {
     const isMedioPollo = prodId === 2 || prodId === 11 || prodId === 17;
 
     if (isPolloEntero) {
-      return [
-        {
-          name: "Elige la Bebida (1.5 Litros)",
-          key: "bebida",
-          options: [
-            { label: "Inca Kola 1.5L", value: "Inca Kola 1.5L" },
-            { label: "Coca Cola 1.5 Litros", value: "Gaseosa 1 1/2 Lt" },
-            { label: "Chicha Morada 1.5 Litros", value: "Chicha Morada - 1 1/2 Lt" },
-            { label: "Limonada 1.5 Litros", value: "Limonada - 1 1/2 Lt" },
-            { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
-          ]
-        }
-      ];
+      return [];
     }
 
     if (isMedioPollo) {
-      return [
-        {
-          name: "Elige la Bebida (1 Litro)",
-          key: "bebida",
-          options: [
-            { label: "Gaseosa 1 Litro", value: "Gaseosa 1 Lt" },
-            { label: "Chicha Morada 1 Litro", value: "Chicha Morada - 1 Lt" },
-            { label: "Limonada 1 Litro", value: "Limonada - 1 Lt" },
-            { label: "Omitir (Sin Bebida)", value: "Sin Bebida" }
-          ]
-        }
-      ];
+      return [];
     }
 
     // 5. Guarniciones genéricas para carnes y pollos (SIN Pollos a la Brasa)

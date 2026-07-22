@@ -1509,7 +1509,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     }
 
     // Registrar venta inmediatamente
-    const subtotal = parseFloat((grandTotal / 1.18).toFixed(2));
+    const subtotal = parseFloat((grandTotal / 1.105).toFixed(2));
     const igv = parseFloat((grandTotal - subtotal).toFixed(2));
     
     let finalMontoEfectivo = 0;
@@ -1786,7 +1786,7 @@ app.put('/api/pedidos/llevar/:id', async (req, res) => {
       });
 
       // Calcular subtotal e IGV para actualizar la Venta asociada
-      const subtotal = parseFloat((grandTotal / 1.18).toFixed(2));
+      const subtotal = parseFloat((grandTotal / 1.105).toFixed(2));
       const igv = parseFloat((grandTotal - subtotal).toFixed(2));
       let finalMontoEfectivo = 0;
       let finalMontoTarjeta = 0;
@@ -2264,7 +2264,7 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
 
     // Si el nuevo método es Cortesía, el total va a 0.00
     const nuevoTotal = metodoPago === 'Cortesía' ? 0.00 : originalTotal;
-    const subtotal = parseFloat((nuevoTotal / 1.18).toFixed(2));
+    const subtotal = parseFloat((nuevoTotal / 1.105).toFixed(2));
     const igv = parseFloat((nuevoTotal - subtotal).toFixed(2));
 
     let finalMontoEfectivo = 0;
@@ -2383,7 +2383,7 @@ app.patch('/api/ventas/:ventaId/tipo-entrega', async (req, res) => {
       return res.status(400).json({ error: 'Tipo de entrega inválido.' });
     }
 
-    const subtotal = parseFloat((nuevoTotal / 1.18).toFixed(2));
+    const subtotal = parseFloat((nuevoTotal / 1.105).toFixed(2));
     const igv = parseFloat((nuevoTotal - subtotal).toFixed(2));
 
     // Actualizar Pedido
@@ -2483,7 +2483,7 @@ app.post('/api/ventas', async (req, res) => {
       });
 
       const finalTotal = metodoPago === 'Cortesía' ? 0.00 : nuevoTotalPedido;
-      const subtotal = parseFloat((finalTotal / 1.18).toFixed(2));
+      const subtotal = parseFloat((finalTotal / 1.105).toFixed(2));
       const igv = parseFloat((finalTotal - subtotal).toFixed(2));
 
       let finalMontoEfectivo = 0;
@@ -2667,7 +2667,10 @@ app.get('/api/ventas', async (req, res) => {
     }
 
     const ventas = await prisma.venta.findMany({
-      where: { createdAt: filtroFecha },
+      where: { 
+        createdAt: filtroFecha,
+        pedido: { estado: { not: 'Cancelado' } }
+      },
       include: {
         pedido: {
           include: {
@@ -2699,6 +2702,7 @@ app.get('/api/ventas', async (req, res) => {
       mesero: v.pedido?.mesero || null,
       codigoPedidosYa: v.pedido?.codigoPedidosYa || null,
       tipoEntrega: v.pedido?.tipoEntrega || 'salon',
+      estadoPedido: v.pedido?.estado || null,
       createdAt: v.createdAt.toISOString(),
       estadoNubefact: v.estadoNubefact,
       serie: v.serie,
@@ -2741,7 +2745,10 @@ app.get('/api/ventas/resumen', async (req, res) => {
     }
 
     const ventas = await prisma.venta.findMany({
-      where: { createdAt: { gte: filterDate } },
+      where: { 
+        createdAt: { gte: filterDate },
+        pedido: { estado: { not: 'Cancelado' } }
+      },
     });
 
     const totalVentas = ventas.reduce((s, v) => s + v.total, 0);
@@ -3165,7 +3172,12 @@ app.get('/api/reportes/contable', async (req, res) => {
     }
 
     const [ventas, compras] = await Promise.all([
-      prisma.venta.findMany({ where: { createdAt: filtroFecha } }),
+      prisma.venta.findMany({ 
+        where: { 
+          createdAt: filtroFecha,
+          pedido: { estado: { not: 'Cancelado' } }
+        } 
+      }),
       prisma.compra.findMany({ where: { creadoEn: filtroFecha } }),
     ]);
 
@@ -3378,14 +3390,14 @@ async function enviarAApisunat(venta, itemsRaw) {
   // Formatear items para apisunat.pe
   const formattedItems = items.map((item) => {
     const totalItem = item.precio * item.cantidad;
-    const subtotalItem = totalItem / 1.18;
+    const subtotalItem = totalItem / 1.105;
     
     return {
       unidad_de_medida: "NIU",
       descripcion: item.nombre,
       cantidad: String(item.cantidad),
       valor_unitario: (subtotalItem / item.cantidad).toFixed(6), // Recomienda 6 decimales
-      porcentaje_igv: "18",
+      porcentaje_igv: "10.5",
       codigo_tipo_afectacion_igv: "10", // Gravado - Operación Onerosa
       nombre_tributo: "IGV"
     };

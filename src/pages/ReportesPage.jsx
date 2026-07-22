@@ -472,7 +472,7 @@ export default function ReportesPage() {
               </div>
               <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-4 mt-6">
                 <span>Base Imp: S/ {resumen.ventasBase.toFixed(2)}</span>
-                <span className="font-bold text-blue-600">IGV (18%): S/ {resumen.ventasIGV.toFixed(2)}</span>
+                <span className="font-bold text-blue-600">IGV (10.5%): S/ {resumen.ventasIGV.toFixed(2)}</span>
               </div>
             </div>
 
@@ -488,7 +488,7 @@ export default function ReportesPage() {
               </div>
               <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-4 mt-6">
                 <span>Base Imp: S/ {resumen.comprasBase.toFixed(2)}</span>
-                <span className="font-bold text-rose-600">IGV (18%): S/ {resumen.comprasIGV.toFixed(2)}</span>
+                <span className="font-bold text-rose-600">IGV (10.5%): S/ {resumen.comprasIGV.toFixed(2)}</span>
               </div>
             </div>
 
@@ -1133,7 +1133,7 @@ export default function ReportesPage() {
               
               <div className="space-y-1 text-right font-bold" style={{ fontSize: '11px' }}>
                 <div className="flex justify-between"><span>SUBTOTAL</span> <span>S/ {activeComprobante.subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>I.G.V (18%)</span> <span>S/ {activeComprobante.igv.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>I.G.V (10.5%)</span> <span>S/ {activeComprobante.igv.toFixed(2)}</span></div>
                 <div className="flex justify-between" style={{ fontSize: '12px', fontWeight: '900' }}><span>TOTAL</span> <span>S/ {activeComprobante.total.toFixed(2)}</span></div>
               </div>
               
@@ -1265,7 +1265,7 @@ export default function ReportesPage() {
                     <p className="text-xl font-black font-mono text-slate-800 mt-1">S/ {resumen.ventasTotal.toFixed(2)}</p>
                     <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
                       <p>Base Imp.: S/ {resumen.ventasBase.toFixed(2)}</p>
-                      <p className="font-semibold text-blue-600">IGV (18%): S/ {resumen.ventasIGV.toFixed(2)}</p>
+                      <p className="font-semibold text-blue-600">IGV (10.5%): S/ {resumen.ventasIGV.toFixed(2)}</p>
                     </div>
                   </div>
                   <div className="border rounded-2xl p-4 bg-slate-50/50">
@@ -1273,7 +1273,7 @@ export default function ReportesPage() {
                     <p className="text-xl font-black font-mono text-slate-800 mt-1">S/ {resumen.comprasTotal.toFixed(2)}</p>
                     <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
                       <p>Base Imp.: S/ {resumen.comprasBase.toFixed(2)}</p>
-                      <p className="font-semibold text-rose-600">IGV (18%): S/ {resumen.comprasIGV.toFixed(2)}</p>
+                      <p className="font-semibold text-rose-600">IGV (10.5%): S/ {resumen.comprasIGV.toFixed(2)}</p>
                     </div>
                   </div>
                   <div className="border rounded-2xl p-4 bg-slate-900 text-white">
@@ -1516,10 +1516,15 @@ export default function ReportesPage() {
             width: 74mm !important;
             padding: 6px !important;
             margin: 0 !important;
-            font-family: 'Courier New', Courier, monospace !important;
+            font-family: 'Arial', 'Helvetica', sans-serif !important;
             font-size: 11px !important;
             line-height: 1.3 !important;
-            color: black !important;
+            color: #000000 !important;
+            font-weight: 850 !important;
+          }
+          #comprobante-sunat-ticket-print * {
+            color: #000000 !important;
+            font-weight: 850 !important;
           }
           #comprobante-sunat-ticket-print div,
           #comprobante-sunat-ticket-print blockquote {

@@ -117,7 +117,7 @@ export default function ComprasPage() {
   const calcularPorTotal = (valTotal) => {
     const total = parseFloat(valTotal);
     if (isNaN(total)) return;
-    const base = parseFloat((total / 1.18).toFixed(2));
+    const base = parseFloat((total / 1.105).toFixed(2));
     const igv = parseFloat((total - base).toFixed(2));
     setFormCompra(f => ({ ...f, total: String(total), baseImponible: String(base), igv: String(igv) }));
   };
@@ -139,7 +139,7 @@ export default function ComprasPage() {
   // ── EXPORTAR CSV SIRE ───────────────────────────────────────────────────
   const exportarCSV = () => {
     if (compras.length === 0) { showToast('No hay compras para exportar.', 'error'); return; }
-    const encabezado = ['Periodo', 'Nro Correlativo', 'Fecha Emisión', 'Tipo Comprobante', 'Serie-Número', 'RUC Proveedor', 'Razón Social', 'Moneda', 'Base Imponible', 'IGV (18%)', 'Total', 'Categoría Interna', 'Origen'];
+    const encabezado = ['Periodo', 'Nro Correlativo', 'Fecha Emisión', 'Tipo Comprobante', 'Serie-Número', 'RUC Proveedor', 'Razón Social', 'Moneda', 'Base Imponible', 'IGV (10.5%)', 'Total', 'Categoría Interna', 'Origen'];
     const filas = compras.map((c, i) => {
       const fechaEm = c.fechaEmision ? new Date(c.fechaEmision).toLocaleDateString('es-PE') : new Date(c.creadoEn).toLocaleDateString('es-PE');
       return [
@@ -574,7 +574,7 @@ export default function ComprasPage() {
                     <span className="font-mono font-bold text-slate-700">S/ {parseFloat(formCompra.baseImponible || 0).toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">IGV Calculado (18%)</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">IGV Calculado (10.5%)</span>
                     <span className="font-mono font-bold text-emerald-600">S/ {parseFloat(formCompra.igv || 0).toFixed(2)}</span>
                   </div>
                 </div>
