@@ -1146,9 +1146,9 @@ export default function ReportesPage() {
                 </div>
               )}
               
-              {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && (
+              {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && activeComprobante.hashResumen && (
                 <div className="mb-3">
-                  <strong>RESUMEN:</strong> <span className="font-mono text-[10px]">{activeComprobante.hashResumen}</span>
+                  <strong>CÓDIGO HASH:</strong> <span className="font-mono text-[10px]">{activeComprobante.hashResumen}</span>
                 </div>
               )}
               
