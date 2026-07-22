@@ -381,19 +381,23 @@ async function expandPedidoItemsForDb(itemsList) {
 async function evaluarEstadoEnsalada(itemsList) {
   try {
     let tieneEnsaladaPendiente = false;
+    const categoriasGuarnicion = ['Pollos', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
+
     for (const item of itemsList) {
       const prodId = parseInt(item.id || item.productoId);
-      if (!prodId) continue;
-      const prod = await prisma.producto.findUnique({
-        where: { id: prodId },
-        select: { requiereGuarnicion: true }
-      });
-      if (prod && prod.requiereGuarnicion) {
-        const notasStr = item.notas || '';
-        if (notasStr.includes('Sin Ensalada')) {
-          continue;
-        }
+      let prod = null;
+      if (prodId) {
+        prod = await prisma.producto.findUnique({
+          where: { id: prodId },
+          select: { requiereGuarnicion: true, categoria: true }
+        });
+      }
+      const cat = item.categoria || prod?.categoria;
+      const requiereG = prod ? prod.requiereGuarnicion : false;
+
+      if (requiereG || (cat && categoriasGuarnicion.includes(cat))) {
         tieneEnsaladaPendiente = true;
+        break;
       }
     }
     if (tieneEnsaladaPendiente) {
@@ -883,7 +887,7 @@ app.get('/api/pedidos/barra', async (req, res) => {
   }
 });
 
-// GET /api/pedidos/ensaladas → Todos los pedidos con ensalada pendiente
+// GET /api/pedidos/ensaladas → Todos los pedidos con ensalada / cremas pendientes
 app.get('/api/pedidos/ensaladas', async (req, res) => {
   try {
     const pedidos = await prisma.pedido.findMany({
@@ -900,6 +904,8 @@ app.get('/api/pedidos/ensaladas', async (req, res) => {
       },
     });
 
+    const categoriasGuarnicion = ['Pollos', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
+
     const formateados = pedidos.map(p => ({
       pedidoId: p.id,
       mesaNum: p.mesa?.numero || null,
@@ -914,8 +920,8 @@ app.get('/api/pedidos/ensaladas', async (req, res) => {
       items: p.items
         .filter(i => {
           const esBarra = BARRA_CATEGORIAS.includes(i.producto?.categoria);
-          const llevaEnsalada = i.producto?.requiereGuarnicion;
-          return llevaEnsalada && !esBarra && i.precio > 0;
+          const llevaGuarnicion = i.producto?.requiereGuarnicion || (i.producto?.categoria && categoriasGuarnicion.includes(i.producto.categoria));
+          return llevaGuarnicion && !esBarra;
         })
         .map(i => ({
           nombre: i.nombre,
@@ -3296,16 +3302,23 @@ async function ejecutarMigracionMontos() {
 
 async function ejecutarMigracionEnsaladas() {
   try {
-    console.log("⚡ Iniciando migración de estado de ensaladas histórico...");
-    await prisma.pedido.updateMany({
-      where: {
-        NOT: {
-          estado: 'Cocina'
-        }
-      },
-      data: { estadoEnsalada: 'No Aplica' }
+    console.log("⚡ Sincronizando estado de ensaladas/cremas para pedidos activos...");
+    const pedidosActivos = await prisma.pedido.findMany({
+      where: { estado: { in: ['Cocina', 'Servido'] } },
+      include: { items: true }
     });
-    console.log("✅ Migración de ensaladas completada.");
+    for (const p of pedidosActivos) {
+      if (p.estadoEnsalada !== 'Listo') {
+        const nuevoEstado = await evaluarEstadoEnsalada(p.items);
+        if (nuevoEstado !== p.estadoEnsalada) {
+          await prisma.pedido.update({
+            where: { id: p.id },
+            data: { estadoEnsalada: nuevoEstado }
+          });
+        }
+      }
+    }
+    console.log("✅ Sincronización de ensaladas/cremas completada.");
   } catch (err) {
     console.error("❌ Error al ejecutar migración de ensaladas:", err);
   }
