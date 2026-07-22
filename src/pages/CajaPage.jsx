@@ -3458,20 +3458,31 @@ export default function CajaPage({ currentUser }) {
           ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
           : ventas).filter(v => v.estadoPedido !== 'Cancelado');
 
-        const totalEfectivo = ventasFiltradas.reduce((s, v) => s + (v.montoEfectivo || 0), 0);
-        const totalTarjeta = ventasFiltradas.reduce((s, v) => s + (v.montoTarjeta || 0), 0);
-        const totalYape = ventasFiltradas.reduce((s, v) => s + (v.montoYape || 0), 0);
-        const totalPedidosYa = ventasFiltradas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0);
-        const totalConsumos = ventasFiltradas.filter(v => v.metodoPago === 'Consumo').reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
-        // Total Caja = solo ingresos reales (sin PedidosYa ni Cortesías ni Consumo)
+        // Ventas reales (sin Cortesía, Consumo ni PedidosYa)
+        const ventasReales = ventasFiltradas.filter(v =>
+          v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo' && v.metodoPago !== 'PedidosYa'
+        );
+
+        // Para Mixto: montoEfectivo, montoTarjeta, montoYape ya vienen desglosados desde la BD
+        // Para Efectivo/Tarjeta/Yape: el monto correspondiente = total de la venta
+        // No filtramos por metodoPago sino que siempre sumamos los campos individuales
+        const totalEfectivo = ventasReales.reduce((s, v) => s + (v.montoEfectivo || 0), 0);
+        const totalTarjeta  = ventasReales.reduce((s, v) => s + (v.montoTarjeta  || 0), 0);
+        const totalYape     = ventasReales.reduce((s, v) => s + (v.montoYape     || 0), 0);
+        const totalPedidosYa = ventasFiltradas
+          .filter(v => v.metodoPago === 'PedidosYa')
+          .reduce((s, v) => s + (v.total || 0), 0);
+        const totalConsumos = ventasFiltradas
+          .filter(v => v.metodoPago === 'Consumo')
+          .reduce((s, v) => s + (v.descuentoAplicado || v.total || 0), 0);
+
+        // Total Caja = ingresos reales cobrados en caja (efectivo + tarjeta + yape)
         const totalCalculado = totalEfectivo + totalTarjeta + totalYape;
 
-        const totalCortesias = ventasFiltradas.reduce((sum, v) => {
-          if (v.metodoPago === 'Cortesía') {
-            return sum + (v.descuentoAplicado || v.total);
-          }
-          return sum + (v.descuentoAplicado || 0);
-        }, 0);
+        // Cortesías: solo las ventas con metodoPago === 'Cortesía' o descuentoAplicado parcial
+        const totalCortesias = ventasFiltradas
+          .filter(v => v.metodoPago === 'Cortesía')
+          .reduce((s, v) => s + (v.descuentoAplicado || v.total || 0), 0);
 
         return (
           <div id="modal-cierre" className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">

@@ -2756,25 +2756,27 @@ app.get('/api/ventas/resumen', async (req, res) => {
     const atendidas = ventas.length;
 
     // Desglose por tipo
-    const ingresosCaja = ventas.reduce((s, v) => s + (v.montoEfectivo || 0) + (v.montoTarjeta || 0) + (v.montoYape || 0), 0);
+    // Ventas reales cobradas en caja (excluir Cortesía, Consumo, PedidosYa)
+    const ventasReales = ventas.filter(v =>
+      v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo' && v.metodoPago !== 'PedidosYa'
+    );
+    const ingresosCaja = ventasReales.reduce((s, v) => s + (v.montoEfectivo || 0) + (v.montoTarjeta || 0) + (v.montoYape || 0), 0);
     const ingresosPedidosYa = ventas
       .filter(v => v.metodoPago === 'PedidosYa')
       .reduce((s, v) => s + v.total, 0);
     const totalConsumos = ventas
       .filter(v => v.metodoPago === 'Consumo')
       .reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
-    const totalCortesias = ventas.reduce((s, v) => {
-      if (v.metodoPago === 'Cortesía') {
-        return s + (v.descuentoAplicado || v.total);
-      }
-      return s + (v.descuentoAplicado || 0);
-    }, 0);
+    // Solo ventas marcadas explícitamente como Cortesía
+    const totalCortesias = ventas
+      .filter(v => v.metodoPago === 'Cortesía')
+      .reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
 
     // Desglose por método (de todos los ingresos reales de caja distribuidos)
     const porMetodoPago = {
-      Efectivo: ventas.reduce((s, v) => s + (v.montoEfectivo || 0), 0),
-      Tarjeta: ventas.reduce((s, v) => s + (v.montoTarjeta || 0), 0),
-      Yape: ventas.reduce((s, v) => s + (v.montoYape || 0), 0),
+      Efectivo: ventasReales.reduce((s, v) => s + (v.montoEfectivo || 0), 0),
+      Tarjeta:  ventasReales.reduce((s, v) => s + (v.montoTarjeta  || 0), 0),
+      Yape:     ventasReales.reduce((s, v) => s + (v.montoYape     || 0), 0),
       PedidosYa: ingresosPedidosYa,
       Consumo: totalConsumos,
       Cortesía: totalCortesias,
