@@ -416,7 +416,14 @@ app.use(express.json());
 // ESTADO DEL SERVIDOR
 // ============================================================
 app.get('/api/status', (req, res) => {
-  res.json({ ok: true, mensaje: '🚀 Fogón Dorado Backend v3 funcionando al 100%' });
+  const token = process.env.APISUNAT_TOKEN;
+  const modoDemo = !token || token.includes('tu_token') || token.trim() === '';
+  res.json({
+    ok: true,
+    mensaje: '🚀 Fogón Dorado Backend v3 funcionando al 100%',
+    modoDemo,
+    apisunatActivo: !modoDemo
+  });
 });
 
 // ============================================================

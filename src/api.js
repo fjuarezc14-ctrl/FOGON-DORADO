@@ -159,4 +159,5 @@ export const api = {
   actualizarDelivery: (id, body) => fetch(`${API_BASE}/api/pedidos/llevar/${id}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
+  getStatus: () => fetch(`${API_BASE}/api/status`).then(r => r.json()),
 };

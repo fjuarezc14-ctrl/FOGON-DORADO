@@ -49,6 +49,8 @@ export default function ComprasPage() {
     baseImponible: '', igv: '', total: '', categoria: '', fechaEmision: '',
   });
 
+  const [apiStatus, setApiStatus] = useState({ modoDemo: true, apisunatActivo: false });
+
   const showToast = (msg, tipo = 'ok') => {
     setToastMsg({ msg, tipo });
     setTimeout(() => setToastMsg(null), 5000);
@@ -56,9 +58,16 @@ export default function ComprasPage() {
 
   const fetchTodo = useCallback(async () => {
     try {
-      const [cs, st] = await Promise.all([api.getCompras(), api.getComprasStats()]);
+      const [cs, st, stApi] = await Promise.all([
+        api.getCompras(),
+        api.getComprasStats(),
+        api.getStatus().catch(() => null)
+      ]);
       setCompras(cs);
       setStats(st);
+      if (stApi && stApi.ok) {
+        setApiStatus({ modoDemo: stApi.modoDemo, apisunatActivo: stApi.apisunatActivo });
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -215,13 +224,20 @@ export default function ComprasPage() {
           />
         </div>
 
-        {/* Badge modo demo */}
+        {/* Badge modo demo / token status */}
         <div className="hidden md:flex flex-col gap-1">
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estado API</span>
-          <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            MODO DEMO — Sin token apisunat.pe
-          </span>
+          {apiStatus.apisunatActivo ? (
+            <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              API CONECTADO — apisunat.pe Activo 🚀
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              MODO DEMO — Sin token apisunat.pe
+            </span>
+          )}
         </div>
 
         {ultimaSync && (
