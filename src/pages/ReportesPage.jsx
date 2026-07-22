@@ -118,7 +118,7 @@ export default function ReportesPage() {
 
   const reimprimirComprobante = (v) => {
     if (!v) return;
-    const serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+    const serie = v.serie || (v.tipoComprobante === 'Factura' ? 'E001' : 'EB01');
     const correlativoStr = String(v.id % 10000).padStart(4, '0');
     const totalLetras = numeroALetras(v.total);
     const hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
@@ -197,7 +197,7 @@ export default function ReportesPage() {
       return;
     }
     
-    const serie = v.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+    const serie = v.serie || (v.tipoComprobante === 'Factura' ? 'E001' : 'EB01');
     const correlativoStr = String(v.id % 10000).padStart(4, '0');
     
     const mensaje = `Estimado cliente *${v.nombreCliente || 'Consumidor Final'}*, le hacemos entrega de su comprobante electrónico *${v.tipoComprobante === 'Factura' ? 'FACTURA' : 'BOLETA'} ${serie}-${correlativoStr}* por un monto total de *S/ ${v.total.toFixed(2)}*.\n\nPuede consultar y descargar su documento ingresando con sus datos en: https://consulta.susii.com\n\n¡Gracias por su preferencia en *El Fogón Dorado*!`;

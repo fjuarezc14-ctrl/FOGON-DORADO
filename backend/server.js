@@ -1543,18 +1543,7 @@ app.post('/api/pedidos/llevar', async (req, res) => {
 
     // Calcular correlativo para apisunat.pe si es Boleta o Factura
     const finalTipoComprobante = tipoComprobante || 'Ticket';
-    // finalMetodoPago is already defined above
-
-    let serie = null;
-    let numero = null;
-    if (finalTipoComprobante === 'Boleta' || finalTipoComprobante === 'Factura') {
-      const ultimaVenta = await prisma.venta.findFirst({
-        where: { tipoComprobante: finalTipoComprobante, numero: { not: null } },
-        orderBy: { numero: 'desc' }
-      });
-      serie = finalTipoComprobante === 'Factura' ? 'F001' : 'B001';
-      numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
-    }
+    const { serie, numero } = await obtenerSiguienteSerieYNumero(finalTipoComprobante);
 
     const initEstadoSunat = (finalTipoComprobante === 'Boleta' || finalTipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
 
@@ -2509,16 +2498,7 @@ app.post('/api/ventas', async (req, res) => {
       }
 
       // Calcular correlativo para apisunat.pe si es Boleta o Factura
-      let serie = null;
-      let numero = null;
-      if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
-        const ultimaVenta = await tx.venta.findFirst({
-          where: { tipoComprobante, numero: { not: null } },
-          orderBy: { numero: 'desc' }
-        });
-        serie = tipoComprobante === 'Factura' ? 'F001' : 'B001';
-        numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
-      }
+      const { serie, numero } = await obtenerSiguienteSerieYNumero(tipoComprobante, tx);
 
       // Crear Venta principal (inicialmente PENDIENTE si es factura/boleta)
       const initEstadoSunat = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
@@ -3350,6 +3330,32 @@ app.listen(PORT, async () => {
 // HELPERS E INTEGRACIÓN APISUNAT.PE (SUNAT PSE)
 // ============================================================
 
+async function obtenerSiguienteSerieYNumero(tipoComprobante, txPrisma = prisma) {
+  if (tipoComprobante !== 'Boleta' && tipoComprobante !== 'Factura') {
+    return { serie: null, numero: null };
+  }
+
+  const isFactura = tipoComprobante === 'Factura';
+  const serieDefault = isFactura ? (process.env.SERIE_FACTURA || 'E001') : (process.env.SERIE_BOLETA || 'EB01');
+  const minCorrelativo = isFactura
+    ? parseInt(process.env.ULTIMO_CORRELATIVO_FACTURA || '7508')
+    : parseInt(process.env.ULTIMO_CORRELATIVO_BOLETA || '10726');
+
+  const ultimaVenta = await txPrisma.venta.findFirst({
+    where: { tipoComprobante, numero: { not: null } },
+    orderBy: { numero: 'desc' }
+  });
+
+  const siguienteNumero = ultimaVenta
+    ? Math.max(ultimaVenta.numero + 1, minCorrelativo + 1)
+    : (minCorrelativo + 1);
+
+  return {
+    serie: ultimaVenta?.serie || serieDefault,
+    numero: siguienteNumero
+  };
+}
+
 async function enviarAApisunat(venta, itemsRaw) {
   // Filtrar los items para excluir componentes de combos de precio 0 que no son barra
   const items = itemsRaw.filter(i => {
@@ -3366,7 +3372,7 @@ async function enviarAApisunat(venta, itemsRaw) {
   const url = process.env.APISUNAT_API_URL || 'https://sandbox.apisunat.pe/api/v3/documents';
   const MODO_DEMO = !token || token.includes('tu_token') || token === '';
 
-  const serie = venta.tipoComprobante === 'Factura' ? 'F001' : 'B001';
+  const serie = venta.serie || (venta.tipoComprobante === 'Factura' ? (process.env.SERIE_FACTURA || 'E001') : (process.env.SERIE_BOLETA || 'EB01'));
 
   // Identificación del cliente (1 = DNI, 6 = RUC, 0 = Sin Documento)
   let clienteTipoDoc = "1";
@@ -3525,12 +3531,9 @@ app.post('/api/sunat/reintentar/:id', async (req, res) => {
 
     // Asignar serie y correlativo si no los tiene
     if (!venta.serie || !venta.numero) {
-      const ultimaVenta = await prisma.venta.findFirst({
-        where: { tipoComprobante: venta.tipoComprobante, numero: { not: null } },
-        orderBy: { numero: 'desc' }
-      });
-      venta.serie = venta.tipoComprobante === 'Factura' ? 'F001' : 'B001';
-      venta.numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
+      const datosSerie = await obtenerSiguienteSerieYNumero(venta.tipoComprobante);
+      venta.serie = datosSerie.serie;
+      venta.numero = datosSerie.numero;
 
       await prisma.venta.update({
         where: { id: venta.id },
@@ -3609,12 +3612,9 @@ async function procesarVentasPendientes() {
         console.log(`[Worker SUNAT] 🔄 Reintentando envío de Venta #${venta.id}...`);
 
         if (!venta.serie || !venta.numero) {
-          const ultimaVenta = await prisma.venta.findFirst({
-            where: { tipoComprobante: venta.tipoComprobante, numero: { not: null } },
-            orderBy: { numero: 'desc' }
-          });
-          venta.serie = venta.tipoComprobante === 'Factura' ? 'F001' : 'B001';
-          venta.numero = ultimaVenta ? (ultimaVenta.numero + 1) : 1;
+          const datosSerie = await obtenerSiguienteSerieYNumero(venta.tipoComprobante);
+          venta.serie = datosSerie.serie;
+          venta.numero = datosSerie.numero;
 
           await prisma.venta.update({
             where: { id: venta.id },
