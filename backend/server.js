@@ -3346,13 +3346,13 @@ async function obtenerSiguienteSerieYNumero(tipoComprobante, txPrisma = prisma) 
   }
 
   const isFactura = tipoComprobante === 'Factura';
-  const serieDefault = isFactura ? (process.env.SERIE_FACTURA || 'E001') : (process.env.SERIE_BOLETA || 'EB01');
+  const serieDefault = isFactura ? (process.env.SERIE_FACTURA || 'F001') : (process.env.SERIE_BOLETA || 'B001');
   const minCorrelativo = isFactura
-    ? parseInt(process.env.ULTIMO_CORRELATIVO_FACTURA || '7508')
-    : parseInt(process.env.ULTIMO_CORRELATIVO_BOLETA || '10726');
+    ? parseInt(process.env.ULTIMO_CORRELATIVO_FACTURA || '2')
+    : parseInt(process.env.ULTIMO_CORRELATIVO_BOLETA || '0');
 
   const ultimaVenta = await txPrisma.venta.findFirst({
-    where: { tipoComprobante, numero: { not: null } },
+    where: { tipoComprobante, serie: serieDefault, numero: { not: null } },
     orderBy: { numero: 'desc' }
   });
 
@@ -3361,7 +3361,7 @@ async function obtenerSiguienteSerieYNumero(tipoComprobante, txPrisma = prisma) 
     : (minCorrelativo + 1);
 
   return {
-    serie: ultimaVenta?.serie || serieDefault,
+    serie: serieDefault,
     numero: siguienteNumero
   };
 }
@@ -3539,8 +3539,12 @@ app.post('/api/sunat/reintentar/:id', async (req, res) => {
 
     console.log(`[SUNAT Manual] 🔄 Reintento manual forzado para Venta #${id}...`);
 
-    // Asignar serie y correlativo si no los tiene
-    if (!venta.serie || !venta.numero) {
+    // Asignar o curar serie y correlativo si no coincide con la configurada y no está aceptada por SUNAT
+    const isFactura = venta.tipoComprobante === 'Factura';
+    const serieDefault = isFactura ? (process.env.SERIE_FACTURA || 'F001') : (process.env.SERIE_BOLETA || 'B001');
+    const noAceptado = !venta.estadoSunat || !venta.estadoSunat.startsWith('ACEPTADO:');
+
+    if (!venta.serie || !venta.numero || (noAceptado && venta.serie !== serieDefault)) {
       const datosSerie = await obtenerSiguienteSerieYNumero(venta.tipoComprobante);
       venta.serie = datosSerie.serie;
       venta.numero = datosSerie.numero;
@@ -3621,7 +3625,12 @@ async function procesarVentasPendientes() {
       try {
         console.log(`[Worker SUNAT] 🔄 Reintentando envío de Venta #${venta.id}...`);
 
-        if (!venta.serie || !venta.numero) {
+        // Asignar o curar serie y correlativo si no coincide con la configurada y no está aceptada por SUNAT
+        const isFactura = venta.tipoComprobante === 'Factura';
+        const serieDefault = isFactura ? (process.env.SERIE_FACTURA || 'F001') : (process.env.SERIE_BOLETA || 'B001');
+        const noAceptado = !venta.estadoSunat || !venta.estadoSunat.startsWith('ACEPTADO:');
+
+        if (!venta.serie || !venta.numero || (noAceptado && venta.serie !== serieDefault)) {
           const datosSerie = await obtenerSiguienteSerieYNumero(venta.tipoComprobante);
           venta.serie = datosSerie.serie;
           venta.numero = datosSerie.numero;
