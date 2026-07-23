@@ -60,6 +60,14 @@ export default function ReportesPage() {
   const [gerencialModalOpen, setGerencialModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('resumen');
 
+  // Filtros de secciones para el Reporte Gerencial PDF
+  const [incluirBalance, setIncluirBalance] = useState(true);
+  const [incluirMozos, setIncluirMozos] = useState(true);
+  const [incluirRotacion, setIncluirRotacion] = useState(true);
+  const [incluirGastos, setIncluirGastos] = useState(true);
+  const [incluirPedidosYa, setIncluirPedidosYa] = useState(true);
+  const [incluirPersonal, setIncluirPersonal] = useState(true);
+
   const getChickenEquivalency = (name) => {
     const normalized = name.toLowerCase();
     if (normalized.includes('1/2 pollo') || normalized.includes('medio pollo')) {
@@ -1249,6 +1257,67 @@ export default function ReportesPage() {
               </div>
             </div>
 
+            {/* Checkboxes para filtrar secciones del reporte */}
+            <div className="bg-slate-50 border-b border-slate-200 p-4 flex flex-col md:flex-row md:items-center gap-3.5 no-print shrink-0">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Incluir en el Reporte:</span>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-xs font-black text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={incluirBalance}
+                    onChange={e => setIncluirBalance(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  Balance / IGV
+                </label>
+                <label className="flex items-center gap-2 text-xs font-black text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={incluirMozos}
+                    onChange={e => setIncluirMozos(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  Mozos
+                </label>
+                <label className="flex items-center gap-2 text-xs font-black text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={incluirRotacion}
+                    onChange={e => setIncluirRotacion(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  Rotación y Pollos
+                </label>
+                <label className="flex items-center gap-2 text-xs font-black text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={incluirGastos}
+                    onChange={e => setIncluirGastos(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  Compras y Gastos
+                </label>
+                <label className="flex items-center gap-2 text-xs font-black text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={incluirPedidosYa}
+                    onChange={e => setIncluirPedidosYa(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  PedidosYa
+                </label>
+                <label className="flex items-center gap-2 text-xs font-black text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={incluirPersonal}
+                    onChange={e => setIncluirPersonal(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500"
+                  />
+                  Personal (Planilla)
+                </label>
+              </div>
+            </div>
+
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1 bg-white text-slate-900 font-sans">
               <div className="text-center border-b pb-6 mb-6">
                 <h1 className="text-2xl font-black tracking-tight text-slate-900 uppercase">El Fogón Dorado</h1>
@@ -1257,258 +1326,272 @@ export default function ReportesPage() {
                 <p className="text-[10px] text-slate-400 mt-1 font-mono">Generado el: {new Date().toLocaleString('es-PE')}</p>
               </div>
 
-              <div className="mb-8">
-                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  1. Balance y Resumen Gerencial Ejecutivo
-                </h2>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="border rounded-2xl p-4 bg-slate-50/50">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ventas</p>
-                    <p className="text-xl font-black font-mono text-slate-800 mt-1 font-sans">S/ {resumen.ventasTotal.toFixed(2)}</p>
-                    <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
-                      <p>Base Imp.: S/ {resumen.ventasBase.toFixed(2)}</p>
-                      <p className="font-semibold text-emerald-600">IGV (10.5%): S/ {resumen.ventasIGV.toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="border rounded-2xl p-4 bg-slate-50/50">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Compras / Gastos</p>
-                    <p className="text-xl font-black font-mono text-slate-800 mt-1 font-sans">S/ {resumen.comprasTotal.toFixed(2)}</p>
-                    <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
-                      <p>Base Imp.: S/ {resumen.comprasBase.toFixed(2)}</p>
-                      <p className="font-semibold text-rose-600">IGV (10.5%): S/ {resumen.comprasIGV.toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="border rounded-2xl p-4 bg-slate-900 text-white">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">IGV Neto a Liquidar</p>
-                    <p className="text-xl font-black font-mono text-amber-400 mt-1 font-sans">S/ {resumen.igvAPagar.toFixed(2)}</p>
-                    <p className="text-[9px] text-slate-400 mt-2">Diferencia entre débito fiscal y crédito fiscal.</p>
-                  </div>
-                  <div className="border rounded-2xl p-4 bg-amber-500/10 border-amber-500/20 text-amber-950">
-                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Consumo Total de Pollos</p>
-                    <p className="text-xl font-black font-mono text-amber-800 mt-1 font-sans">
-                      {(() => {
-                        let total = 0;
-                        rotacion.forEach(item => {
-                          const equiv = getChickenEquivalency(item.nombre);
-                          total += item.cantidad * equiv;
-                        });
-                        return total.toFixed(2);
-                      })()} <span className="text-xs font-black">Und.</span>
-                    </p>
-                    <p className="text-[9px] text-amber-700/80 mt-2 leading-tight">Consolidado de equivalencias de pollo a la brasa vendido.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-8">
-                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
-                  2. Rendimiento de Mozos (Mesas Atendidas)
-                </h2>
-                <div className="border rounded-2xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b">
-                      <tr>
-                        <th className="px-4 py-3">Nombre Mozo</th>
-                        <th className="px-4 py-3 text-center">Mesas Activas</th>
-                        <th className="px-4 py-3 text-center">Mesas Atendidas y Cobradas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y font-medium text-slate-700">
-                      {mozos.length > 0 ? mozos.map((m, idx) => (
-                        <tr key={idx}>
-                          <td className="px-4 py-3 font-bold text-slate-800">{m.nombre}</td>
-                          <td className="px-4 py-3 text-center">{m.mesasActivas}</td>
-                          <td className="px-4 py-3 text-center text-emerald-600 font-bold">{m.mesasAtendidas}</td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan="3" className="px-4 py-3 text-center text-slate-400">Sin registros en el periodo</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="mb-8 break-inside-avoid-page">
-                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-                  3. Rotación Detallada de Productos por Categoría
-                </h2>
-                <div className="space-y-6">
-                  {(() => {
-                    const grouped = {};
-                    rotacion.forEach(r => {
-                      const cat = r.categoria || 'Otros';
-                      if (!grouped[cat]) grouped[cat] = [];
-                      grouped[cat].push(r);
-                    });
-
-                    const categories = Object.keys(grouped).sort();
-                    if (categories.length === 0) {
-                      return <p className="text-xs text-slate-400 text-center py-4">Sin datos de rotación en el periodo.</p>;
-                    }
-
-                    return categories.map(cat => {
-                      const items = grouped[cat].sort((a, b) => b.cantidad - a.cantidad);
-                      const totalCatQty = items.reduce((sum, item) => sum + item.cantidad, 0);
-                      const totalCatRev = items.reduce((sum, item) => sum + item.total, 0);
-
-                      return (
-                        <div key={cat} className="border rounded-2xl overflow-hidden bg-slate-50/20 break-inside-avoid mb-4">
-                          <div className="bg-slate-100/80 px-4 py-2.5 border-b flex justify-between items-center">
-                            <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{cat}</span>
-                            <div className="flex gap-4 text-[10px] font-bold text-slate-500 uppercase">
-                              <span>Cant. Total: <strong className="text-slate-800">{totalCatQty}</strong></span>
-                              <span>Total Ventas: <strong className="text-slate-800">S/ {totalCatRev.toFixed(2)}</strong></span>
-                            </div>
-                          </div>
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 text-slate-450 text-[9px] font-black uppercase tracking-wider border-b">
-                              <tr>
-                                <th className="px-4 py-2">Producto</th>
-                                <th className="px-4 py-2 text-center">Cantidad Vendida</th>
-                                <th className="px-4 py-2 text-center">Equivalencia Pollo (Und.)</th>
-                                <th className="px-4 py-2 text-right">Recaudación (S/)</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y font-semibold text-slate-700 bg-white">
-                              {items.map((r, idx) => {
-                                const equiv = getChickenEquivalency(r.nombre);
-                                return (
-                                  <tr key={idx} className="hover:bg-slate-50/20">
-                                    <td className="px-4 py-2 text-slate-850">{r.nombre}</td>
-                                    <td className="px-4 py-2 text-center font-bold">{r.cantidad}</td>
-                                    <td className="px-4 py-2 text-center font-mono">
-                                      {equiv > 0 ? (equiv * r.cantidad).toFixed(2) : '-'}
-                                    </td>
-                                    <td className="px-4 py-2 text-right font-mono text-slate-900 font-bold">S/ {r.total.toFixed(2)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              <div className="mb-8 break-inside-avoid">
-                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
-                  4. Detalle de Compras y Gastos del Periodo
-                </h2>
-                <div className="border rounded-2xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-550 font-bold uppercase tracking-wider border-b">
-                      <tr>
-                        <th className="px-4 py-3">Fecha</th>
-                        <th className="px-4 py-3">Comprobante</th>
-                        <th className="px-4 py-3">Proveedor / RUC</th>
-                        <th className="px-4 py-3 text-right">Base Imp.</th>
-                        <th className="px-4 py-3 text-right">IGV (10.5%)</th>
-                        <th className="px-4 py-3 text-right">Total (S/)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y font-medium text-slate-700 bg-white">
-                      {compras.length > 0 ? compras.map((c, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-mono text-[10px]">{c.creadoEn ? c.creadoEn.split('T')[0] : ''}</td>
-                          <td className="px-4 py-3 uppercase text-[10px] font-bold">{c.tipoDocumento || 'Factura'}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-slate-800 uppercase text-[11px]">{c.proveedor}</span>
-                              <span className="text-[9px] text-slate-450 font-mono">{c.ruc || 'S/D'}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right font-mono">S/ {c.baseImponible.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right font-mono text-rose-600">S/ {c.igv.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">S/ {c.total.toFixed(2)}</td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan="6" className="px-4 py-4 text-center text-slate-400">Sin compras o gastos registrados en el periodo</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6 mt-8 break-inside-avoid">
-                <div>
+              {incluirBalance && (
+                <div className="mb-8">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                    5. Conciliación PedidosYa
+                    1. Balance y Resumen Gerencial Ejecutivo
                   </h2>
-                  <div className="border rounded-2xl p-4 bg-indigo-50/20 flex flex-col justify-between h-[130px]">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Recaudado PedidosYa</p>
-                      <p className="text-3xl font-black text-indigo-950 mt-2 font-mono">
-                        S/ {(() => {
-                          const totalPY = ventas
-                            .filter(v => v.metodoPago === 'PedidosYa' && v.codigoPedidosYa && !v.codigoPedidosYa.startsWith('DELIVERY -') && !v.codigoPedidosYa.startsWith('LLEVAR -'))
-                            .reduce((s, v) => s + v.total, 0);
-                          return totalPY.toFixed(2);
-                        })()}
-                      </p>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="border rounded-2xl p-4 bg-slate-50/50">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ventas</p>
+                      <p className="text-xl font-black font-mono text-slate-800 mt-1 font-sans">S/ {resumen.ventasTotal.toFixed(2)}</p>
+                      <div className="text-[10px] text-slate-500 mt-2 space-y-0.5 font-bold">
+                        <p>Base Imp.: S/ {resumen.ventasBase.toFixed(2)}</p>
+                        <p className="font-semibold text-emerald-600">IGV (10.5%): S/ {resumen.ventasIGV.toFixed(2)}</p>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-slate-400 leading-tight">
-                      Monto consolidado para conciliar la liquidación semanal del portal PedidosYa.
-                    </p>
+                    <div className="border rounded-2xl p-4 bg-slate-50/50">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Compras / Gastos</p>
+                      <p className="text-xl font-black font-mono text-slate-800 mt-1 font-sans">S/ {resumen.comprasTotal.toFixed(2)}</p>
+                      <div className="text-[10px] text-slate-500 mt-2 space-y-0.5 font-bold">
+                        <p>Base Imp.: S/ {resumen.comprasBase.toFixed(2)}</p>
+                        <p className="font-semibold text-rose-600">IGV (10.5%): S/ {resumen.comprasIGV.toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="border rounded-2xl p-4 bg-slate-900 text-white">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">IGV Neto a Liquidar</p>
+                      <p className="text-xl font-black font-mono text-amber-400 mt-1 font-sans">S/ {resumen.igvAPagar.toFixed(2)}</p>
+                      <p className="text-[9px] text-slate-400 mt-2">Diferencia entre débito fiscal y crédito fiscal.</p>
+                    </div>
+                    <div className="border rounded-2xl p-4 bg-amber-500/10 border-amber-500/20 text-amber-950">
+                      <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Consumo Total de Pollos</p>
+                      <p className="text-xl font-black font-mono text-amber-800 mt-1 font-sans">
+                        {(() => {
+                          let total = 0;
+                          rotacion.forEach(item => {
+                            const equiv = getChickenEquivalency(item.nombre);
+                            total += item.cantidad * equiv;
+                          });
+                          return total.toFixed(2);
+                        })()} <span className="text-xs font-black">Und.</span>
+                      </p>
+                      <p className="text-[9px] text-amber-700/80 mt-2 leading-tight">Consolidado de equivalencias de pollo a la brasa vendido.</p>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                <div>
+              {incluirMozos && (
+                <div className="mb-8">
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-violet-600"></span>
-                    6. Consumo de Personal (Planilla)
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                    2. Rendimiento de Mozos (Mesas Atendidas)
                   </h2>
-                  <div className="border rounded-2xl overflow-hidden max-h-[130px] overflow-y-auto custom-scrollbar">
+                  <div className="border rounded-2xl overflow-hidden">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b sticky top-0">
+                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b">
                         <tr>
-                          <th className="px-4 py-2">Colaborador</th>
-                          <th className="px-4 py-2 text-right">Monto</th>
+                          <th className="px-4 py-3">Nombre Mozo</th>
+                          <th className="px-4 py-3 text-center">Mesas Activas</th>
+                          <th className="px-4 py-3 text-center">Mesas Atendidas y Cobradas</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y font-medium text-slate-700 bg-white">
-                        {(() => {
-                          const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
-                          const porMozo = {};
-                          consumos.forEach(v => {
-                            const mName = v.mesero || v.nombreCliente || 'Sin Nombre';
-                            porMozo[mName] = (porMozo[mName] || 0) + v.total;
-                          });
-                          const entries = Object.entries(porMozo);
-                          return entries.length > 0 ? entries.map(([mozo, total]) => (
-                            <tr key={mozo}>
-                              <td className="px-4 py-2 font-bold text-slate-850 truncate max-w-[120px]">{mozo}</td>
-                              <td className="px-4 py-2 text-right font-mono font-bold text-violet-700">S/ {total.toFixed(2)}</td>
-                            </tr>
-                          )) : (
-                            <tr>
-                              <td colSpan="2" className="px-4 py-4 text-center text-slate-400">Sin consumos en el periodo</td>
-                            </tr>
-                          );
-                        })()}
+                      <tbody className="divide-y font-medium text-slate-700">
+                        {mozos.length > 0 ? mozos.map((m, idx) => (
+                          <tr key={idx}>
+                            <td className="px-4 py-3 font-bold text-slate-800">{m.nombre}</td>
+                            <td className="px-4 py-3 text-center">{m.mesasActivas}</td>
+                            <td className="px-4 py-3 text-center text-emerald-600 font-bold">{m.mesasAtendidas}</td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan="3" className="px-4 py-3 text-center text-slate-400">Sin registros en el periodo</td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="mt-16 flex justify-around text-xs">
+              {incluirRotacion && (
+                <div className="mb-8 break-inside-avoid-page">
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                    3. Rotación Detallada de Productos por Categoría
+                  </h2>
+                  <div className="space-y-6">
+                    {(() => {
+                      const grouped = {};
+                      rotacion.forEach(r => {
+                        const cat = r.categoria || 'Otros';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(r);
+                      });
+
+                      const categories = Object.keys(grouped).sort();
+                      if (categories.length === 0) {
+                        return <p className="text-xs text-slate-400 text-center py-4">Sin datos de rotación en el periodo.</p>;
+                      }
+
+                      return categories.map(cat => {
+                        const items = grouped[cat].sort((a, b) => b.cantidad - a.cantidad);
+                        const totalCatQty = items.reduce((sum, item) => sum + item.cantidad, 0);
+                        const totalCatRev = items.reduce((sum, item) => sum + item.total, 0);
+
+                        return (
+                          <div key={cat} className="border rounded-2xl overflow-hidden bg-slate-50/20 break-inside-avoid mb-4">
+                            <div className="bg-slate-100/80 px-4 py-2.5 border-b flex justify-between items-center">
+                              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{cat}</span>
+                              <div className="flex gap-4 text-[10px] font-bold text-slate-500 uppercase">
+                                <span>Cant. Total: <strong className="text-slate-800">{totalCatQty}</strong></span>
+                                <span>Total Ventas: <strong className="text-slate-800">S/ {totalCatRev.toFixed(2)}</strong></span>
+                              </div>
+                            </div>
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-455 text-[9px] font-black uppercase tracking-wider border-b">
+                                <tr>
+                                  <th className="px-4 py-2">Producto</th>
+                                  <th className="px-4 py-2 text-center">Cantidad Vendida</th>
+                                  <th className="px-4 py-2 text-center">Equivalencia Pollo (Und.)</th>
+                                  <th className="px-4 py-2 text-right">Recaudación (S/)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y font-semibold text-slate-700 bg-white">
+                                {items.map((r, idx) => {
+                                  const equiv = getChickenEquivalency(r.nombre);
+                                  return (
+                                    <tr key={idx} className="hover:bg-slate-50/20">
+                                      <td className="px-4 py-2 text-slate-850">{r.nombre}</td>
+                                      <td className="px-4 py-2 text-center font-bold">{r.cantidad}</td>
+                                      <td className="px-4 py-2 text-center font-mono">
+                                        {equiv > 0 ? (equiv * r.cantidad).toFixed(2) : '-'}
+                                      </td>
+                                      <td className="px-4 py-2 text-right font-mono text-slate-900 font-bold">S/ {r.total.toFixed(2)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {incluirGastos && (
+                <div className="mb-8 break-inside-avoid">
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+                    4. Detalle de Compras y Gastos del Periodo
+                  </h2>
+                  <div className="border rounded-2xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-550 font-bold uppercase tracking-wider border-b">
+                        <tr>
+                          <th className="px-4 py-3">Fecha</th>
+                          <th className="px-4 py-3">Comprobante</th>
+                          <th className="px-4 py-3">Proveedor / RUC</th>
+                          <th className="px-4 py-3 text-right">Base Imp.</th>
+                          <th className="px-4 py-3 text-right">IGV (10.5%)</th>
+                          <th className="px-4 py-3 text-right">Total (S/)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y font-medium text-slate-700 bg-white">
+                        {compras.length > 0 ? compras.map((c, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3 font-mono text-[10px]">{c.creadoEn ? c.creadoEn.split('T')[0] : ''}</td>
+                            <td className="px-4 py-3 uppercase text-[10px] font-bold">{c.tipoDocumento || 'Factura'}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-800 uppercase text-[11px]">{c.proveedor}</span>
+                                <span className="text-[9px] text-slate-450 font-mono">{c.ruc || 'S/D'}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono">S/ {c.baseImponible.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right font-mono text-rose-600">S/ {c.igv.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">S/ {c.total.toFixed(2)}</td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan="6" className="px-4 py-4 text-center text-slate-400">Sin compras o gastos registrados en el periodo</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {(incluirPedidosYa || incluirPersonal) && (
+                <div className={`grid ${incluirPedidosYa && incluirPersonal ? 'grid-cols-2' : 'grid-cols-1'} gap-6 mt-8 break-inside-avoid`}>
+                  {incluirPedidosYa && (
+                    <div>
+                      <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                        5. Conciliación PedidosYa
+                      </h2>
+                      <div className="border rounded-2xl p-4 bg-indigo-50/20 flex flex-col justify-between h-[130px]">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Recaudado PedidosYa</p>
+                          <p className="text-3xl font-black text-indigo-950 mt-2 font-mono">
+                            S/ {(() => {
+                              const totalPY = ventas
+                                .filter(v => v.metodoPago === 'PedidosYa' && v.codigoPedidosYa && !v.codigoPedidosYa.startsWith('DELIVERY -') && !v.codigoPedidosYa.startsWith('LLEVAR -'))
+                                .reduce((s, v) => s + v.total, 0);
+                              return totalPY.toFixed(2);
+                            })()}
+                          </p>
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-tight">
+                          Monto consolidado para conciliar la liquidación semanal del portal PedidosYa.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {incluirPersonal && (
+                    <div>
+                      <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-violet-600"></span>
+                        6. Consumo de Personal (Planilla)
+                      </h2>
+                      <div className="border rounded-2xl overflow-hidden max-h-[130px] overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-slate-550 font-bold uppercase tracking-wider border-b sticky top-0">
+                            <tr>
+                              <th className="px-4 py-2">Colaborador</th>
+                              <th className="px-4 py-2 text-right">Monto</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y font-medium text-slate-700 bg-white">
+                            {(() => {
+                              const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
+                              const porMozo = {};
+                              consumos.forEach(v => {
+                                const mName = v.mesero || v.nombreCliente || 'Sin Nombre';
+                                porMozo[mName] = (porMozo[mName] || 0) + v.total;
+                              });
+                              const entries = Object.entries(porMozo);
+                              return entries.length > 0 ? entries.map(([mozo, total]) => (
+                                <tr key={mozo}>
+                                  <td className="px-4 py-2 font-bold text-slate-850 truncate max-w-[120px]">{mozo}</td>
+                                  <td className="px-4 py-2 text-right font-mono font-bold text-violet-700">S/ {total.toFixed(2)}</td>
+                                </tr>
+                              )) : (
+                                <tr>
+                                  <td colSpan="2" className="px-4 py-4 text-center text-slate-400">Sin consumos en el periodo</td>
+                                </tr>
+                              );
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-16 flex justify-around text-xs break-inside-avoid">
                 <div className="text-center w-48">
-                  <div className="border-b border-slate-350 h-10 mb-2"></div>
+                  <div className="border-b border-slate-300 h-10 mb-2"></div>
                   <p className="font-bold text-slate-700">Firma Administrador</p>
                 </div>
                 <div className="text-center w-48">
-                  <div className="border-b border-slate-355 h-10 mb-2"></div>
+                  <div className="border-b border-slate-300 h-10 mb-2"></div>
                   <p className="font-bold text-slate-700">Firma Propietario</p>
                   <p className="text-[10px] text-slate-400">El Fogón Dorado</p>
                 </div>
@@ -1606,15 +1689,30 @@ export default function ReportesPage() {
             max-width: 100% !important;
             width: 100% !important;
             height: auto !important;
+            max-height: none !important;
             padding: 0 !important;
             margin: 0 !important;
             overflow: visible !important;
+            display: block !important;
           }
           #modal-reporte-gerencial-container .overflow-y-auto {
             overflow: visible !important;
+            display: block !important;
             height: auto !important;
             max-height: none !important;
-            padding: 0 !important;
+            padding: 15mm 20mm !important;
+          }
+          .break-inside-avoid {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .break-inside-avoid-page {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
