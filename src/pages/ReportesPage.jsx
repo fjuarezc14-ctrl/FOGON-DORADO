@@ -1604,7 +1604,7 @@ export default function ReportesPage() {
       <style>{`
         @page {
           size: auto;
-          margin: 0mm;
+          margin: 15mm 20mm !important;
         }
         @media print {
           /* Ocultar elementos de navegación y fondos */
@@ -1702,7 +1702,7 @@ export default function ReportesPage() {
             display: block !important;
             height: auto !important;
             max-height: none !important;
-            padding: 15mm 20mm !important;
+            padding: 0 !important;
           }
           .break-inside-avoid {
             page-break-inside: avoid !important;
