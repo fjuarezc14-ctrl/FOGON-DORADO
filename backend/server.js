@@ -2421,6 +2421,79 @@ app.patch('/api/ventas/:ventaId/tipo-entrega', async (req, res) => {
   }
 });
 
+// PATCH /api/ventas/:ventaId/datos-cliente → Corregir datos de facturación / datos de cliente de una venta
+app.patch('/api/ventas/:ventaId/datos-cliente', async (req, res) => {
+  const { ventaId } = req.params;
+  const { 
+    tipoComprobante, // "Boleta" | "Factura" | "Ticket"
+    numDocumento, 
+    nombreCliente, 
+    clienteDireccion, 
+    pin 
+  } = req.body;
+
+  if (!pin) {
+    return res.status(400).json({ error: 'Se requiere PIN de Administrador.' });
+  }
+
+  try {
+    // Validar PIN
+    const admin = await prisma.usuario.findFirst({ where: { pin, activo: true } });
+    if (!admin) return res.status(401).json({ error: 'PIN incorrecto.' });
+    if (admin.rol !== 'Administrador') {
+      return res.status(403).json({ error: 'Solo el Administrador puede cambiar los datos del cliente.' });
+    }
+
+    // Obtener la venta
+    const venta = await prisma.venta.findUnique({
+      where: { id: parseInt(ventaId) }
+    });
+    if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
+
+    // Validar si ya fue aceptado por la SUNAT
+    if (venta.estadoSunat && venta.estadoSunat.startsWith('ACEPTADO:')) {
+      return res.status(400).json({ error: 'No se puede modificar un comprobante que ya fue ACEPTADO por la SUNAT.' });
+    }
+
+    // Si cambió el tipo de comprobante, borramos la serie y número anterior para recalcularlos
+    let newSerie = venta.serie;
+    let newNumero = venta.numero;
+    let newEstado = venta.estadoSunat;
+    let newEstadoNube = venta.estadoNubefact;
+
+    if (tipoComprobante !== venta.tipoComprobante) {
+      newSerie = null;
+      newNumero = null;
+      // Resetear estado a PENDIENTE si es Boleta/Factura, o NO_APLICA si es Ticket
+      const initEstadoSunat = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
+      newEstado = initEstadoSunat;
+      newEstadoNube = initEstadoSunat;
+    }
+
+    // Actualizar datos
+    const ventaActualizada = await prisma.venta.update({
+      where: { id: venta.id },
+      data: {
+        tipoComprobante,
+        numDocumento: numDocumento || null,
+        nombreCliente: nombreCliente || null,
+        clienteDireccion: clienteDireccion || null,
+        serie: newSerie,
+        numero: newNumero,
+        estadoSunat: newEstado,
+        estadoNubefact: newEstadoNube
+      }
+    });
+
+    console.log(`🔄 Datos de cliente corregidos por ${admin.nombre} (${admin.rol}): Venta #${ventaId}`);
+
+    res.json({ ok: true, venta: ventaActualizada, cambiadoPor: admin.nombre });
+  } catch (err) {
+    console.error('Error al cambiar datos de cliente:', err);
+    res.status(500).json({ error: 'Error interno: ' + err.message });
+  }
+});
+
 // POST /api/ventas → Cobrar mesa (acepta pedidoIds array o pedidoId simple)
 app.post('/api/ventas', async (req, res) => {
   const { 

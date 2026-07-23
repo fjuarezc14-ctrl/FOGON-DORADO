@@ -191,7 +191,15 @@ export default function CajaPage({ currentUser }) {
   const [deliveryClienteNombre, setDeliveryClienteNombre] = useState('');
   const [deliveryNumDocumento, setDeliveryNumDocumento] = useState('');
 
-
+  // Campos para Corregir Datos de Cliente / Facturación en Historial
+  const [editClienteVenta, setEditClienteVenta] = useState(null);
+  const [editClienteTipoComprobante, setEditClienteTipoComprobante] = useState('Ticket');
+  const [editClienteNumDoc, setEditClienteNumDoc] = useState('');
+  const [editClienteNombre, setEditClienteNombre] = useState('');
+  const [editClienteDireccion, setEditClienteDireccion] = useState('');
+  const [editClientePin, setEditClientePin] = useState('');
+  const [editClienteError, setEditClienteError] = useState('');
+  const [editClienteCargando, setEditClienteCargando] = useState(false);
   // Historial de Ventas y Arqueo/Cierre de Caja
   const [ventas, setVentas] = useState([]);
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
@@ -942,6 +950,81 @@ export default function CajaPage({ currentUser }) {
       setCambioTipoError('Error de conexión: ' + err.message);
     } finally {
       setCambioTipoCambiando(false);
+    }
+  };
+
+  // --- Corregir Datos de Cliente / Facturación en Historial ---
+  const abrirModalEditarClienteVenta = (v) => {
+    setEditClienteVenta(v);
+    setEditClienteTipoComprobante(v.tipoComprobante || 'Ticket');
+    setEditClienteNumDoc(v.numDocumento || '');
+    setEditClienteNombre(v.nombreCliente || '');
+    setEditClienteDireccion(v.clienteDireccion || '');
+    setEditClientePin('');
+    setEditClienteError('');
+    setEditClienteCargando(false);
+  };
+
+  const handleGuardarClienteVenta = async () => {
+    if (!editClientePin.trim()) {
+      setEditClienteError('Ingresa el PIN de Administrador.');
+      return;
+    }
+
+    if (editClienteTipoComprobante === 'Factura') {
+      if (!editClienteNumDoc || editClienteNumDoc.trim().length !== 11) {
+        setEditClienteError('Para Factura, el RUC debe tener 11 dígitos.');
+        return;
+      }
+      if (!editClienteNombre || !editClienteNombre.trim()) {
+        setEditClienteError('La Razón Social del cliente es obligatoria.');
+        return;
+      }
+      if (!editClienteDireccion || !editClienteDireccion.trim()) {
+        setEditClienteError('La Dirección fiscal del cliente es obligatoria.');
+        return;
+      }
+    }
+
+    setEditClienteCargando(true);
+    setEditClienteError('');
+
+    try {
+      const res = await api.actualizarClienteVenta(editClienteVenta.id, {
+        tipoComprobante: editClienteTipoComprobante,
+        numDocumento: editClienteNumDoc.trim() || null,
+        nombreCliente: editClienteNombre.trim() || null,
+        clienteDireccion: editClienteDireccion.trim() || null,
+        pin: editClientePin.trim()
+      });
+
+      if (res.error) {
+        setEditClienteError(res.error);
+        return;
+      }
+
+      await fetchCajaData();
+      setEditClienteVenta(null);
+      setEditClientePin('');
+      alert('✅ Datos de facturación del cliente actualizados correctamente.');
+    } catch (err) {
+      setEditClienteError('Error al guardar datos: ' + err.message);
+    } finally {
+      setEditClienteCargando(false);
+    }
+  };
+
+  const reintentarVentaIndividual = async (ventaId) => {
+    try {
+      const res = await api.reintentarNubefact(ventaId);
+      if (res.error) {
+        alert(`❌ Error al enviar a SUNAT: ${res.error}`);
+        return;
+      }
+      await fetchCajaData();
+      alert(`✅ Comprobante enviado y aceptado por SUNAT.`);
+    } catch (err) {
+      alert(`❌ Error al conectar con el servidor: ${err.message}`);
     }
   };
 
@@ -2062,16 +2145,46 @@ export default function CajaPage({ currentUser }) {
                                   <span className="font-bold text-slate-800 text-xs">
                                     {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
                                   </span>
-                                  {v.estadoNubefact === 'PENDIENTE_REINTENTO' && (
-                                    <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
-                                    </span>
+                                  {(!v.estadoNubefact || !v.estadoNubefact.startsWith('ACEPTADO:')) && (
+                                    <button
+                                      title="Corregir datos de facturación (requiere PIN)"
+                                      onClick={() => abrirModalEditarClienteVenta(v)}
+                                      className="p-0.5 rounded bg-slate-100 hover:bg-amber-100 text-slate-400 hover:text-amber-600 border border-slate-200 hover:border-amber-300 transition-all shrink-0"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                    </button>
                                   )}
-                                  {v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:') && (
+                                  {v.estadoNubefact === 'PENDIENTE_REINTENTO' ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
+                                      </span>
+                                      <button
+                                        onClick={() => reintentarVentaIndividual(v.id)}
+                                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded border border-amber-600 flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0"
+                                        title="Reintentar envío a SUNAT ahora mismo"
+                                      >
+                                        Reintentar
+                                      </button>
+                                    </div>
+                                  ) : (v.tipoComprobante === 'Boleta' || v.tipoComprobante === 'Factura') && (!v.estadoNubefact || !v.estadoNubefact.startsWith('ACEPTADO:')) ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="bg-slate-100 text-slate-600 text-[9px] font-black px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full"></span> ⏳ NO ENVIADO
+                                      </span>
+                                      <button
+                                        onClick={() => reintentarVentaIndividual(v.id)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black px-2 py-0.5 rounded border border-blue-600 flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0"
+                                        title="Enviar comprobante a SUNAT"
+                                      >
+                                        Enviar
+                                      </button>
+                                    </div>
+                                  ) : v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:') ? (
                                     <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
                                       <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> ✅ ENVIADO
                                     </span>
-                                  )}
+                                  ) : null}
                                 </div>
                                 <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
                                   {(() => {
@@ -4022,6 +4135,143 @@ export default function CajaPage({ currentUser }) {
                 >
                   {cambioTipoCambiando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
                   {cambioTipoCambiando ? 'Guardando...' : 'Confirmar Cambio'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Corregir Datos de Facturación / Cliente */}
+      {editClienteVenta && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[260] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-teal-500 to-emerald-600 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+                  Corregir Datos del Cliente
+                </h3>
+                <p className="text-xs font-bold opacity-80 mt-0.5">Venta #{editClienteVenta.id} · S/ {editClienteVenta.total.toFixed(2)}</p>
+              </div>
+              <button onClick={() => { setEditClienteVenta(null); setEditClientePin(''); setEditClienteError(''); }} className="bg-black/20 hover:bg-black/30 p-2 rounded-xl transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
+              {/* Tipo de Comprobante */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Tipo de Comprobante</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['Ticket', 'Boleta', 'Factura'].map(tc => (
+                    <button
+                      key={tc}
+                      type="button"
+                      onClick={() => {
+                        setEditClienteTipoComprobante(tc);
+                        setEditClienteError('');
+                      }}
+                      className={`py-3 px-2 rounded-2xl text-xs font-black uppercase border-2 transition-all ${
+                        editClienteTipoComprobante === tc
+                          ? 'bg-emerald-600 border-emerald-700 text-white shadow-lg shadow-emerald-500/20'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {tc}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Campos del Documento */}
+              {(editClienteTipoComprobante === 'Boleta' || editClienteTipoComprobante === 'Factura') && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                      {editClienteTipoComprobante === 'Factura' ? 'RUC del Cliente:' : 'DNI del Cliente:'}
+                    </label>
+                    <input
+                      type="text"
+                      value={editClienteNumDoc}
+                      onChange={e => setEditClienteNumDoc(e.target.value)}
+                      placeholder={editClienteTipoComprobante === 'Factura' ? '11 dígitos' : '8 dígitos'}
+                      className="w-full bg-white border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                      {editClienteTipoComprobante === 'Factura' ? 'Razón Social:' : 'Nombres del Cliente:'}
+                    </label>
+                    <input
+                      type="text"
+                      value={editClienteNombre}
+                      onChange={e => setEditClienteNombre(e.target.value)}
+                      placeholder="Nombre / Razón Social"
+                      className="w-full bg-white border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none transition-all uppercase"
+                    />
+                  </div>
+                  {editClienteTipoComprobante === 'Factura' && (
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                        Dirección Fiscal:
+                      </label>
+                      <input
+                        type="text"
+                        value={editClienteDireccion}
+                        onChange={e => setEditClienteDireccion(e.target.value)}
+                        placeholder="Ej. Av. Hoyos Rubio Nro. 338"
+                        className="w-full bg-white border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none transition-all uppercase"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PIN Autorización */}
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">🔐 PIN de Autorización (Administrador)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={editClientePin}
+                  onChange={e => { setEditClientePin(e.target.value); setEditClienteError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleGuardarClienteVenta()}
+                  placeholder="••••••"
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-emerald-500 focus:bg-white rounded-2xl px-4 py-2.5 text-center text-xl font-black tracking-[0.5em] text-slate-800 placeholder:tracking-normal placeholder:text-slate-300 focus:outline-none transition-all"
+                  style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
+                  autoComplete="off"
+                  name="edit-cliente-pin-auth"
+                />
+              </div>
+
+              {/* Mensaje de Error */}
+              {editClienteError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-black px-4 py-2.5 rounded-2xl uppercase tracking-wide flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  {editClienteError}
+                </div>
+              )}
+
+              {/* Botones de Acción */}
+              <div className="flex gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => { setEditClienteVenta(null); setEditClientePin(''); setEditClienteError(''); }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase rounded-2xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGuardarClienteVenta}
+                  disabled={editClienteCargando || !editClientePin.trim()}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase rounded-2xl transition-all flex items-center justify-center gap-2 shadow-md"
+                >
+                  {editClienteCargando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                  {editClienteCargando ? 'Guardando...' : 'Guardar y Recalcular'}
                 </button>
               </div>
             </div>

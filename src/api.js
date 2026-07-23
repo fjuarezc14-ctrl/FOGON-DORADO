@@ -160,4 +160,7 @@ export const api = {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
   getStatus: () => fetch(`${API_BASE}/api/status`).then(r => r.json()),
+  actualizarClienteVenta: (ventaId, body) => fetch(`${API_BASE}/api/ventas/${ventaId}/datos-cliente`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
 };
