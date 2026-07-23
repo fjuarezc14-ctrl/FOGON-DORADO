@@ -1616,15 +1616,18 @@ export default function ReportesPage() {
           section > *:not(#modal-comprobante-sunat-print-container):not(#modal-reporte-gerencial-container):not(#modal-cierre) {
             display: none !important;
           }
-          /* Garantizar que el body y contenedores no tengan alturas fijas o desbordamientos */
-          html, body, #root, main, section {
+           /* Garantizar que el body y todos los contenedores padre fluyan libremente sin alturas fijas */
+          html, body, #root, #root > div, #root > div > main, #root > div > main > section {
             background: white !important;
             color: black !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: visible !important;
             height: auto !important;
+            max-height: none !important;
             width: auto !important;
+            display: block !important;
+            position: static !important;
           }
           /* Formatear el contenedor del ticket en 74mm en la esquina superior izquierda */
           #modal-comprobante-sunat-print-container {
@@ -1671,9 +1674,7 @@ export default function ReportesPage() {
             page-break-inside: avoid !important;
           }
           #modal-reporte-gerencial-container {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: relative !important;
             width: 100% !important;
             height: auto !important;
             display: block !important;
@@ -1694,6 +1695,7 @@ export default function ReportesPage() {
             margin: 0 !important;
             overflow: visible !important;
             display: block !important;
+            position: static !important;
           }
           #modal-reporte-gerencial-container .overflow-y-auto {
             overflow: visible !important;
