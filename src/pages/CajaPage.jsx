@@ -965,6 +965,47 @@ export default function CajaPage({ currentUser }) {
     setEditClienteCargando(false);
   };
 
+  const buscarClienteEdicion = async () => {
+    if (!editClienteNumDoc) return;
+    setIsBuscando(true);
+    setEditClienteError('');
+    const doc = editClienteNumDoc.trim();
+    
+    // Fallbacks locales rápidos de prueba en desarrollo
+    if (doc === '20613857321') {
+      setEditClienteNombre('FIRST FISH S.A.C.');
+      setEditClienteDireccion('LT. 05 DPTO. LIMA MZ. J COOP. CAJABAMBA - LIMA LIMA LOS OLIVOS');
+      setEditClienteTipoComprobante('Factura');
+      setIsBuscando(false);
+      return;
+    } else if (doc === '10404040404') {
+      setEditClienteNombre('JUAN PEREZ SOTO');
+      setEditClienteDireccion('CALLE SAN MARTÍN 109');
+      setEditClienteTipoComprobante('Boleta');
+      setIsBuscando(false);
+      return;
+    }
+
+    try {
+      const data = await api.consultarCliente(doc);
+      const isRUC = doc.length === 11;
+      if (isRUC) {
+        setEditClienteNombre(data.razonSocial || '');
+        setEditClienteDireccion(data.direccion || '');
+        setEditClienteTipoComprobante('Factura');
+      } else {
+        setEditClienteNombre(data.nombre || '');
+        setEditClienteDireccion(data.direccion || '');
+        setEditClienteTipoComprobante('Boleta');
+      }
+    } catch (err) {
+      console.error("Error consultando API de DNI/RUC en edición:", err);
+      setEditClienteError('No se encontró el documento en SUNAT/RENIEC.');
+    } finally {
+      setIsBuscando(false);
+    }
+  };
+
   const handleGuardarClienteVenta = async () => {
     if (!editClientePin.trim()) {
       setEditClienteError('Ingresa el PIN de Administrador.');
@@ -4192,13 +4233,28 @@ export default function CajaPage({ currentUser }) {
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                       {editClienteTipoComprobante === 'Factura' ? 'RUC del Cliente:' : 'DNI del Cliente:'}
                     </label>
-                    <input
-                      type="text"
-                      value={editClienteNumDoc}
-                      onChange={e => setEditClienteNumDoc(e.target.value)}
-                      placeholder={editClienteTipoComprobante === 'Factura' ? '11 dígitos' : '8 dígitos'}
-                      className="w-full bg-white border border-slate-200 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 focus:outline-none transition-all"
-                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={editClienteNumDoc}
+                        onChange={e => setEditClienteNumDoc(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscarClienteEdicion(); } }}
+                        placeholder={editClienteTipoComprobante === 'Factura' ? '11 dígitos' : '8 dígitos'}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={buscarClienteEdicion}
+                        disabled={isBuscando}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white px-2.5 rounded-xl text-xs font-black flex items-center justify-center transition-colors shrink-0 shadow-sm"
+                      >
+                        {isBuscando ? (
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        ) : (
+                          <Search className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
