@@ -1177,13 +1177,6 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
           error: 'Este pedido ya no puede cancelarse. Solo se cancelan pedidos en estado "Cocina".',
         });
       }
-
-      const elapsed = Date.now() - new Date(pedido.createdAt).getTime();
-      if (elapsed > LIMITE_CANCELACION_MS) {
-        return res.status(400).json({
-          error: 'El tiempo límite de 5 minutos para cancelar ha expirado. Consulta con el administrador.',
-        });
-      }
     }
 
     // Cancelar el pedido
@@ -1327,13 +1320,6 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
       if (pedido.estado !== 'Cocina') {
         return res.status(400).json({
           error: 'Este pedido ya no puede modificarse. Solo se cancelan ítems de pedidos en estado "Cocina".',
-        });
-      }
-
-      const elapsed = Date.now() - new Date(pedido.createdAt).getTime();
-      if (elapsed > LIMITE_CANCELACION_MS) {
-        return res.status(400).json({
-          error: 'El tiempo límite de 5 minutos para cancelar ha expirado. Consulta con el administrador.',
         });
       }
     }

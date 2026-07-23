@@ -747,7 +747,7 @@ export default function SalonPage({ currentUser }) {
     setCancelandoPedido(true);
     try {
       const pedidoId = mesaActual.pedidoData.pedidoId;
-      const isForce = esReclamo || tiempoRestante <= 0 || mesaActual.estado === 'Servido';
+      const isForce = esReclamo || mesaActual.estado === 'Servido';
       const result = await api.cancelarPedido(pedidoId, {
         canceladoPor: supervisorAprobador ? `${supervisorAprobador.nombre} (${supervisorAprobador.rol}) | Mozo: ${meseroGlobal}` : meseroGlobal,
         motivo: cancelMotivo.trim(),
@@ -784,7 +784,7 @@ export default function SalonPage({ currentUser }) {
     const cant = parseInt(cantStr);
     if (isNaN(cant) || cant <= 0 || cant > item.cant) { alert("Cantidad no válida."); return; }
 
-    const isForce = tiempoRestante <= 0 || mesaActual.estado === 'Servido' || item.historial;
+    const isForce = mesaActual.estado === 'Servido' || item.historial;
 
     try {
       const res = await api.cancelarItemPedido(item.pedidoId, {
@@ -1278,7 +1278,11 @@ export default function SalonPage({ currentUser }) {
                                     {esCancelable && (
                                       <button 
                                         onClick={() => {
-                                          requestSupervisorAuth(`Anular "${item.nombre}"`, (supervisor) => handleCancelarItem(item, supervisor));
+                                          if (mesaActual.estado === 'Servido' || item.historial) {
+                                            requestSupervisorAuth(`Anular "${item.nombre}"`, (supervisor) => handleCancelarItem(item, supervisor));
+                                          } else {
+                                            handleCancelarItem(item, null);
+                                          }
                                         }} 
                                         title="Anular o reducir cantidad de este producto"
                                         className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg hover:text-red-700 transition-colors pointer-events-auto shrink-0"
@@ -1365,7 +1369,7 @@ export default function SalonPage({ currentUser }) {
                    {/* Botón cancelar pedido */}
                   {mesaActual?.pedidoData && (
                     <div className="mb-3">
-                      {mesaActual.estado === 'Cocina' && tiempoRestante > 0 ? (
+                      {mesaActual.estado === 'Cocina' ? (
                         <button
                           onClick={() => {
                             const algunItemPreparado = ticketActual.some(i => i.yaEnviado && i.historial && i.pedidoId === mesaActual.pedidoData?.pedidoId);
@@ -1373,19 +1377,14 @@ export default function SalonPage({ currentUser }) {
                               alert("⚠️ No puedes realizar una cancelación normal porque algunos platos ya han sido preparados.\n\nPara cancelar platos servidos, usa el botón de 'Anulación Especial (Reclamo)'.");
                               return;
                             }
-                            requestSupervisorAuth("Cancelar comanda completa", (supervisor) => {
-                              setSupervisorAprobador(supervisor);
-                              setEsReclamo(false);
-                              setCancelModal(true);
-                            });
+                            setSupervisorAprobador(null);
+                            setEsReclamo(false);
+                            setCancelModal(true);
                           }}
                           className="w-full py-2.5 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 font-black uppercase text-[10px] tracking-widest rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                           <AlertTriangle className="w-4 h-4" />
                           Cancelar Pedido
-                          <span className="ml-1 font-mono bg-red-100 border border-red-200 px-2 py-0.5 rounded-md text-red-600">
-                            <Clock className="w-3 h-3 inline mr-1" />{formatCuentaRegresiva(tiempoRestante)}
-                          </span>
                         </button>
                       ) : (
                         <button

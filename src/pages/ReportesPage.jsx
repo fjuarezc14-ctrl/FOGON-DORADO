@@ -56,6 +56,7 @@ export default function ReportesPage() {
   const [activeComprobante, setActiveComprobante] = useState(null);
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
   const [rotacion, setRotacion] = useState([]);
+  const [compras, setCompras] = useState([]);
   const [gerencialModalOpen, setGerencialModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('resumen');
 
@@ -210,18 +211,20 @@ export default function ReportesPage() {
   const fetchReportes = useCallback(async (desde, hasta) => {
     setFiltrando(true);
     try {
-      const [data, cancs, mzs, vts, rot] = await Promise.all([
+      const [data, cancs, mzs, vts, rot, cmps] = await Promise.all([
         api.getReporteContable(desde, hasta),
         api.getCancelaciones(desde, hasta),
         api.getReporteMozos(desde, hasta),
         api.getHistorialVentas(desde, hasta),
         api.getRotacion(desde, hasta),
+        api.getCompras(desde, hasta),
       ]);
       setResumen(data);
       setCancelaciones(cancs || []);
       setMozos(mzs || []);
       setVentas(vts || []);
       setRotacion(rot || []);
+      setCompras(cmps || []);
     } catch(err) {
       console.error('Error cargando reportes:', err);
     } finally {
@@ -1257,20 +1260,20 @@ export default function ReportesPage() {
               <div className="mb-8">
                 <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  1. Balance y Resumen Contable (IGV)
+                  1. Balance y Resumen Gerencial Ejecutivo
                 </h2>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div className="border rounded-2xl p-4 bg-slate-50/50">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ventas</p>
-                    <p className="text-xl font-black font-mono text-slate-800 mt-1">S/ {resumen.ventasTotal.toFixed(2)}</p>
+                    <p className="text-xl font-black font-mono text-slate-800 mt-1 font-sans">S/ {resumen.ventasTotal.toFixed(2)}</p>
                     <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
                       <p>Base Imp.: S/ {resumen.ventasBase.toFixed(2)}</p>
-                      <p className="font-semibold text-blue-600">IGV (10.5%): S/ {resumen.ventasIGV.toFixed(2)}</p>
+                      <p className="font-semibold text-emerald-600">IGV (10.5%): S/ {resumen.ventasIGV.toFixed(2)}</p>
                     </div>
                   </div>
                   <div className="border rounded-2xl p-4 bg-slate-50/50">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Compras / Gastos</p>
-                    <p className="text-xl font-black font-mono text-slate-800 mt-1">S/ {resumen.comprasTotal.toFixed(2)}</p>
+                    <p className="text-xl font-black font-mono text-slate-800 mt-1 font-sans">S/ {resumen.comprasTotal.toFixed(2)}</p>
                     <div className="text-[10px] text-slate-500 mt-2 space-y-0.5">
                       <p>Base Imp.: S/ {resumen.comprasBase.toFixed(2)}</p>
                       <p className="font-semibold text-rose-600">IGV (10.5%): S/ {resumen.comprasIGV.toFixed(2)}</p>
@@ -1278,8 +1281,22 @@ export default function ReportesPage() {
                   </div>
                   <div className="border rounded-2xl p-4 bg-slate-900 text-white">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">IGV Neto a Liquidar</p>
-                    <p className="text-xl font-black font-mono text-amber-400 mt-1">S/ {resumen.igvAPagar.toFixed(2)}</p>
-                    <p className="text-[9px] text-slate-400 mt-2">Diferencia entre débito fiscal de ventas y crédito fiscal de compras.</p>
+                    <p className="text-xl font-black font-mono text-amber-400 mt-1 font-sans">S/ {resumen.igvAPagar.toFixed(2)}</p>
+                    <p className="text-[9px] text-slate-400 mt-2">Diferencia entre débito fiscal y crédito fiscal.</p>
+                  </div>
+                  <div className="border rounded-2xl p-4 bg-amber-500/10 border-amber-500/20 text-amber-950">
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Consumo Total de Pollos</p>
+                    <p className="text-xl font-black font-mono text-amber-800 mt-1 font-sans">
+                      {(() => {
+                        let total = 0;
+                        rotacion.forEach(item => {
+                          const equiv = getChickenEquivalency(item.nombre);
+                          total += item.cantidad * equiv;
+                        });
+                        return total.toFixed(2);
+                      })()} <span className="text-xs font-black">Und.</span>
+                    </p>
+                    <p className="text-[9px] text-amber-700/80 mt-2 leading-tight">Consolidado de equivalencias de pollo a la brasa vendido.</p>
                   </div>
                 </div>
               </div>
@@ -1315,74 +1332,114 @@ export default function ReportesPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                    3. Top 5 Platos Más Vendidos
-                  </h2>
-                  <div className="border rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b">
-                        <tr>
-                          <th className="px-4 py-3">Plato</th>
-                          <th className="px-4 py-3 text-center">Cantidad</th>
-                          <th className="px-4 py-3 text-right">Recaudado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y font-medium text-slate-700">
-                        {(() => {
-                          const categoriasExcluidas = ['Bebidas y Refrescos', 'Cervezas', 'Bar y Cocteles', 'Postres'];
-                          return [...rotacion]
-                            .filter(p => !categoriasExcluidas.includes(p.categoria))
-                            .sort((a, b) => b.cantidad - a.cantidad)
-                            .slice(0, 5)
-                            .map((r, idx) => (
-                              <tr key={idx}>
-                                <td className="px-4 py-3 font-bold text-slate-800">{r.nombre}</td>
-                                <td className="px-4 py-3 text-center font-bold text-slate-900">{r.cantidad}</td>
-                                <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">S/ {r.total.toFixed(2)}</td>
-                              </tr>
-                            ));
-                        })()}
-                        {rotacion.length === 0 && (
-                          <tr>
-                            <td colSpan="3" className="px-4 py-3 text-center text-slate-400">Sin datos de rotación</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              <div className="mb-8 break-inside-avoid-page">
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                  3. Rotación Detallada de Productos por Categoría
+                </h2>
+                <div className="space-y-6">
+                  {(() => {
+                    const grouped = {};
+                    rotacion.forEach(r => {
+                      const cat = r.categoria || 'Otros';
+                      if (!grouped[cat]) grouped[cat] = [];
+                      grouped[cat].push(r);
+                    });
 
-                <div>
-                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-700"></span>
-                    4. Consumo de Pollos (Equivalencias)
-                  </h2>
-                  <div className="border rounded-2xl p-4 bg-amber-50/30 flex flex-col justify-between h-[155px]">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Consumo Total de Pollos</p>
-                      <p className="text-4xl font-black text-amber-800 mt-2 font-mono font-sans">
-                        {(() => {
-                          let total = 0;
-                          rotacion.forEach(item => {
-                            const equiv = getChickenEquivalency(item.nombre);
-                            total += item.cantidad * equiv;
-                          });
-                          return total.toFixed(2);
-                        })()} <span className="text-lg font-bold">Unidades</span>
-                      </p>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-tight">
-                      Cálculo en base a las porciones de pollo a la brasa vendidas (1 entero = 1.0, 1/2 = 0.5, 1/4 = 0.25, 1/8 = 0.125).
-                    </p>
-                  </div>
+                    const categories = Object.keys(grouped).sort();
+                    if (categories.length === 0) {
+                      return <p className="text-xs text-slate-400 text-center py-4">Sin datos de rotación en el periodo.</p>;
+                    }
+
+                    return categories.map(cat => {
+                      const items = grouped[cat].sort((a, b) => b.cantidad - a.cantidad);
+                      const totalCatQty = items.reduce((sum, item) => sum + item.cantidad, 0);
+                      const totalCatRev = items.reduce((sum, item) => sum + item.total, 0);
+
+                      return (
+                        <div key={cat} className="border rounded-2xl overflow-hidden bg-slate-50/20 break-inside-avoid mb-4">
+                          <div className="bg-slate-100/80 px-4 py-2.5 border-b flex justify-between items-center">
+                            <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{cat}</span>
+                            <div className="flex gap-4 text-[10px] font-bold text-slate-500 uppercase">
+                              <span>Cant. Total: <strong className="text-slate-800">{totalCatQty}</strong></span>
+                              <span>Total Ventas: <strong className="text-slate-800">S/ {totalCatRev.toFixed(2)}</strong></span>
+                            </div>
+                          </div>
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 text-slate-450 text-[9px] font-black uppercase tracking-wider border-b">
+                              <tr>
+                                <th className="px-4 py-2">Producto</th>
+                                <th className="px-4 py-2 text-center">Cantidad Vendida</th>
+                                <th className="px-4 py-2 text-center">Equivalencia Pollo (Und.)</th>
+                                <th className="px-4 py-2 text-right">Recaudación (S/)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y font-semibold text-slate-700 bg-white">
+                              {items.map((r, idx) => {
+                                const equiv = getChickenEquivalency(r.nombre);
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/20">
+                                    <td className="px-4 py-2 text-slate-850">{r.nombre}</td>
+                                    <td className="px-4 py-2 text-center font-bold">{r.cantidad}</td>
+                                    <td className="px-4 py-2 text-center font-mono">
+                                      {equiv > 0 ? (equiv * r.cantidad).toFixed(2) : '-'}
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-mono text-slate-900 font-bold">S/ {r.total.toFixed(2)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
-              {/* Nuevas secciones para PedidosYa y Consumos de Personal en PDF */}
-              <div className="grid grid-cols-2 gap-6 mt-8">
+              <div className="mb-8 break-inside-avoid">
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+                  4. Detalle de Compras y Gastos del Periodo
+                </h2>
+                <div className="border rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-550 font-bold uppercase tracking-wider border-b">
+                      <tr>
+                        <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3">Comprobante</th>
+                        <th className="px-4 py-3">Proveedor / RUC</th>
+                        <th className="px-4 py-3 text-right">Base Imp.</th>
+                        <th className="px-4 py-3 text-right">IGV (10.5%)</th>
+                        <th className="px-4 py-3 text-right">Total (S/)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y font-medium text-slate-700 bg-white">
+                      {compras.length > 0 ? compras.map((c, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="px-4 py-3 font-mono text-[10px]">{c.creadoEn ? c.creadoEn.split('T')[0] : ''}</td>
+                          <td className="px-4 py-3 uppercase text-[10px] font-bold">{c.tipoDocumento || 'Factura'}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 uppercase text-[11px]">{c.proveedor}</span>
+                              <span className="text-[9px] text-slate-450 font-mono">{c.ruc || 'S/D'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">S/ {c.baseImponible.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right font-mono text-rose-600">S/ {c.igv.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">S/ {c.total.toFixed(2)}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="6" className="px-4 py-4 text-center text-slate-400">Sin compras o gastos registrados en el periodo</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 mt-8 break-inside-avoid">
                 <div>
                   <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider border-b pb-2 mb-4 flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
@@ -1419,7 +1476,7 @@ export default function ReportesPage() {
                           <th className="px-4 py-2 text-right">Monto</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y font-medium text-slate-700">
+                      <tbody className="divide-y font-medium text-slate-700 bg-white">
                         {(() => {
                           const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
                           const porMozo = {};
