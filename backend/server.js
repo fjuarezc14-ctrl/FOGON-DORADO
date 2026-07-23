@@ -3483,7 +3483,11 @@ async function enviarAApisunat(venta, itemsRaw) {
     throw new Error(`apisunat.pe Error (${response.status}): ${errMsg}`);
   }
 
-  return await response.json();
+  const resData = await response.json();
+  if (resData.success && resData.payload?.estado === 'RECHAZADO') {
+    throw new Error(`SUNAT rechazó el comprobante: ${resData.message || 'Datos incorrectos'}`);
+  }
+  return resData;
 }
 
 
