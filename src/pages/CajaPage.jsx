@@ -637,9 +637,19 @@ export default function CajaPage({ currentUser }) {
 
   const procesarCobroYFacturar = async () => {
     if (!mesaSeleccionada || !mesaSeleccionada.pedidoData) return;
-    if (tipoComprobante === 'Factura' && !clienteNombre) {
-      alert('Por favor, busca y valida el RUC del cliente antes de cobrar.');
-      return;
+    if (tipoComprobante === 'Factura') {
+      if (!numDocumento || numDocumento.trim().length !== 11) {
+        alert('Para emitir Factura, el RUC debe tener 11 dígitos.');
+        return;
+      }
+      if (!clienteNombre || !clienteNombre.trim()) {
+        alert('Por favor, busca y valida el RUC del cliente antes de cobrar.');
+        return;
+      }
+      if (!clienteDireccion || !clienteDireccion.trim()) {
+        alert('La Dirección fiscal del cliente es obligatoria para emitir una Factura. Por favor, ingrésala.');
+        return;
+      }
     }
 
     const items = mesaSeleccionada.pedidoData.items || [];
@@ -1525,6 +1535,10 @@ export default function CajaPage({ currentUser }) {
         }
         if (!deliveryClienteNombre.trim()) {
           alert('Para emitir Factura, la Razón Social del cliente es obligatoria.');
+          return;
+        }
+        if (!deliveryDireccion.trim()) {
+          alert('Para emitir Factura, la Dirección fiscal del cliente es obligatoria. Por favor, ingrésala.');
           return;
         }
       }
@@ -3084,48 +3098,63 @@ export default function CajaPage({ currentUser }) {
                       );
                     })()}
 
-                    {/* DNI o RUC si es Boleta o Factura */}
                     {(deliveryTipoComprobante === 'Boleta' || deliveryTipoComprobante === 'Factura') && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">
-                            {deliveryTipoComprobante === 'Factura' ? 'RUC del Cliente:' : 'DNI del Cliente:'}
-                          </label>
-                          <div className="flex gap-1.5">
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">
+                              {deliveryTipoComprobante === 'Factura' ? 'RUC del Cliente:' : 'DNI del Cliente:'}
+                            </label>
+                            <div className="flex gap-1.5">
+                              <input 
+                                type="text" 
+                                value={deliveryNumDocumento} 
+                                onChange={(e) => setDeliveryNumDocumento(e.target.value)} 
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscarClienteDelivery(); } }}
+                                placeholder={deliveryTipoComprobante === 'Factura' ? '11 dígitos' : '8 dígitos'}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={buscarClienteDelivery}
+                                disabled={isBuscando}
+                                className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white px-2.5 rounded-xl text-xs font-black flex items-center justify-center transition-colors shrink-0"
+                              >
+                                {isBuscando ? (
+                                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                ) : (
+                                  <Search className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">
+                              {deliveryTipoComprobante === 'Factura' ? 'Razón Social:' : 'Nombre Cliente:'}
+                            </label>
                             <input 
                               type="text" 
-                              value={deliveryNumDocumento} 
-                              onChange={(e) => setDeliveryNumDocumento(e.target.value)} 
-                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscarClienteDelivery(); } }}
-                              placeholder={deliveryTipoComprobante === 'Factura' ? '11 dígitos' : '8 dígitos'}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-slate-800 focus:outline-none"
+                              value={deliveryClienteNombre} 
+                              onChange={(e) => setDeliveryClienteNombre(e.target.value)} 
+                              placeholder="Nombre/Razón Social"
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
                             />
-                            <button
-                              type="button"
-                              onClick={buscarClienteDelivery}
-                              disabled={isBuscando}
-                              className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white px-2.5 rounded-xl text-xs font-black flex items-center justify-center transition-colors shrink-0"
-                            >
-                              {isBuscando ? (
-                                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                              ) : (
-                                <Search className="w-3.5 h-3.5" />
-                              )}
-                            </button>
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">
-                            {deliveryTipoComprobante === 'Factura' ? 'Razón Social:' : 'Nombre Cliente:'}
-                          </label>
-                          <input 
-                            type="text" 
-                            value={deliveryClienteNombre} 
-                            onChange={(e) => setDeliveryClienteNombre(e.target.value)} 
-                            placeholder="Nombre/Razón Social"
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
-                          />
-                        </div>
+                        {deliveryTipoComprobante === 'Factura' && tipoDelivery !== 'DeliveryPropio' && (
+                          <div>
+                            <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">
+                              Dirección Fiscal:
+                            </label>
+                            <input 
+                              type="text" 
+                              value={deliveryDireccion} 
+                              onChange={(e) => setDeliveryDireccion(e.target.value)} 
+                              placeholder="Obligatorio (Ej. Av. Hoyos Rubio Nro. 338)" 
+                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500" 
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 

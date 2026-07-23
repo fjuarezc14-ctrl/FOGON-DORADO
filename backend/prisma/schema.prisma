@@ -98,6 +98,7 @@ model Venta {
   tipoComprobante String   // "Boleta", "Factura", "Ticket"
   numDocumento    String?  // DNI o RUC del cliente
   nombreCliente   String?
+  clienteDireccion String?
   total           Float
   igv             Float
   subtotal        Float
