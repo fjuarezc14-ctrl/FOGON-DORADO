@@ -1815,7 +1815,11 @@ app.put('/api/pedidos/llevar/:id', async (req, res) => {
       });
     });
 
-    res.json({ ok: true });
+    const venta = await prisma.venta.findFirst({
+      where: { pedidoId: id }
+    });
+
+    res.json({ ok: true, venta });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -3441,7 +3445,7 @@ async function enviarAApisunat(venta, itemsRaw) {
   const url = process.env.APISUNAT_API_URL || 'https://sandbox.apisunat.pe/api/v3/documents';
   const MODO_DEMO = !token || token.includes('tu_token') || token === '';
 
-  const serie = venta.serie || (venta.tipoComprobante === 'Factura' ? (process.env.SERIE_FACTURA || 'E001') : (process.env.SERIE_BOLETA || 'EB01'));
+  const serie = venta.serie || (venta.tipoComprobante === 'Factura' ? (process.env.SERIE_FACTURA || 'F001') : (process.env.SERIE_BOLETA || 'B001'));
 
   // Identificación del cliente (1 = DNI, 6 = RUC, 0 = Sin Documento)
   let clienteTipoDoc = "1";

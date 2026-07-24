@@ -503,7 +503,7 @@ export default function CajaPage({ currentUser }) {
     if (!v) return;
     const rucEmpresa = "R.U.C. N° 20496009259";
     
-    let serie = v.serie || (v.tipoComprobante === 'Factura' ? 'E001' : (v.tipoComprobante === 'Ticket' ? 'T001' : 'EB01'));
+    let serie = v.serie || (v.tipoComprobante === 'Factura' ? 'F001' : (v.tipoComprobante === 'Ticket' ? 'T001' : 'B001'));
     let correlativoStr = String(v.numero || (v.id % 10000)).padStart(4, '0');
     let qrData = `${rucEmpresa}|${v.tipoComprobante === 'Factura' ? '01' : '03'}|${serie}|${correlativoStr}|${v.igv.toFixed(2)}|${v.total.toFixed(2)}|${v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')}|${v.tipoComprobante === 'Factura'?'6':(v.numDocumento?.length === 8 ? '1' : '0')}|${v.numDocumento || '00000000'}`;
     let hashResumen = "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=";
@@ -610,7 +610,7 @@ export default function CajaPage({ currentUser }) {
       return;
     }
     
-    let serie = v.serie || (v.tipoComprobante === 'Factura' ? 'E001' : 'EB01');
+    let serie = v.serie || (v.tipoComprobante === 'Factura' ? 'F001' : 'B001');
     let correlativoStr = String(v.id % 10000).padStart(4, '0');
     let enlace = 'https://www.sunat.gob.pe';
 
@@ -1576,7 +1576,7 @@ export default function CajaPage({ currentUser }) {
     const fecha = new Date().toLocaleDateString('es-PE');
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     
-    let serie = response.serie || (tipoComprobante === 'Factura' ? 'E001' : (tipoComprobante === 'Ticket' ? 'T001' : 'EB01'));
+    let serie = response.serie || (tipoComprobante === 'Factura' ? 'F001' : (tipoComprobante === 'Ticket' ? 'T001' : 'B001'));
     let correlativoStr = String(response.numero || 1).padStart(4, '0');
     let subtotal = total / 1.105;
     let igv = total - subtotal;
