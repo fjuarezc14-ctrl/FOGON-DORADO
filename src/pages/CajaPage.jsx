@@ -2015,7 +2015,7 @@ export default function CajaPage({ currentUser }) {
                           <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5"><Clock className="w-3 h-3" />{p.hora}</span>
                         </td>
                         <td className="px-6 py-4">
-                          {p.estado === 'Servido'
+                          {(p.estado === 'Servido' || (p.estado && p.estado.toUpperCase().includes('LISTO')) || (p.estado && p.estado.toUpperCase().includes('SERVIDO')))
                             ? <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-200 text-[10px] font-black uppercase flex items-center gap-1.5 w-max">
                                 <PackageCheck className="w-3.5 h-3.5" /> Listo p/ Entregar
                               </span>
@@ -2030,7 +2030,7 @@ export default function CajaPage({ currentUser }) {
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="flex flex-col items-center gap-1.5 justify-center">
-                            {p.estado === 'Servido' ? (
+                            {(p.estado === 'Servido' || (p.estado && p.estado.toUpperCase().includes('LISTO')) || (p.estado && p.estado.toUpperCase().includes('SERVIDO'))) ? (
                               <button
                                 onClick={() => confirmarEntregaDelivery(p.pedidoId, p.codigoPedidosYa)}
                                 className="w-full max-w-[130px] px-3 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:bg-blue-700 active:scale-95 animate-pulse"
