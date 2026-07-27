@@ -3520,7 +3520,7 @@ async function enviarAApisunat(venta, itemsRaw) {
     cliente_tipo_de_documento: clienteTipoDoc,
     cliente_numero_de_documento: clienteNumDoc,
     cliente_denominacion: clienteDenominacion,
-    cliente_direccion: venta.clienteDireccion || "",
+    cliente_direccion: (venta.clienteDireccion && venta.clienteDireccion.trim()) || "-",
     items: formattedItems,
     total: venta.total.toFixed(2)
   };
