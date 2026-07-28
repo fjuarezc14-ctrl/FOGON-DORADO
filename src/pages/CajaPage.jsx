@@ -2186,7 +2186,7 @@ export default function CajaPage({ currentUser }) {
                                   <span className="font-bold text-slate-800 text-xs">
                                     {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
                                   </span>
-                                  {(!v.estadoNubefact || !v.estadoNubefact.startsWith('ACEPTADO:')) && (
+                                  {(v.tipoComprobante === 'Ticket') && (
                                     <button
                                       title="Corregir datos de facturación (requiere PIN)"
                                       onClick={() => abrirModalEditarClienteVenta(v)}

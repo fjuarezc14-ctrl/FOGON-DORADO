@@ -2444,39 +2444,59 @@ app.patch('/api/ventas/:ventaId/datos-cliente', async (req, res) => {
     });
     if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
 
-    // Validar si ya fue aceptado por la SUNAT
-    if (venta.estadoSunat && venta.estadoSunat.startsWith('ACEPTADO:')) {
-      return res.status(400).json({ error: 'No se puede modificar un comprobante que ya fue ACEPTADO por la SUNAT.' });
-    }
-
-    // Si cambió el tipo de comprobante, borramos la serie y número anterior para recalcularlos
-    let newSerie = venta.serie;
-    let newNumero = venta.numero;
-    let newEstado = venta.estadoSunat;
-    let newEstadoNube = venta.estadoNubefact;
-
-    if (tipoComprobante !== venta.tipoComprobante) {
-      newSerie = null;
-      newNumero = null;
-      // Resetear estado a PENDIENTE si es Boleta/Factura, o NO_APLICA si es Ticket
-      const initEstadoSunat = (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') ? 'PENDIENTE' : 'NO_APLICA';
-      newEstado = initEstadoSunat;
-      newEstadoNube = initEstadoSunat;
+    // Validar si ya fue emitida como Boleta o Factura
+    if (venta.tipoComprobante === 'Boleta' || venta.tipoComprobante === 'Factura') {
+      return res.status(400).json({ error: 'No se pueden corregir datos de una Boleta o Factura ya emitida. Solo se permite actualizar comprobantes de tipo Ticket.' });
     }
 
     // Actualizar datos
-    const ventaActualizada = await prisma.venta.update({
-      where: { id: venta.id },
-      data: {
-        tipoComprobante,
-        numDocumento: numDocumento || null,
-        nombreCliente: nombreCliente || null,
-        clienteDireccion: clienteDireccion || null,
-        serie: newSerie,
-        numero: newNumero,
-        estadoSunat: newEstado,
-        estadoNubefact: newEstadoNube
+    const ventaActualizada = await prisma.$transaction(async (tx) => {
+      let newSerie = venta.serie;
+      let newNumero = venta.numero;
+      let newEstado = venta.estadoSunat;
+      let newEstadoNube = venta.estadoNubefact;
+
+      if (tipoComprobante !== venta.tipoComprobante) {
+        if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
+          // Obtener la siguiente serie y correlativo dentro de la transacción
+          const isFactura = tipoComprobante === 'Factura';
+          const serieDefault = isFactura ? (process.env.SERIE_FACTURA || 'F001') : (process.env.SERIE_BOLETA || 'B001');
+          const minCorrelativo = isFactura ? 2 : 0; // Factura inicia en F001-0003, Boleta en B001-0001
+
+          const ultimaVenta = await tx.venta.findFirst({
+            where: { tipoComprobante, serie: serieDefault, numero: { not: null } },
+            orderBy: { numero: 'desc' }
+          });
+
+          const siguienteNumero = ultimaVenta
+            ? Math.max(ultimaVenta.numero + 1, minCorrelativo + 1)
+            : (minCorrelativo + 1);
+
+          newSerie = serieDefault;
+          newNumero = siguienteNumero;
+          newEstado = 'PENDIENTE';
+          newEstadoNube = 'PENDIENTE';
+        } else {
+          newSerie = null;
+          newNumero = null;
+          newEstado = 'NO_APLICA';
+          newEstadoNube = 'NO_APLICA';
+        }
       }
+
+      return await tx.venta.update({
+        where: { id: venta.id },
+        data: {
+          tipoComprobante,
+          numDocumento: numDocumento || null,
+          nombreCliente: nombreCliente || null,
+          clienteDireccion: clienteDireccion || null,
+          serie: newSerie,
+          numero: newNumero,
+          estadoSunat: newEstado,
+          estadoNubefact: newEstadoNube
+        }
+      });
     });
 
     console.log(`🔄 Datos de cliente corregidos por ${admin.nombre} (${admin.rol}): Venta #${ventaId}`);
