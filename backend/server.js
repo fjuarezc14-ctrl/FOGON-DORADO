@@ -171,7 +171,7 @@ function parseSelectionsFromNotes(notas) {
 async function expandPedidoItemsForDb(itemsList) {
   const expandedList = [];
   for (const i of itemsList) {
-    const prodId = parseInt(i.id || i.productoId);
+    const prodId = parseInt(i.productoId || i.id);
     const decomp = MIX_PRODUCTS_DECOMPOSITION[prodId];
     
     if (decomp) {
@@ -384,7 +384,7 @@ async function evaluarEstadoEnsalada(itemsList) {
     const categoriasGuarnicion = ['Pollos', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'];
 
     for (const item of itemsList) {
-      const prodId = parseInt(item.id || item.productoId);
+      const prodId = parseInt(item.productoId || item.id);
       let prod = null;
       if (prodId) {
         prod = await prisma.producto.findUnique({
