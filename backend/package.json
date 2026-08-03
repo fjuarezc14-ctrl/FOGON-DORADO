@@ -9,7 +9,9 @@
     "db:migrate": "npx prisma migrate dev --name init",
     "db:seed": "node prisma/seed.js",
     "db:studio": "npx prisma studio",
-    "db:setup": "npx prisma migrate deploy && node prisma/seed.js"
+    "db:setup": "npx prisma migrate deploy && node prisma/seed.js",
+    "db:dump-menu": "node dump-menu.js",
+    "db:load-menu": "node load-menu.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
