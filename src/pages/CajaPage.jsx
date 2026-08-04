@@ -2353,7 +2353,11 @@ export default function CajaPage({ currentUser }) {
                             </div>
                            </td>
                           <td className="px-6 py-4">
-                            {(() => {
+                            {v.anulado ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-red-100 border border-red-200 text-red-700 whitespace-nowrap">
+                                🚫 CANCELADO
+                              </span>
+                            ) : (() => {
                               let method = v.metodoPago;
                               const editable = true;
                               return (

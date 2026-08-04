@@ -3243,22 +3243,28 @@ app.get('/api/reportes/cancelaciones', async (req, res) => {
     }
 
     const pedidos = await prisma.pedido.findMany({
-      where: { estado: 'Cancelado', canceladoEn: filtroFecha },
-      include: { items: true, mesa: true },
-      orderBy: { canceladoEn: 'desc' },
+      where: { 
+        OR: [
+          { estado: 'Cancelado' },
+          { venta: { anulado: true } }
+        ],
+        createdAt: filtroFecha 
+      },
+      include: { items: true, mesa: true, venta: true },
+      orderBy: { createdAt: 'desc' },
     });
 
     const formateados = pedidos.map(p => ({
       id: p.id,
-      hora: p.canceladoEn?.toLocaleTimeString('es-PE', {
+      hora: (p.canceladoEn || p.updatedAt || p.createdAt)?.toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),
-      fecha: p.canceladoEn?.toLocaleDateString('es-PE'),
+      fecha: (p.canceladoEn || p.updatedAt || p.createdAt)?.toLocaleDateString('es-PE'),
       mesa: p.mesa?.numero || null,
       codigoPedidosYa: p.codigoPedidosYa,
-      canceladoPor: p.canceladoPor,
-      motivoCancela: p.motivoCancela,
-      total: p.total,
+      canceladoPor: p.canceladoPor || p.venta?.anuladoPor || 'Admin',
+      motivoCancela: p.motivoCancela || p.venta?.motivoAnulacion || 'Devolución en Caja',
+      total: p.venta?.montoOriginal || p.total,
       resumenItems: p.items.map(i => `${i.cantidad}x ${i.nombre}`).join(', '),
     }));
 
