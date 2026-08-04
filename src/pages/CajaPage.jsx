@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check, Users, Layers } from 'lucide-react';
+import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check, Users, Layers, Ban, AlertTriangle } from 'lucide-react';
 
 import { api } from '../api';
 
@@ -200,6 +199,15 @@ export default function CajaPage({ currentUser }) {
   const [editClientePin, setEditClientePin] = useState('');
   const [editClienteError, setEditClienteError] = useState('');
   const [editClienteCargando, setEditClienteCargando] = useState(false);
+
+  // Modal Anular / Registrar Devolución de Venta Entregada
+  const [anularVentaModal, setAnularVentaModal] = useState(false);
+  const [ventaAAnular, setVentaAAnular] = useState(null);
+  const [anularPin, setAnularPin] = useState('');
+  const [anularMotivo, setAnularMotivo] = useState('');
+  const [anularError, setAnularError] = useState('');
+  const [anularCargando, setAnularCargando] = useState(false);
+
   // Historial de Ventas y Arqueo/Cierre de Caja
   const [ventas, setVentas] = useState([]);
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
@@ -1066,6 +1074,45 @@ export default function CajaPage({ currentUser }) {
       alert(`✅ Comprobante enviado y aceptado por SUNAT.`);
     } catch (err) {
       alert(`❌ Error al conectar con el servidor: ${err.message}`);
+    }
+  };
+
+  const abrirAnularVentaModal = (v) => {
+    setVentaAAnular(v);
+    setAnularPin('');
+    setAnularMotivo('');
+    setAnularError('');
+    setAnularCargando(false);
+    setAnularVentaModal(true);
+  };
+
+  const procesarAnulacionVenta = async () => {
+    if (!anularPin) {
+      setAnularError('Por favor ingresa el PIN de Administrador.');
+      return;
+    }
+    if (!anularMotivo.trim()) {
+      setAnularError('Por favor ingresa el motivo de la devolución / anulación.');
+      return;
+    }
+    setAnularCargando(true);
+    setAnularError('');
+    try {
+      const res = await api.anularVenta(ventaAAnular.id, anularPin, anularMotivo);
+      if (res.error) {
+        setAnularError(res.error);
+        return;
+      }
+      setAnularVentaModal(false);
+      setVentaAAnular(null);
+      setAnularPin('');
+      setAnularMotivo('');
+      await fetchCajaData();
+      alert('✅ Devolución / Anulación registrada con éxito. La venta ha sido ajustada a S/ 0.00 en caja.');
+    } catch (err) {
+      setAnularError('Error al procesar devolución: ' + err.message);
+    } finally {
+      setAnularCargando(false);
     }
   };
 
@@ -2168,12 +2215,11 @@ export default function CajaPage({ currentUser }) {
                         <th className="px-6 py-4">Detalle</th>
                         <th className="px-6 py-4 text-right">Total</th>
                         <th className="px-6 py-4 text-center">Acción</th>
-
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-sm bg-white">
                       {ventasFiltradas.length > 0 ? ventasFiltradas.map(v => (
-                        <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
+                        <tr key={v.id} className={`hover:bg-slate-50/80 transition-colors ${v.anulado ? 'bg-red-50/60' : ''}`}>
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
                               <span className="font-mono text-xs font-black text-slate-900">#VT-{v.id}</span>
@@ -2186,7 +2232,18 @@ export default function CajaPage({ currentUser }) {
                                   <span className="font-bold text-slate-800 text-xs">
                                     {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
                                   </span>
-                                  {(v.tipoComprobante === 'Ticket') && (
+                                  {v.anulado ? (
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-200 flex items-center gap-1 w-fit shrink-0">
+                                        <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-ping"></span> 🚫 DEVUELTO
+                                      </span>
+                                      {v.motivoAnulacion && (
+                                        <span className="text-[9px] text-red-600 font-medium block leading-none">
+                                          Motivo: {v.motivoAnulacion} ({v.anuladoPor || 'Admin'})
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (v.tipoComprobante === 'Ticket') && (
                                     <button
                                       title="Corregir datos de facturación (requiere PIN)"
                                       onClick={() => abrirModalEditarClienteVenta(v)}
@@ -2195,7 +2252,7 @@ export default function CajaPage({ currentUser }) {
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                                     </button>
                                   )}
-                                  {v.estadoNubefact === 'PENDIENTE_REINTENTO' ? (
+                                  {!v.anulado && v.estadoNubefact === 'PENDIENTE_REINTENTO' ? (
                                     <div className="flex items-center gap-1.5">
                                       <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
                                         <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
@@ -2345,26 +2402,50 @@ export default function CajaPage({ currentUser }) {
                              </div>
                           </td>
                           <td className="px-6 py-4 text-right font-mono font-black text-slate-900 text-base">
-                            S/ {v.total.toFixed(2)}
+                            {v.anulado ? (
+                              <div className="flex flex-col items-end leading-none">
+                                <span className="text-red-600 font-black">S/ 0.00</span>
+                                <span className="line-through text-slate-400 font-bold text-xs mt-1">
+                                  S/ {(v.montoOriginal || v.total).toFixed(2)}
+                                </span>
+                              </div>
+                            ) : (
+                              `S/ ${v.total.toFixed(2)}`
+                            )}
                           </td>
                           <td className="px-6 py-4 text-center">
                             <div className="flex items-center justify-center gap-2">
-                              <button
-                                onClick={() => reimprimirComprobante(v)}
-                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                                title="Reimprimir Comprobante Susii 80mm"
-                              >
-                                <Printer className="w-3.5 h-3.5" /> Reimprimir
-                              </button>
-                              <button
-                                onClick={() => enviarPorWhatsApp(v)}
-                                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                                title="Enviar Comprobante por WhatsApp"
-                              >
-                                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.161.001 6.136 1.23 8.375 3.466 2.238 2.237 3.467 5.21 3.466 8.373-.003 6.535-5.328 11.86-11.859 11.86-2.007-.001-3.98-.51-5.753-1.48L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.269 0 9.557-4.287 9.559-9.556.001-2.553-.99-4.955-2.792-6.758-1.802-1.802-4.199-2.793-6.753-2.794-5.27 0-9.559 4.287-9.56 9.559-.001 1.625.434 3.208 1.262 4.622L1.51 21.054l4.137-1.9zm12.135-6.843c-.268-.134-1.583-.78-1.828-.87-.247-.09-.427-.134-.607.134-.18.267-.697.87-.852 1.047-.156.178-.311.201-.579.067-.268-.134-1.132-.418-2.156-1.332-.796-.71-1.335-1.586-1.492-1.853-.156-.268-.017-.413.117-.547.12-.12.268-.312.401-.468.134-.156.179-.268.268-.446.09-.178.045-.335-.022-.469-.067-.134-.607-1.462-.832-2.002-.22-.53-.442-.457-.607-.466-.156-.008-.337-.008-.518-.008-.18 0-.473.067-.72.337-.247.268-.943.922-.943 2.248s.965 2.604 1.1 2.784c.134.18 1.9 2.901 4.6 4.068.643.277 1.143.443 1.534.568.646.205 1.233.176 1.697.107.518-.077 1.583-.647 1.807-1.272.223-.624.223-1.159.156-1.272-.069-.112-.249-.18-.517-.313z" />
-                                </svg> WhatsApp
-                              </button>
+                              {v.anulado ? (
+                                <span className="px-3 py-1.5 bg-red-100 text-red-700 rounded-xl text-[10px] font-black uppercase border border-red-200 flex items-center justify-center gap-1">
+                                  🚫 VENTA DEVUELTA (S/ 0.00)
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => reimprimirComprobante(v)}
+                                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                    title="Reimprimir Comprobante Susii 80mm"
+                                  >
+                                    <Printer className="w-3.5 h-3.5" /> Reimprimir
+                                  </button>
+                                  <button
+                                    onClick={() => enviarPorWhatsApp(v)}
+                                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                    title="Enviar Comprobante por WhatsApp"
+                                  >
+                                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.161.001 6.136 1.23 8.375 3.466 2.238 2.237 3.467 5.21 3.466 8.373-.003 6.535-5.328 11.86-11.859 11.86-2.007-.001-3.98-.51-5.753-1.48L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.269 0 9.557-4.287 9.559-9.556.001-2.553-.99-4.955-2.792-6.758-1.802-1.802-4.199-2.793-6.753-2.794-5.27 0-9.559 4.287-9.56 9.559-.001 1.625.434 3.208 1.262 4.622L1.51 21.054l4.137-1.9zm12.135-6.843c-.268-.134-1.583-.78-1.828-.87-.247-.09-.427-.134-.607.134-.18.267-.697.87-.852 1.047-.156.178-.311.201-.579.067-.268-.134-1.132-.418-2.156-1.332-.796-.71-1.335-1.586-1.492-1.853-.156-.268-.017-.413.117-.547.12-.12.268-.312.401-.468.134-.156.179-.268.268-.446.09-.178.045-.335-.022-.469-.067-.134-.607-1.462-.832-2.002-.22-.53-.442-.457-.607-.466-.156-.008-.337-.008-.518-.008-.18 0-.473.067-.72.337-.247.268-.943.922-.943 2.248s.965 2.604 1.1 2.784c.134.18 1.9 2.901 4.6 4.068.643.277 1.143.443 1.534.568.646.205 1.233.176 1.697.107.518-.077 1.583-.647 1.807-1.272.223-.624.223-1.159.156-1.272-.069-.112-.249-.18-.517-.313z" />
+                                    </svg> WhatsApp
+                                  </button>
+                                  <button
+                                    onClick={() => abrirAnularVentaModal(v)}
+                                    className="px-2.5 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-red-200 shadow-sm active:scale-95 shrink-0"
+                                    title="Registrar Devolución de Pedido (requiere PIN Administrador)"
+                                  >
+                                    <Ban className="w-3.5 h-3.5" /> Devolución
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -4643,6 +4724,104 @@ export default function CajaPage({ currentUser }) {
               <button onClick={() => window.print()} className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black uppercase tracking-widest rounded-xl text-xs flex justify-center items-center gap-2 shadow-lg shadow-emerald-500/20">
                 <Receipt className="w-4 h-4" /> Imprimir 80mm
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Anular / Registrar Devolución de Venta */}
+      {anularVentaModal && ventaAAnular && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[260] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-100">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-600 to-rose-700 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                  <Ban className="w-5 h-5 animate-pulse" />
+                  Registrar Devolución
+                </h3>
+                <p className="text-xs font-bold opacity-90 mt-0.5">
+                  Venta #{ventaAAnular.id} ({ventaAAnular.tipoComprobante}) · Original: S/ {(ventaAAnular.montoOriginal || ventaAAnular.total).toFixed(2)}
+                </p>
+              </div>
+              <button 
+                onClick={() => { setAnularVentaModal(false); setVentaAAnular(null); setAnularError(''); }}
+                className="bg-black/20 hover:bg-black/30 p-2 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <div className="bg-red-50 border border-red-200 p-3 rounded-2xl text-red-900 text-xs font-medium space-y-1">
+                <div className="font-black flex items-center gap-1.5 text-red-700 uppercase tracking-wide">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                  Atención sobre Devoluciones
+                </div>
+                <p className="text-[11px] text-red-800 leading-snug">
+                  Esta venta <strong>permanecerá en el historial</strong> para auditoría, pero su monto cambiará a <strong>S/ 0.00</strong> para que no afecte el arqueo de caja.
+                </p>
+              </div>
+
+              {/* Motivo de Devolución */}
+              <div>
+                <label className="block text-slate-600 font-black text-xs uppercase tracking-wider mb-1">
+                  Motivo de Devolución / Anulación:
+                </label>
+                <textarea
+                  value={anularMotivo}
+                  onChange={(e) => setAnularMotivo(e.target.value)}
+                  placeholder="Ej: Cliente devolvió pedido por demora / Pedido equivocado / Cancelación..."
+                  rows={2}
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-500 rounded-xl p-2.5 font-medium text-slate-800 text-xs focus:outline-none resize-none"
+                />
+              </div>
+
+              {/* PIN de Administrador */}
+              <div>
+                <label className="block text-slate-600 font-black text-xs uppercase tracking-wider mb-1">
+                  PIN de Autorización (Administrador):
+                </label>
+                <input
+                  type="password"
+                  value={anularPin}
+                  onChange={(e) => setAnularPin(e.target.value)}
+                  placeholder="••••"
+                  maxLength={6}
+                  className="w-full bg-slate-50 border-2 border-slate-200 focus:border-red-500 rounded-xl px-4 py-2.5 text-center font-mono font-black text-slate-900 tracking-[0.5em] text-lg focus:outline-none"
+                  style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
+                  autoComplete="off"
+                />
+              </div>
+
+              {/* Error */}
+              {anularError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-black px-4 py-2 rounded-xl flex items-center gap-2">
+                  <X className="w-4 h-4 shrink-0" />
+                  {anularError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setAnularVentaModal(false); setVentaAAnular(null); setAnularError(''); }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase rounded-2xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={procesarAnulacionVenta}
+                  disabled={anularCargando || !anularPin.trim() || !anularMotivo.trim()}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-black text-xs uppercase rounded-2xl transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
+                >
+                  {anularCargando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                  {anularCargando ? 'Procesando...' : 'Confirmar Devolución'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

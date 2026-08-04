@@ -2508,6 +2508,82 @@ app.patch('/api/ventas/:ventaId/datos-cliente', async (req, res) => {
   }
 });
 
+// PATCH /api/ventas/:ventaId/anular → Anular / Registrar devolución de un pedido entregado
+app.patch('/api/ventas/:ventaId/anular', async (req, res) => {
+  const { ventaId } = req.params;
+  const { pin, motivo } = req.body;
+
+  if (!pin) {
+    return res.status(400).json({ error: 'Se requiere PIN de Administrador.' });
+  }
+
+  try {
+    const admin = await prisma.usuario.findFirst({ where: { pin, activo: true } });
+    if (!admin) return res.status(401).json({ error: 'PIN incorrecto.' });
+    if (admin.rol !== 'Administrador') {
+      return res.status(403).json({ error: 'Solo el Administrador puede anular o registrar devolución de ventas.' });
+    }
+
+    const venta = await prisma.venta.findUnique({
+      where: { id: parseInt(ventaId) },
+      include: { pedido: true }
+    });
+    if (!venta) return res.status(404).json({ error: 'Venta no encontrada.' });
+
+    if (venta.anulado || venta.pedido?.estado === 'Cancelado') {
+      return res.status(400).json({ error: 'Esta venta ya se encuentra anulada / devuelta.' });
+    }
+
+    const motivoFinal = motivo ? String(motivo).trim() : 'Devolución de pedido por cliente';
+    const now = new Date();
+
+    const ventaAnulada = await prisma.$transaction(async (tx) => {
+      const vUpdated = await tx.venta.update({
+        where: { id: venta.id },
+        data: {
+          anulado: true,
+          motivoAnulacion: motivoFinal,
+          anuladoPor: admin.nombre,
+          anuladoEn: now,
+          montoOriginal: venta.montoOriginal || venta.total,
+          total: 0.00,
+          subtotal: 0.00,
+          igv: 0.00,
+          montoEfectivo: 0.00,
+          montoTarjeta: 0.00,
+          montoYape: 0.00
+        }
+      });
+
+      if (venta.pedidoId) {
+        await tx.pedido.update({
+          where: { id: venta.pedidoId },
+          data: {
+            estado: 'Cancelado',
+            motivoCancela: `[DEVOLUCIÓN CAJA]: ${motivoFinal}`,
+            canceladoPor: admin.nombre,
+            canceladoEn: now
+          }
+        });
+      }
+
+      return vUpdated;
+    });
+
+    console.log(`🚫 Venta #${ventaId} anulada/devuelta por ${admin.nombre}. Motivo: ${motivoFinal}`);
+
+    res.json({ 
+      ok: true, 
+      venta: ventaAnulada, 
+      anuladoPor: admin.nombre,
+      mensaje: 'Venta anulada y devuelta a S/ 0.00 con éxito.' 
+    });
+  } catch (err) {
+    console.error('Error al anular venta:', err);
+    res.status(500).json({ error: 'Error al anular venta: ' + err.message });
+  }
+});
+
 // POST /api/ventas → Cobrar mesa (acepta pedidoIds array o pedidoId simple)
 app.post('/api/ventas', async (req, res) => {
   const { 
@@ -2750,8 +2826,7 @@ app.get('/api/ventas', async (req, res) => {
 
     const ventas = await prisma.venta.findMany({
       where: { 
-        createdAt: filtroFecha,
-        pedido: { estado: { not: 'Cancelado' } }
+        createdAt: filtroFecha
       },
       include: {
         pedido: {
@@ -2778,6 +2853,11 @@ app.get('/api/ventas', async (req, res) => {
       montoEfectivo: v.montoEfectivo,
       montoTarjeta: v.montoTarjeta,
       montoYape: v.montoYape,
+      anulado: v.anulado || v.pedido?.estado === 'Cancelado',
+      motivoAnulacion: v.motivoAnulacion || v.pedido?.motivoCancela || null,
+      anuladoPor: v.anuladoPor || v.pedido?.canceladoPor || null,
+      anuladoEn: v.anuladoEn || v.pedido?.canceladoEn || null,
+      montoOriginal: v.montoOriginal || null,
       hora: v.createdAt.toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }),

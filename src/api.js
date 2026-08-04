@@ -163,4 +163,7 @@ export const api = {
   actualizarClienteVenta: (ventaId, body) => fetch(`${API_BASE}/api/ventas/${ventaId}/datos-cliente`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
+  anularVenta: (ventaId, pin, motivo) => fetch(`${API_BASE}/api/ventas/${ventaId}/anular`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin, motivo }),
+  }).then(r => r.json()),
 };
