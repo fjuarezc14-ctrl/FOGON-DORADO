@@ -2233,57 +2233,59 @@ export default function CajaPage({ currentUser }) {
                                     {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
                                   </span>
                                   {v.anulado ? (
-                                    <div className="flex flex-col gap-0.5">
-                                      <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-200 flex items-center gap-1 w-fit shrink-0">
-                                        <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-ping"></span> 🚫 DEVUELTO
-                                      </span>
-                                      {v.motivoAnulacion && (
-                                        <span className="text-[9px] text-red-600 font-medium block leading-none">
-                                          Motivo: {v.motivoAnulacion} ({v.anuladoPor || 'Admin'})
-                                        </span>
-                                      )}
-                                    </div>
-                                  ) : (v.tipoComprobante === 'Ticket') && (
-                                    <button
-                                      title="Corregir datos de facturación (requiere PIN)"
-                                      onClick={() => abrirModalEditarClienteVenta(v)}
-                                      className="p-0.5 rounded bg-slate-100 hover:bg-amber-100 text-slate-400 hover:text-amber-600 border border-slate-200 hover:border-amber-300 transition-all shrink-0"
-                                    >
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-                                    </button>
-                                  )}
-                                  {!v.anulado && v.estadoNubefact === 'PENDIENTE_REINTENTO' ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
-                                      </span>
-                                      <button
-                                        onClick={() => reintentarVentaIndividual(v.id)}
-                                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded border border-amber-600 flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0"
-                                        title="Reintentar envío a SUNAT ahora mismo"
-                                      >
-                                        Reintentar
-                                      </button>
-                                    </div>
-                                  ) : (v.tipoComprobante === 'Boleta' || v.tipoComprobante === 'Factura') && (!v.estadoNubefact || !v.estadoNubefact.startsWith('ACEPTADO:')) ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="bg-slate-100 text-slate-600 text-[9px] font-black px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full"></span> ⏳ NO ENVIADO
-                                      </span>
-                                      <button
-                                        onClick={() => reintentarVentaIndividual(v.id)}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black px-2 py-0.5 rounded border border-blue-600 flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0"
-                                        title="Enviar comprobante a SUNAT"
-                                      >
-                                        Enviar
-                                      </button>
-                                    </div>
-                                  ) : v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:') ? (
-                                    <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> ✅ ENVIADO
+                                    <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-200 flex items-center gap-1 shrink-0">
+                                      <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-ping"></span> 🚫 DEVUELTO
                                     </span>
-                                  ) : null}
+                                  ) : (
+                                    <>
+                                      {v.tipoComprobante === 'Ticket' && (
+                                        <button
+                                          title="Corregir datos de facturación (requiere PIN)"
+                                          onClick={() => abrirModalEditarClienteVenta(v)}
+                                          className="p-0.5 rounded bg-slate-100 hover:bg-amber-100 text-slate-400 hover:text-amber-600 border border-slate-200 hover:border-amber-300 transition-all shrink-0"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                        </button>
+                                      )}
+                                      {v.estadoNubefact === 'PENDIENTE_REINTENTO' ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 animate-pulse flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> ⚠️ CONTINGENCIA
+                                          </span>
+                                          <button
+                                            onClick={() => reintentarVentaIndividual(v.id)}
+                                            className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded border border-amber-600 flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0"
+                                            title="Reintentar envío a SUNAT ahora mismo"
+                                          >
+                                            Reintentar
+                                          </button>
+                                        </div>
+                                      ) : (v.tipoComprobante === 'Boleta' || v.tipoComprobante === 'Factura') && (!v.estadoNubefact || !v.estadoNubefact.startsWith('ACEPTADO:')) ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="bg-slate-100 text-slate-600 text-[9px] font-black px-1.5 py-0.5 rounded border border-slate-200 flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full"></span> ⏳ NO ENVIADO
+                                          </span>
+                                          <button
+                                            onClick={() => reintentarVentaIndividual(v.id)}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black px-2 py-0.5 rounded border border-blue-600 flex items-center gap-1 active:scale-95 transition-all shadow-sm shrink-0"
+                                            title="Enviar comprobante a SUNAT"
+                                          >
+                                            Enviar
+                                          </button>
+                                        </div>
+                                      ) : v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:') ? (
+                                        <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> ✅ ENVIADO
+                                        </span>
+                                      ) : null}
+                                    </>
+                                  )}
                                 </div>
+                                {v.anulado && v.motivoAnulacion && (
+                                  <span className="text-[9px] text-red-600 font-medium block leading-none mt-1">
+                                    Motivo: {v.motivoAnulacion} ({v.anuladoPor || 'Admin'})
+                                  </span>
+                                )}
                                 <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
                                   {(() => {
                                     if (v.codigoPedidosYa?.startsWith('DELIVERY -')) {
@@ -2406,11 +2408,11 @@ export default function CajaPage({ currentUser }) {
                               <div className="flex flex-col items-end leading-none">
                                 <span className="text-red-600 font-black">S/ 0.00</span>
                                 <span className="line-through text-slate-400 font-bold text-xs mt-1">
-                                  S/ {(v.montoOriginal || v.total).toFixed(2)}
+                                  S/ {(v.montoOriginal ?? v.total ?? 0).toFixed(2)}
                                 </span>
                               </div>
                             ) : (
-                              `S/ ${v.total.toFixed(2)}`
+                              `S/ ${(v.total ?? 0).toFixed(2)}`
                             )}
                           </td>
                           <td className="px-6 py-4 text-center">
