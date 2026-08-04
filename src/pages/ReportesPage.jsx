@@ -558,7 +558,7 @@ export default function ReportesPage() {
                   {(() => {
                     const filtradas = ventas;
                     return filtradas.length > 0 ? filtradas.map(v => (
-                      <tr key={v.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr key={v.id} className={`hover:bg-slate-50/80 transition-colors ${v.anulado ? 'bg-red-50/60' : ''}`}>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
                             <span className="font-mono text-xs font-black text-slate-900">#VT-{v.id}</span>
@@ -567,9 +567,21 @@ export default function ReportesPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="font-bold text-slate-800 text-xs">
-                              {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
-                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-slate-800 text-xs">
+                                {v.tipoComprobante} {v.serie ? `${v.serie}-${String(v.numero).padStart(4, '0')}` : `#${v.id}`}
+                              </span>
+                              {v.anulado && (
+                                <span className="bg-red-100 text-red-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-200 flex items-center gap-1 shrink-0">
+                                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-ping"></span> 🚫 DEVUELTO
+                                </span>
+                              )}
+                            </div>
+                            {v.anulado && v.motivoAnulacion && (
+                              <span className="text-[9px] text-red-600 font-medium block leading-none mt-1">
+                                Motivo: {v.motivoAnulacion} ({v.anuladoPor || 'Admin'})
+                              </span>
+                            )}
                             <span className="text-[10px] text-slate-500 uppercase tracking-tight font-medium mt-0.5">
                               {(() => {
                                 if (v.codigoPedidosYa?.startsWith('DELIVERY -')) {
@@ -625,7 +637,11 @@ export default function ReportesPage() {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          {(() => {
+                          {v.anulado ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-red-100 border border-red-200 text-red-700 whitespace-nowrap">
+                              🚫 CANCELADO
+                            </span>
+                          ) : (() => {
                             let method = v.metodoPago;
                             if (method === 'PedidosYa' && v.codigoPedidosYa) {
                               if (v.codigoPedidosYa.startsWith('DELIVERY -') || v.codigoPedidosYa.startsWith('LLEVAR -')) {
@@ -648,26 +664,45 @@ export default function ReportesPage() {
                           {v.itemsResumen}
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-black text-slate-900 text-base">
-                          S/ {v.total.toFixed(2)}
+                          {v.anulado ? (
+                            <div className="flex flex-col items-end leading-none">
+                              <span className="text-red-600 font-black">S/ 0.00</span>
+                              {v.montoOriginal != null && (
+                                <span className="line-through text-slate-400 font-bold text-xs mt-1">
+                                  S/ {v.montoOriginal.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            `S/ ${(v.total ?? 0).toFixed(2)}`
+                          )}
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => reimprimirComprobante(v)}
-                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                              title="Reimprimir Comprobante Susii 80mm"
-                            >
-                              <Printer className="w-3.5 h-3.5" /> Reimprimir
-                            </button>
-                            <button
-                              onClick={() => enviarPorWhatsApp(v)}
-                              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                              title="Enviar Comprobante por WhatsApp"
-                            >
-                              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.161.001 6.136 1.23 8.375 3.466 2.238 2.237 3.467 5.21 3.466 8.373-.003 6.535-5.328 11.86-11.859 11.86-2.007-.001-3.98-.51-5.753-1.48L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.269 0 9.557-4.287 9.559-9.556.001-2.553-.99-4.955-2.792-6.758-1.802-1.802-4.199-2.793-6.753-2.794-5.27 0-9.559 4.287-9.56 9.559-.001 1.625.434 3.208 1.262 4.622L1.51 21.054l4.137-1.9zm12.135-6.843c-.268-.134-1.583-.78-1.828-.87-.247-.09-.427-.134-.607.134-.18.267-.697.87-.852 1.047-.156.178-.311.201-.579.067-.268-.134-1.132-.418-2.156-1.332-.796-.71-1.335-1.586-1.492-1.853-.156-.268-.017-.413.117-.547.12-.12.268-.312.401-.468.134-.156.179-.268.268-.446.09-.178.045-.335-.022-.469-.067-.134-.607-1.462-.832-2.002-.22-.53-.442-.457-.607-.466-.156-.008-.337-.008-.518-.008-.18 0-.473.067-.72.337-.247.268-.943.922-.943 2.248s.965 2.604 1.1 2.784c.134.18 1.9 2.901 4.6 4.068.643.277 1.143.443 1.534.568.646.205 1.233.176 1.697.107.518-.077 1.583-.647 1.807-1.272.223-.624.223-1.159.156-1.272-.069-.112-.249-.18-.517-.313z" />
-                              </svg> WhatsApp
-                            </button>
+                            {v.anulado ? (
+                              <span className="px-3 py-1.5 bg-red-100 text-red-700 rounded-xl text-[10px] font-black uppercase border border-red-200 flex items-center justify-center gap-1">
+                                🚫 VENTA DEVUELTA (S/ 0.00)
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => reimprimirComprobante(v)}
+                                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                  title="Reimprimir Comprobante Susii 80mm"
+                                >
+                                  <Printer className="w-3.5 h-3.5" /> Reimprimir
+                                </button>
+                                <button
+                                  onClick={() => enviarPorWhatsApp(v)}
+                                  className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                  title="Enviar Comprobante por WhatsApp"
+                                >
+                                  <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.161.001 6.136 1.23 8.375 3.466 2.238 2.237 3.467 5.21 3.466 8.373-.003 6.535-5.328 11.86-11.859 11.86-2.007-.001-3.98-.51-5.753-1.48L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.269 0 9.557-4.287 9.559-9.556.001-2.553-.99-4.955-2.792-6.758-1.802-1.802-4.199-2.793-6.753-2.794-5.27 0-9.559 4.287-9.56 9.559-.001 1.625.434 3.208 1.262 4.622L1.51 21.054l4.137-1.9zm12.135-6.843c-.268-.134-1.583-.78-1.828-.87-.247-.09-.427-.134-.607.134-.18.267-.697.87-.852 1.047-.156.178-.311.201-.579.067-.268-.134-1.132-.418-2.156-1.332-.796-.71-1.335-1.586-1.492-1.853-.156-.268-.017-.413.117-.547.12-.12.268-.312.401-.468.134-.156.179-.268.268-.446.09-.178.045-.335-.022-.469-.067-.134-.607-1.462-.832-2.002-.22-.53-.442-.457-.607-.466-.156-.008-.337-.008-.518-.008-.18 0-.473.067-.72.337-.247.268-.943.922-.943 2.248s.965 2.604 1.1 2.784c.134.18 1.9 2.901 4.6 4.068.643.277 1.143.443 1.534.568.646.205 1.233.176 1.697.107.518-.077 1.583-.647 1.807-1.272.223-.624.223-1.159.156-1.272-.069-.112-.249-.18-.517-.313z" />
+                                  </svg> WhatsApp
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
