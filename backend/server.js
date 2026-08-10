@@ -29,6 +29,47 @@ const BARRA_CATEGORIAS = [
   'Postres',
 ];
 
+// Helper universal para desglosar y asegurar que el 100% de la venta real en Caja sume correctamente
+function obtenerMontosVenta(v) {
+  if (!v || v.anulado || v.pedido?.estado === 'Cancelado') {
+    return { efec: 0, tarj: 0, yape: 0 };
+  }
+  if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa') {
+    return { efec: 0, tarj: 0, yape: 0 };
+  }
+
+  let efec = parseFloat(v.montoEfectivo || 0);
+  let tarj = parseFloat(v.montoTarjeta || 0);
+  let yape = parseFloat(v.montoYape || 0);
+  const total = parseFloat(v.total || 0);
+
+  if (total <= 0) {
+    return { efec: 0, tarj: 0, yape: 0 };
+  }
+
+  if (v.metodoPago === 'Efectivo') {
+    return { efec: total, tarj: 0, yape: 0 };
+  }
+  if (v.metodoPago === 'Tarjeta') {
+    return { efec: 0, tarj: total, yape: 0 };
+  }
+  if (v.metodoPago === 'Yape') {
+    return { efec: 0, tarj: 0, yape: total };
+  }
+
+  // Para 'Mixto' u otros: si la suma difiere del total o está incompleta
+  const suma = efec + tarj + yape;
+  if (Math.abs(suma - total) > 0.01) {
+    if (suma === 0) {
+      efec = total; // Fallback seguro
+    } else if (total > suma) {
+      efec += (total - suma); // Cubrir remanente en efectivo para no perder recaudación
+    }
+  }
+
+  return { efec, tarj, yape };
+}
+
 // ============================================================
 // CONFIGURACIÓN DE PARRILLADAS Y PIQUEOS MIX (COMBO DECOMPOSITION)
 // ============================================================
@@ -2918,28 +2959,32 @@ app.get('/api/ventas/resumen', async (req, res) => {
     const totalIGVVentas = ventas.reduce((s, v) => s + v.igv, 0);
     const atendidas = ventas.length;
 
-    // Desglose por tipo
-    // Ventas reales cobradas en caja (excluir Cortesía, Consumo, PedidosYa)
-    const ventasReales = ventas.filter(v =>
-      v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo' && v.metodoPago !== 'PedidosYa'
-    );
-    const ingresosCaja = ventasReales.reduce((s, v) => s + (v.montoEfectivo || 0) + (v.montoTarjeta || 0) + (v.montoYape || 0), 0);
+    let totalEfectivo = 0;
+    let totalTarjeta = 0;
+    let totalYape = 0;
+
+    ventas.forEach(v => {
+      const { efec, tarj, yape } = obtenerMontosVenta(v);
+      totalEfectivo += efec;
+      totalTarjeta += tarj;
+      totalYape += yape;
+    });
+
+    const ingresosCaja = totalEfectivo + totalTarjeta + totalYape;
     const ingresosPedidosYa = ventas
       .filter(v => v.metodoPago === 'PedidosYa')
       .reduce((s, v) => s + v.total, 0);
     const totalConsumos = ventas
       .filter(v => v.metodoPago === 'Consumo')
       .reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
-    // Solo ventas marcadas explícitamente como Cortesía
     const totalCortesias = ventas
       .filter(v => v.metodoPago === 'Cortesía')
       .reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
 
-    // Desglose por método (de todos los ingresos reales de caja distribuidos)
     const porMetodoPago = {
-      Efectivo: ventasReales.reduce((s, v) => s + (v.montoEfectivo || 0), 0),
-      Tarjeta:  ventasReales.reduce((s, v) => s + (v.montoTarjeta  || 0), 0),
-      Yape:     ventasReales.reduce((s, v) => s + (v.montoYape     || 0), 0),
+      Efectivo: totalEfectivo,
+      Tarjeta: totalTarjeta,
+      Yape: totalYape,
       PedidosYa: ingresosPedidosYa,
       Consumo: totalConsumos,
       Cortesía: totalCortesias,
@@ -3359,10 +3404,29 @@ app.get('/api/reportes/contable', async (req, res) => {
     const comprasIGV = compras.reduce((s, c) => s + c.igv, 0);
     const comprasBase = compras.reduce((s, c) => s + c.baseImponible, 0);
 
+    let totalEfectivo = 0;
+    let totalTarjeta = 0;
+    let totalYape = 0;
+
+    ventas.forEach(v => {
+      const { efec, tarj, yape } = obtenerMontosVenta(v);
+      totalEfectivo += efec;
+      totalTarjeta += tarj;
+      totalYape += yape;
+    });
+
     res.json({
       ventasTotal, ventasIGV, ventasBase,
       comprasTotal, comprasIGV, comprasBase,
       igvAPagar: ventasIGV - comprasIGV,
+      desgloseCaja: {
+        efectivo: totalEfectivo,
+        tarjeta: totalTarjeta,
+        yape: totalYape,
+        pedidosYa: ventas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0),
+        consumos: ventas.filter(v => v.metodoPago === 'Consumo').reduce((s, v) => s + (v.descuentoAplicado || v.total), 0),
+        cortesias: ventas.filter(v => v.metodoPago === 'Cortesía').reduce((s, v) => s + (v.descuentoAplicado || v.total), 0),
+      }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3441,23 +3505,28 @@ app.get('/api/reportes/rotacion', async (req, res) => {
 // ============================================================
 async function ejecutarMigracionMontos() {
   try {
-    console.log("⚡ Iniciando migración de montos de pago históricos...");
+    console.log("⚡ Iniciando migración y auto-reparación de montos de pago históricos...");
     await prisma.$executeRawUnsafe(`
       UPDATE "Venta" 
       SET "montoEfectivo" = "total" 
-      WHERE "metodoPago" = 'Efectivo' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0;
+      WHERE "metodoPago" = 'Efectivo' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
     `);
     await prisma.$executeRawUnsafe(`
       UPDATE "Venta" 
       SET "montoTarjeta" = "total" 
-      WHERE "metodoPago" = 'Tarjeta' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0;
+      WHERE "metodoPago" = 'Tarjeta' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
     `);
     await prisma.$executeRawUnsafe(`
       UPDATE "Venta" 
       SET "montoYape" = "total" 
-      WHERE "metodoPago" = 'Yape' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0;
+      WHERE "metodoPago" = 'Yape' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
     `);
-    console.log("✅ Migración de montos históricos completada exitosamente.");
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Venta" 
+      SET "montoEfectivo" = "total" 
+      WHERE "metodoPago" = 'Mixto' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
+    `);
+    console.log("✅ Migración y auto-reparación de montos completada exitosamente.");
   } catch (err) {
     console.error("❌ Error al ejecutar migración de montos históricos:", err);
   }

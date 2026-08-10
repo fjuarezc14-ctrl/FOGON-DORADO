@@ -2489,14 +2489,45 @@ export default function CajaPage({ currentUser }) {
 
         {/* RESUMEN LATERAL */}
         {(() => {
+          const obtenerMontosVentaFrontend = (v) => {
+            if (!v || v.anulado || v.estadoPedido === 'Cancelado') return { efec: 0, tarj: 0, yape: 0 };
+            if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa') return { efec: 0, tarj: 0, yape: 0 };
+
+            let efec = parseFloat(v.montoEfectivo || 0);
+            let tarj = parseFloat(v.montoTarjeta || 0);
+            let yape = parseFloat(v.montoYape || 0);
+            const total = parseFloat(v.total || 0);
+
+            if (total <= 0) return { efec: 0, tarj: 0, yape: 0 };
+            if (v.metodoPago === 'Efectivo') return { efec: total, tarj: 0, yape: 0 };
+            if (v.metodoPago === 'Tarjeta') return { efec: 0, tarj: total, yape: 0 };
+            if (v.metodoPago === 'Yape') return { efec: 0, tarj: 0, yape: total };
+
+            const suma = efec + tarj + yape;
+            if (Math.abs(suma - total) > 0.01) {
+              if (suma === 0) efec = total;
+              else if (total > suma) efec += (total - suma);
+            }
+            return { efec, tarj, yape };
+          };
+
           const ventasFiltradas = ultimoCierre
             ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
             : ventas;
           const activeAtendidas = ventasFiltradas.length;
 
-          // Separar ingresos reales (caja) vs PedidosYa vs Cortesías
-          const activeIngresosCaja = ventasFiltradas
-            .reduce((s, v) => s + (v.montoEfectivo || 0) + (v.montoTarjeta || 0) + (v.montoYape || 0), 0);
+          let activeEfectivo = 0;
+          let activeTarjeta = 0;
+          let activeYape = 0;
+
+          ventasFiltradas.forEach(v => {
+            const { efec, tarj, yape } = obtenerMontosVentaFrontend(v);
+            activeEfectivo += efec;
+            activeTarjeta += tarj;
+            activeYape += yape;
+          });
+
+          const activeIngresosCaja = activeEfectivo + activeTarjeta + activeYape;
           const activeIngresosPedidosYa = ventasFiltradas
             .filter(v => v.metodoPago === 'PedidosYa')
             .reduce((s, v) => s + v.total, 0);
@@ -2509,10 +2540,6 @@ export default function CajaPage({ currentUser }) {
           const activeConsumos = ventasFiltradas
             .filter(v => v.metodoPago === 'Consumo')
             .reduce((s, v) => s + v.total, 0);
-
-          const activeEfectivo = ventasFiltradas.reduce((s, v) => s + (v.montoEfectivo || 0), 0);
-          const activeTarjeta = ventasFiltradas.reduce((s, v) => s + (v.montoTarjeta || 0), 0);
-          const activeYape = ventasFiltradas.reduce((s, v) => s + (v.montoYape || 0), 0);
 
           return (
             <div className="bg-slate-900 rounded-3xl shadow-xl p-5 text-white flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
@@ -3729,17 +3756,39 @@ export default function CajaPage({ currentUser }) {
           ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
           : ventas).filter(v => v.estadoPedido !== 'Cancelado');
 
-        // Ventas reales (sin Cortesía, Consumo ni PedidosYa)
-        const ventasReales = ventasFiltradas.filter(v =>
-          v.metodoPago !== 'Cortesía' && v.metodoPago !== 'Consumo' && v.metodoPago !== 'PedidosYa'
-        );
+        const obtenerMontosVentaFrontend = (v) => {
+          if (!v || v.anulado || v.estadoPedido === 'Cancelado') return { efec: 0, tarj: 0, yape: 0 };
+          if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa') return { efec: 0, tarj: 0, yape: 0 };
 
-        // Para Mixto: montoEfectivo, montoTarjeta, montoYape ya vienen desglosados desde la BD
-        // Para Efectivo/Tarjeta/Yape: el monto correspondiente = total de la venta
-        // No filtramos por metodoPago sino que siempre sumamos los campos individuales
-        const totalEfectivo = ventasReales.reduce((s, v) => s + (v.montoEfectivo || 0), 0);
-        const totalTarjeta  = ventasReales.reduce((s, v) => s + (v.montoTarjeta  || 0), 0);
-        const totalYape     = ventasReales.reduce((s, v) => s + (v.montoYape     || 0), 0);
+          let efec = parseFloat(v.montoEfectivo || 0);
+          let tarj = parseFloat(v.montoTarjeta || 0);
+          let yape = parseFloat(v.montoYape || 0);
+          const total = parseFloat(v.total || 0);
+
+          if (total <= 0) return { efec: 0, tarj: 0, yape: 0 };
+          if (v.metodoPago === 'Efectivo') return { efec: total, tarj: 0, yape: 0 };
+          if (v.metodoPago === 'Tarjeta') return { efec: 0, tarj: total, yape: 0 };
+          if (v.metodoPago === 'Yape') return { efec: 0, tarj: 0, yape: total };
+
+          const suma = efec + tarj + yape;
+          if (Math.abs(suma - total) > 0.01) {
+            if (suma === 0) efec = total;
+            else if (total > suma) efec += (total - suma);
+          }
+          return { efec, tarj, yape };
+        };
+
+        let totalEfectivo = 0;
+        let totalTarjeta = 0;
+        let totalYape = 0;
+
+        ventasFiltradas.forEach(v => {
+          const { efec, tarj, yape } = obtenerMontosVentaFrontend(v);
+          totalEfectivo += efec;
+          totalTarjeta += tarj;
+          totalYape += yape;
+        });
+
         const totalPedidosYa = ventasFiltradas
           .filter(v => v.metodoPago === 'PedidosYa')
           .reduce((s, v) => s + (v.total || 0), 0);

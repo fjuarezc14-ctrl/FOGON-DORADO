@@ -267,12 +267,20 @@ export default function ReportesPage() {
         ['REGISTRO TRIBUTARIO (RCE / RVE) - EL FOGÓN DORADO'],
         [`PERIODO: DESDE ${fechaDesde} HASTA ${fechaHasta}`],
         [],
-        ['TIPO', 'FECHA EMISION', 'COMPROBANTE', 'NUM DOCUMENTO', 'CLIENTE / PROVEEDOR', 'METODO PAGO', 'BASE IMPONIBLE (S/)', 'IGV (S/)', 'TOTAL (S/)']
+        ['TIPO', 'FECHA EMISION', 'COMPROBANTE', 'NUM DOCUMENTO', 'CLIENTE / PROVEEDOR', 'METODO PAGO', 'BASE IMPONIBLE (S/)', 'IGV (S/)', 'TOTAL (S/)', 'EFECTIVO (S/)', 'TARJETA (S/)', 'YAPE (S/)']
       ];
 
       // Insertar Ventas
       ventasData.forEach(v => {
         const date = v.createdAt ? v.createdAt.split('T')[0] : '';
+        let efec = v.montoEfectivo || (v.metodoPago === 'Efectivo' ? v.total : 0);
+        let tarj = v.montoTarjeta || (v.metodoPago === 'Tarjeta' ? v.total : 0);
+        let yape = v.montoYape || (v.metodoPago === 'Yape' ? v.total : 0);
+        
+        if (v.metodoPago === 'Mixto' && (efec + tarj + yape) < v.total) {
+          efec += (v.total - (efec + tarj + yape));
+        }
+
         rows.push([
           'VENTA',
           date,
@@ -282,7 +290,10 @@ export default function ReportesPage() {
           v.metodoPago,
           v.subtotal.toFixed(2),
           v.igv.toFixed(2),
-          v.total.toFixed(2)
+          v.total.toFixed(2),
+          efec.toFixed(2),
+          tarj.toFixed(2),
+          yape.toFixed(2)
         ]);
       });
 
@@ -298,7 +309,10 @@ export default function ReportesPage() {
           'Efectivo/Transferencia',
           c.baseImponible.toFixed(2),
           c.igv.toFixed(2),
-          c.total.toFixed(2)
+          c.total.toFixed(2),
+          '0.00',
+          '0.00',
+          '0.00'
         ]);
       });
 
@@ -522,6 +536,41 @@ export default function ReportesPage() {
               </div>
             </div>
           </div>
+
+          {/* DESGLOSE DE RECAUDACIÓN EN CAJA */}
+          {resumen.desgloseCaja && (
+            <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-5 mb-8 shadow-sm">
+              <h3 className="font-black text-slate-800 uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-emerald-600" /> Desglose de Recaudación en Caja (Periodo Seleccionado)
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3 text-center">
+                  <span className="text-[10px] font-black uppercase text-emerald-800">💵 Efectivo Total</span>
+                  <p className="text-lg font-mono font-black text-emerald-700 mt-0.5">S/ {resumen.desgloseCaja.efectivo.toFixed(2)}</p>
+                </div>
+                <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-3 text-center">
+                  <span className="text-[10px] font-black uppercase text-blue-800">💳 Tarjeta / POS</span>
+                  <p className="text-lg font-mono font-black text-blue-700 mt-0.5">S/ {resumen.desgloseCaja.tarjeta.toFixed(2)}</p>
+                </div>
+                <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-3 text-center">
+                  <span className="text-[10px] font-black uppercase text-purple-800">📱 Yape / Plin</span>
+                  <p className="text-lg font-mono font-black text-purple-700 mt-0.5">S/ {resumen.desgloseCaja.yape.toFixed(2)}</p>
+                </div>
+                <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-3 text-center">
+                  <span className="text-[10px] font-black uppercase text-indigo-800">🛵 PedidosYa</span>
+                  <p className="text-lg font-mono font-black text-indigo-700 mt-0.5">S/ {resumen.desgloseCaja.pedidosYa.toFixed(2)}</p>
+                </div>
+                <div className="bg-violet-50/70 border border-violet-200/80 rounded-2xl p-3 text-center">
+                  <span className="text-[10px] font-black uppercase text-violet-800">👤 Consumos Pers.</span>
+                  <p className="text-lg font-mono font-black text-violet-700 mt-0.5">S/ {resumen.desgloseCaja.consumos.toFixed(2)}</p>
+                </div>
+                <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 text-center">
+                  <span className="text-[10px] font-black uppercase text-amber-800">🎁 Cortesías</span>
+                  <p className="text-lg font-mono font-black text-amber-700 mt-0.5">S/ {resumen.desgloseCaja.cortesias.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* HISTORIAL Y AUDITORÍA DE COMPROBANTES EMITIDOS */}
           <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
