@@ -3291,11 +3291,11 @@ app.get('/api/reportes/cancelaciones', async (req, res) => {
       where: { 
         OR: [
           { estado: 'Cancelado' },
-          { venta: { anulado: true } }
+          { Venta: { anulado: true } }
         ],
         createdAt: filtroFecha 
       },
-      include: { items: true, mesa: true, venta: true },
+      include: { items: true, mesa: true, Venta: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -3307,9 +3307,9 @@ app.get('/api/reportes/cancelaciones', async (req, res) => {
       fecha: (p.canceladoEn || p.updatedAt || p.createdAt)?.toLocaleDateString('es-PE'),
       mesa: p.mesa?.numero || null,
       codigoPedidosYa: p.codigoPedidosYa,
-      canceladoPor: p.canceladoPor || p.venta?.anuladoPor || 'Admin',
-      motivoCancela: p.motivoCancela || p.venta?.motivoAnulacion || 'Devolución en Caja',
-      total: p.venta?.montoOriginal || p.total,
+      canceladoPor: p.canceladoPor || p.Venta?.anuladoPor || 'Admin',
+      motivoCancela: p.motivoCancela || p.Venta?.motivoAnulacion || 'Devolución en Caja',
+      total: p.Venta?.montoOriginal || p.total,
       resumenItems: p.items.map(i => `${i.cantidad}x ${i.nombre}`).join(', '),
     }));
 
