@@ -132,6 +132,14 @@ export const api = {
     if (params.length > 0) url += `?${params.join('&')}`;
     return fetch(url).then(r => r.json());
   },
+  getReportePollos: (desde = null, hasta = null) => {
+    let url = `${API_BASE}/api/reportes/pollos`;
+    const params = [];
+    if (desde) params.push(`desde=${desde}`);
+    if (hasta) params.push(`hasta=${hasta}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return fetch(url).then(r => r.json());
+  },
 
   // Consulta DNI/RUC segura
   consultarCliente: (doc) => fetch(`${API_BASE}/api/clientes/consulta/${doc}`).then(r => r.json()),
@@ -166,4 +174,19 @@ export const api = {
   anularVenta: (ventaId, pin, motivo) => fetch(`${API_BASE}/api/ventas/${ventaId}/anular`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin, motivo }),
   }).then(r => r.json()),
+
+  // === MÓDULO DE CRÉDITOS ===
+  getClientes: () => fetch(`${API_BASE}/api/clientes`).then(r => r.json()),
+  crearCliente: (body) => fetch(`${API_BASE}/api/clientes`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  editarCliente: (id, body) => fetch(`${API_BASE}/api/clientes/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  eliminarCliente: (id) => fetch(`${API_BASE}/api/clientes/${id}`, { method: 'DELETE' }).then(r => r.json()),
+  getClienteDetalle: (id) => fetch(`${API_BASE}/api/clientes/${id}`).then(r => r.json()),
+  abonarCredito: (id, body) => fetch(`${API_BASE}/api/clientes/${id}/abonar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then(r => r.json()),
+  getVentasCredito: () => fetch(`${API_BASE}/api/clientes/ventas/credito`).then(r => r.json()),
 };

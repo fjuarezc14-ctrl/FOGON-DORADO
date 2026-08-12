@@ -34,7 +34,7 @@ function obtenerMontosVenta(v) {
   if (!v || v.anulado || v.pedido?.estado === 'Cancelado') {
     return { efec: 0, tarj: 0, yape: 0 };
   }
-  if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa') {
+  if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa' || v.metodoPago === 'Crédito') {
     return { efec: 0, tarj: 0, yape: 0 };
   }
 
@@ -465,6 +465,214 @@ app.get('/api/status', (req, res) => {
     modoDemo,
     apisunatActivo: !modoDemo
   });
+});
+
+// ============================================================
+// CLIENTES CON CRÉDITO (MÓDULO DE CRÉDITOS)
+// ============================================================
+
+// GET /api/clientes → Listar todos los clientes con crédito
+app.get('/api/clientes', async (req, res) => {
+  try {
+    const clientes = await prisma.cliente.findMany({
+      where: { activo: true },
+      orderBy: { nombre: 'asc' },
+      include: { AbonosCredito: { orderBy: { creadoEn: 'desc' } } },
+    });
+
+    // Calcular saldo de cada cliente: total de ventas a crédito - abonos
+    const formateados = clientes.map(c => {
+      const totalAbonado = c.AbonosCredito.reduce((s, a) => s + a.monto, 0);
+      return {
+        id: c.id,
+        nombre: c.nombre,
+        tipoDoc: c.tipoDoc,
+        numDoc: c.numDoc,
+        telefono: c.telefono,
+        direccion: c.direccion,
+        esTrabajador: c.esTrabajador,
+        usuarioId: c.usuarioId,
+        activo: c.activo,
+        totalAbonado,
+        abonos: c.AbonosCredito,
+      };
+    });
+
+    res.json(formateados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/clientes → Crear un nuevo cliente
+app.post('/api/clientes', async (req, res) => {
+  try {
+    const { nombre, tipoDoc, numDoc, telefono, direccion, esTrabajador, usuarioId } = req.body;
+    if (!nombre) {
+      return res.status(400).json({ error: 'El nombre del cliente es obligatorio.' });
+    }
+    const cliente = await prisma.cliente.create({
+      data: {
+        nombre: String(nombre),
+        tipoDoc: tipoDoc ? String(tipoDoc) : 'DNI',
+        numDoc: numDoc ? String(numDoc) : null,
+        telefono: telefono ? String(telefono) : null,
+        direccion: direccion ? String(direccion) : null,
+        esTrabajador: Boolean(esTrabajador),
+        usuarioId: usuarioId ? parseInt(usuarioId) : null,
+      },
+    });
+    res.json(cliente);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/clientes/:id → Editar un cliente
+app.put('/api/clientes/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const data = {};
+    if (req.body.nombre !== undefined) data.nombre = String(req.body.nombre);
+    if (req.body.tipoDoc !== undefined) data.tipoDoc = String(req.body.tipoDoc);
+    if (req.body.numDoc !== undefined) data.numDoc = req.body.numDoc ? String(req.body.numDoc) : null;
+    if (req.body.telefono !== undefined) data.telefono = req.body.telefono ? String(req.body.telefono) : null;
+    if (req.body.direccion !== undefined) data.direccion = req.body.direccion ? String(req.body.direccion) : null;
+    if (req.body.esTrabajador !== undefined) data.esTrabajador = Boolean(req.body.esTrabajador);
+    if (req.body.usuarioId !== undefined) data.usuarioId = req.body.usuarioId ? parseInt(req.body.usuarioId) : null;
+    if (req.body.activo !== undefined) data.activo = Boolean(req.body.activo);
+
+    const cliente = await prisma.cliente.update({ where: { id }, data });
+    res.json(cliente);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/clientes/:id → Desactivar un cliente
+app.delete('/api/clientes/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await prisma.cliente.update({ where: { id }, data: { activo: false } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/clientes/:id → Ver detalle de cuenta corriente de un cliente
+app.get('/api/clientes/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const cliente = await prisma.cliente.findUnique({
+      where: { id },
+      include: { AbonosCredito: { orderBy: { creadoEn: 'desc' } } },
+    });
+    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado.' });
+
+    // Buscar todas las ventas a crédito de este cliente
+    const ventasCredito = await prisma.venta.findMany({
+      where: { clienteCreditoId: id, anulado: false },
+      include: { pedido: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const totalConsumido = ventasCredito.reduce((s, v) => s + (v.montoCredito || v.total), 0);
+    const totalAbonado = cliente.AbonosCredito.reduce((s, a) => s + a.monto, 0);
+    const saldo = totalConsumido - totalAbonado;
+
+    res.json({
+      ...cliente,
+      totalConsumido,
+      totalAbonado,
+      saldo,
+      ventasCredito: ventasCredito.map(v => ({
+        id: v.id,
+        fecha: v.createdAt.toISOString(),
+        total: v.total,
+        montoCredito: v.montoCredito || 0,
+        estado: v.pedido?.estado || 'Pagado',
+        tipoComprobante: v.tipoComprobante,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/clientes/:id/abonar → Registrar un abono al crédito
+app.post('/api/clientes/:id/abonar', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { monto, metodoPago, montoEfectivo, montoTarjeta, montoYape, registradoPor, nota } = req.body;
+
+    if (!monto || parseFloat(monto) <= 0) {
+      return res.status(400).json({ error: 'El monto del abono debe ser mayor a 0.' });
+    }
+
+    const cliente = await prisma.cliente.findUnique({ where: { id } });
+    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado.' });
+
+    const finalMetodo = metodoPago || 'Efectivo';
+    let finalEfectivo = 0, finalTarjeta = 0, finalYape = 0;
+    const montoNum = parseFloat(monto);
+
+    if (finalMetodo === 'Mixto') {
+      finalEfectivo = parseFloat(montoEfectivo || 0);
+      finalTarjeta = parseFloat(montoTarjeta || 0);
+      finalYape = parseFloat(montoYape || 0);
+    } else if (finalMetodo === 'Efectivo') {
+      finalEfectivo = montoNum;
+    } else if (finalMetodo === 'Tarjeta') {
+      finalTarjeta = montoNum;
+    } else if (finalMetodo === 'Yape') {
+      finalYape = montoNum;
+    }
+
+    const abono = await prisma.abonoCredito.create({
+      data: {
+        clienteId: id,
+        monto: montoNum,
+        metodoPago: finalMetodo,
+        montoEfectivo: finalEfectivo,
+        montoTarjeta: finalTarjeta,
+        montoYape: finalYape,
+        registradoPor: registradoPor ? String(registradoPor) : 'Cajero',
+        nota: nota ? String(nota) : null,
+      },
+    });
+
+    res.json({ ok: true, abono });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/clientes/ventas/credito → Historial de ventas a crédito (para reportes)
+app.get('/api/clientes/ventas/credito', async (req, res) => {
+  try {
+    const ventas = await prisma.venta.findMany({
+      where: { clienteCreditoId: { not: null }, anulado: false },
+      include: {
+        pedido: { include: { mesa: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formateadas = ventas.map(v => ({
+      id: v.id,
+      clienteId: v.clienteCreditoId,
+      total: v.total,
+      montoCredito: v.montoCredito || 0,
+      nombreCliente: v.nombreCliente,
+      fecha: v.createdAt.toISOString(),
+      mesaNum: v.pedido?.mesa?.numero || null,
+    }));
+
+    res.json(formateadas);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ============================================================
@@ -1501,7 +1709,9 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     telefono,
     montoEfectivo,
     montoTarjeta,
-    montoYape
+    montoYape,
+    descuentoPorcentaje,
+    descuentoDescripcion
   } = req.body;
 
   try {
@@ -1512,10 +1722,15 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     const itemsTotal = parseFloat(total);
     const finalMetodoPago = metodoPago || (tipoDelivery === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
     
-    let grandTotal = itemsTotal + shippingFee;
+    // Aplicar descuento porcentual al subtotal de items
+    const descPct = parseFloat(descuentoPorcentaje || 0);
+    const descuentoMonto = descPct > 0 ? parseFloat((itemsTotal * (descPct / 100)).toFixed(2)) : 0;
+    const totalConDescuento = Math.max(0, itemsTotal - descuentoMonto);
+    let grandTotal = totalConDescuento + shippingFee;
     if (finalMetodoPago === 'Cortesía') {
       grandTotal = 0.00;
     }
+    const descuentoFinal = descPct > 0 ? descuentoMonto : 0;
 
     const expandedItems = await expandPedidoItemsForDb(items);
     const finalEstadoEnsalada = await evaluarEstadoEnsalada(items);
@@ -2641,6 +2856,8 @@ app.post('/api/ventas', async (req, res) => {
     montoEfectivo,
     montoTarjeta,
     montoYape,
+    montoCredito,
+    clienteCreditoId,
     cortesiaItemIds
   } = req.body;
   const idsAPagar = pedidoIds || [pedidoId];
@@ -2696,17 +2913,22 @@ app.post('/api/ventas', async (req, res) => {
       let finalMontoEfectivo = 0;
       let finalMontoTarjeta = 0;
       let finalMontoYape = 0;
+      let finalMontoCredito = 0;
 
       if (metodoPago === 'Mixto') {
+        // Mixto ahora puede incluir crédito como componente
         finalMontoEfectivo = parseFloat(montoEfectivo || 0);
         finalMontoTarjeta = parseFloat(montoTarjeta || 0);
         finalMontoYape = parseFloat(montoYape || 0);
+        finalMontoCredito = parseFloat(montoCredito || 0);
       } else if (metodoPago === 'Efectivo') {
         finalMontoEfectivo = finalTotal;
       } else if (metodoPago === 'Tarjeta') {
         finalMontoTarjeta = finalTotal;
       } else if (metodoPago === 'Yape') {
         finalMontoYape = finalTotal;
+      } else if (metodoPago === 'Crédito') {
+        finalMontoCredito = finalTotal;
       }
 
       // Calcular correlativo para apisunat.pe si es Boleta o Factura
@@ -2739,6 +2961,8 @@ app.post('/api/ventas', async (req, res) => {
           montoEfectivo: finalMontoEfectivo,
           montoTarjeta: finalMontoTarjeta,
           montoYape: finalMontoYape,
+          montoCredito: finalMontoCredito,
+          clienteCreditoId: clienteCreditoId ? parseInt(clienteCreditoId) : null,
           estadoNubefact: initEstadoSunat,
           estadoSunat: initEstadoSunat,
           serie,
@@ -3225,7 +3449,7 @@ app.post('/api/compras/sincronizar-sunat', async (req, res) => {
 
 app.post('/api/compras', async (req, res) => {
   try {
-    const { proveedor, ruc, tipoDocumento, serieNumero, baseImponible, igv, total, xmlData, origenCarga, categoria, fechaEmision } = req.body;
+    const { proveedor, ruc, tipoDocumento, serieNumero, baseImponible, igv, total, xmlData, origenCarga, categoria, fechaEmision, metodoPago } = req.body;
     const compra = await prisma.compra.create({
       data: {
         proveedor: String(proveedor),
@@ -3239,6 +3463,7 @@ app.post('/api/compras', async (req, res) => {
         origenCarga: origenCarga ? String(origenCarga) : 'manual',
         categoria: categoria ? String(categoria) : null,
         fechaEmision: fechaEmision ? new Date(fechaEmision) : null,
+        metodoPago: metodoPago ? String(metodoPago) : 'Efectivo',
       }
     });
     res.json(compra);
@@ -3427,6 +3652,128 @@ app.get('/api/reportes/contable', async (req, res) => {
         consumos: ventas.filter(v => v.metodoPago === 'Consumo').reduce((s, v) => s + (v.descuentoAplicado || v.total), 0),
         cortesias: ventas.filter(v => v.metodoPago === 'Cortesía').reduce((s, v) => s + (v.descuentoAplicado || v.total), 0),
       }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/reportes/pollos → Reporte de pollos vendidos e inventario con conversión fraccionada
+app.get('/api/reportes/pollos', async (req, res) => {
+  const { desde, hasta } = req.query;
+  try {
+    let filtroFecha = {};
+    if (desde && hasta) {
+      const gteDate = desde.length === 10 ? new Date(desde + 'T03:00:00.000-05:00') : new Date(desde);
+      const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      const lteDate = hasta.length === 10 ? new Date(nextDayStr + 'T02:59:59.999-05:00') : new Date(hasta);
+      filtroFecha = { gte: gteDate, lte: lteDate };
+    } else {
+      const ahora = new Date();
+      const hoyPeru = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+      if (hoyPeru.getHours() < 3) {
+        hoyPeru.setDate(hoyPeru.getDate() - 1);
+      }
+      hoyPeru.setHours(3, 0, 0, 0);
+      const inicioUTC = new Date(hoyPeru.getTime() + 5 * 60 * 60 * 1000);
+      filtroFecha = { gte: inicioUTC };
+    }
+
+    // Obtener TODOS los pedidos cobrados (incluyendo items con precio 0 que son componentes de combos)
+    const pedidos = await prisma.pedido.findMany({
+      where: {
+        estado: 'Cobrado',
+        createdAt: filtroFecha
+      },
+      include: {
+        items: {
+          include: { producto: true }
+        }
+      }
+    });
+
+    // Tabla de conversión de fracciones de pollo a unidades enteras
+    const FRACCIONES = {
+      '1/8': 0.125,
+      '1/4': 0.25,
+      '1/2': 0.5,
+      '1': 1.0,
+    };
+
+    // Determinar la fracción de un item basado en nombre o categoría
+    const obtenerFraccion = (nombre, categoria) => {
+      const n = (nombre || '').toLowerCase();
+      // Verificar si es un producto de pollo (nombre contiene pollo o categoría es pollos)
+      const esPollo = n.includes('pollo') || (categoria || '').includes('Pollos') || ['Pollos a la Brasa', 'Piqueo', 'Parrillada Mixta', 'Piqueo Fogón Dorado'].some(c => (categoria || '').includes(c));
+      if (!esPollo) return 0;
+      
+      // Detectar fracción en el nombre
+      if (n.includes('1/8') || n.includes('octavo')) return FRACCIONES['1/8'];
+      if (n.includes('1/4') || n.includes('cuarto')) return FRACCIONES['1/4'];
+      if (n.includes('1/2') || n.includes('medio')) return FRACCIONES['1/2'];
+      if (n.includes('1 pollo') || n.startsWith('1 pollo') || n.includes('pollo entero') || n.includes('un pollo')) return FRACCIONES['1'];
+      
+      // Fallback: si tiene "pollo" pero no fracción específica, asumir 1 entero
+      return n.includes('pollo') ? FRACCIONES['1'] : 0;
+    };
+
+    // Acumulación por producto
+    const productos = {};
+    let totalOctavos = 0, totalCuartos = 0, totalMedios = 0, totalEnteros = 0;
+    let unidadesTotales = 0;
+    let ventasConPollo = 0;
+
+    for (const p of pedidos) {
+      for (const item of p.items) {
+        const fraccion = obtenerFraccion(item.nombre, item.producto?.categoria);
+        if (fraccion > 0) {
+          const prodId = item.productoId;
+          if (!productos[prodId]) {
+            productos[prodId] = {
+              id: prodId,
+              nombre: item.nombre,
+              categoria: item.producto?.categoria || 'Sin categoría',
+              cantidadVendida: 0,
+              unidadesEquivalentes: 0,
+              stockActual: item.producto?.stock || 0,
+            };
+          }
+          const unidades = fraccion * item.cantidad;
+          productos[prodId].cantidadVendida += item.cantidad;
+          productos[prodId].unidadesEquivalentes += unidades;
+          unidadesTotales += unidades;
+          ventasConPollo++;
+
+          if (fraccion === FRACCIONES['1/8']) totalOctavos += item.cantidad;
+          else if (fraccion === FRACCIONES['1/4']) totalCuartos += item.cantidad;
+          else if (fraccion === FRACCIONES['1/2']) totalMedios += item.cantidad;
+          else if (fraccion === FRACCIONES['1']) totalEnteros += item.cantidad;
+        }
+      }
+    }
+
+    // Calcular total de pollos vendidos con la fórmula: Σ (Octavos × 0.125 + Cuartos × 0.25 + Medios × 0.50 + Enteros × 1.0)
+    const totalFormula = (totalOctavos * FRACCIONES['1/8']) + (totalCuartos * FRACCIONES['1/4']) + (totalMedios * FRACCIONES['1/2']) + (totalEnteros * FRACCIONES['1']);
+    
+    // Stock inicial configurable: usar el mayor stock de los productos de pollo registrado, o 0 si no hay
+    const productosPollo = await prisma.producto.findMany({
+      where: { categoria: { in: ['Pollos a la Brasa', 'Piqueo', 'Piqueos'] } }
+    });
+    const stockInicial = productosPollo.reduce((max, p) => Math.max(max, p.stock || 0), 50) || 50; // Default 50 si no hay stock
+    const porcentajeRotacion = stockInicial > 0 ? parseFloat(((totalFormula / stockInicial) * 100).toFixed(1)) : 0;
+
+    res.json({
+      totalOctavos,
+      totalCuartos,
+      totalMedios,
+      totalEnteros,
+      totalVentasConPollo: ventasConPollo,
+      totalUnidadesEquivalentes: parseFloat(totalFormula.toFixed(2)),
+      stockInicial,
+      porcentajeRotacion,
+      detalles: Object.values(productos).sort((a, b) => b.unidadesEquivalentes - a.unidadesEquivalentes),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

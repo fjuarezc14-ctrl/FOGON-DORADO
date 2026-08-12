@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, LogOut, Lock, Salad } from 'lucide-react';
+import { UtensilsCrossed, LayoutDashboard, LayoutGrid, ChefHat, GlassWater, Calculator, PieChart, BookOpen, UsersRound, Menu, X, ChevronRight, LogOut, Lock, Salad, Wallet } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import logoUrl from './assets/logo.jpg';
 import { api } from './api';
@@ -13,6 +13,7 @@ import ReportesPage from './pages/ReportesPage';
 import CartaPage from './pages/CartaPage';
 import UsuariosPage from './pages/UsuariosPage';
 import EnsaladasPage from './pages/EnsaladasPage';
+import CreditosPage from './pages/CreditosPage';
 
 // === PROTECTED ROUTE NAVIGATION GUARD ===
 const ProtectedRoute = ({ children, permission, currentUser }) => {
@@ -160,6 +161,7 @@ const Sidebar = ({ isOpen, toggleSidebar, currentUser, onLogout }) => {
     { path: '/barra', icon: GlassWater, label: 'Barra / Bebidas', permission: 'Barra' },
     { path: '/ensaladas', icon: Salad, label: 'Ensaladas / Fríos', permission: 'Ensaladas' },
     { path: '/caja', icon: Calculator, label: 'Caja / Cobros', permission: 'Caja' },
+    { path: '/creditos', icon: Wallet, label: 'Créditos / Clientes', permission: 'Caja' },
     { path: '/compras', icon: BookOpen, label: 'Compras / Gastos', permission: 'Caja' },
     { path: '/reportes', icon: PieChart, label: 'Reportes (Contador)', permission: 'Reportes' },
     { path: '/carta', icon: BookOpen, label: 'Carta e Inventario', permission: 'Dashboard' },
@@ -337,6 +339,7 @@ function App() {
         <Route path="/barra" element={<Layout title="Monitor de Barra" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Barra" currentUser={currentUser}><BarraPage /></ProtectedRoute></Layout>} />
         <Route path="/ensaladas" element={<Layout title="Monitor de Ensaladas" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Ensaladas" currentUser={currentUser}><EnsaladasPage /></ProtectedRoute></Layout>} />
         <Route path="/caja" element={<Layout title="Punto de Cobro" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Caja" currentUser={currentUser}><CajaPage currentUser={currentUser} /></ProtectedRoute></Layout>} />
+        <Route path="/creditos" element={<Layout title="Módulo de Créditos" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Caja" currentUser={currentUser}><CreditosPage currentUser={currentUser} /></ProtectedRoute></Layout>} />
         <Route path="/compras" element={<Layout title="Registro de Compras" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Caja" currentUser={currentUser}><ComprasPage currentUser={currentUser} /></ProtectedRoute></Layout>} />
         <Route path="/reportes" element={<Layout title="Panel Contable" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Reportes" currentUser={currentUser}><ReportesPage /></ProtectedRoute></Layout>} />
         <Route path="/carta" element={<Layout title="Carta e Inventario" currentUser={currentUser} onLogout={handleLogout}><ProtectedRoute permission="Dashboard" currentUser={currentUser}><CartaPage currentUser={currentUser} /></ProtectedRoute></Layout>} />
