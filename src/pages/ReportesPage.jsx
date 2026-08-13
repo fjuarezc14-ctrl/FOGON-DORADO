@@ -792,18 +792,49 @@ export default function ReportesPage() {
               <p className="text-[10px] text-slate-400 mt-0.5">Productos vendidos ordenados por cantidad. Incluye cálculo de equivalencias en pollos enteros.</p>
             </div>
             {(() => {
-              const calculateChickenTotal = () => {
-                let total = 0;
-                rotacion.forEach(item => {
-                  const equiv = getChickenEquivalency(item.nombre);
-                  total += item.cantidad * equiv;
-                });
-                return total;
-              };
+              // Calcular desde datos de rotación (frontend)
+              let totalEq = 0, enteros = 0, medios = 0, cuartos = 0, octavos = 0;
+              rotacion.forEach(item => {
+                const equiv = getChickenEquivalency(item.nombre);
+                const parcial = equiv * item.cantidad;
+                totalEq += parcial;
+                if (equiv === 1.0)   enteros += item.cantidad;
+                if (equiv === 0.5)   medios  += item.cantidad;
+                if (equiv === 0.25)  cuartos += item.cantidad;
+                if (equiv === 0.125) octavos += item.cantidad;
+              });
+              // Preferir datos del backend si están disponibles
+              if (reportePollos) {
+                enteros = reportePollos.totalEnteros;
+                medios  = reportePollos.totalMedios;
+                cuartos = reportePollos.totalCuartos;
+                octavos = reportePollos.totalOctavos;
+                totalEq = reportePollos.totalUnidadesEquivalentes;
+              }
+              const pollosEnterosFinal = Math.floor(totalEq);
+              const fraccionDecimal   = +(totalEq - pollosEnterosFinal).toFixed(3);
+              const fraccionLabel = fraccionDecimal === 0 ? ''
+                : fraccionDecimal >= 0.875 ? ' + 7/8'
+                : fraccionDecimal >= 0.750 ? ' + 3/4'
+                : fraccionDecimal >= 0.625 ? ' + 5/8'
+                : fraccionDecimal >= 0.500 ? ' + 1/2'
+                : fraccionDecimal >= 0.375 ? ' + 3/8'
+                : fraccionDecimal >= 0.250 ? ' + 1/4'
+                : ' + 1/8';
               return (
-                <span className="bg-amber-100 text-amber-900 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider">
-                  Total Pollos Enteros: {reportePollos ? reportePollos.totalUnidadesEquivalentes.toFixed(2) : calculateChickenTotal().toFixed(2)}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="bg-amber-100 text-amber-900 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+                    🍗 Total: {pollosEnterosFinal}{fraccionLabel} entero{pollosEnterosFinal !== 1 ? 's' : ''} ({totalEq.toFixed(2)} eq.)
+                  </span>
+                  {(enteros > 0 || medios > 0 || cuartos > 0 || octavos > 0) && (
+                    <span className="text-[10px] text-amber-700 font-bold">
+                      {enteros > 0 ? `${enteros} entero${enteros !== 1 ? 's' : ''} · ` : ''}
+                      {medios > 0  ? `${medios} ½ · ` : ''}
+                      {cuartos > 0 ? `${cuartos} ¼ · ` : ''}
+                      {octavos > 0 ? `${octavos} ⅛` : ''}
+                    </span>
+                  )}
+                </div>
               );
             })()}
           </div>
@@ -1597,13 +1628,43 @@ export default function ReportesPage() {
                       <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Consumo Total de Pollos</p>
                       <p className="text-xl font-black font-mono text-amber-800 mt-1 font-sans">
                         {(() => {
-                          let total = 0;
-                          rotacion.forEach(item => {
-                            const equiv = getChickenEquivalency(item.nombre);
-                            total += item.cantidad * equiv;
-                          });
-                          return total.toFixed(2);
-                        })()} <span className="text-xs font-black">Und.</span>
+                          let totalEq = 0, enteros = 0, medios = 0, cuartos = 0, octavos = 0;
+                          if (reportePollos) {
+                            totalEq = reportePollos.totalUnidadesEquivalentes;
+                            enteros = reportePollos.totalEnteros;
+                            medios  = reportePollos.totalMedios;
+                            cuartos = reportePollos.totalCuartos;
+                            octavos = reportePollos.totalOctavos;
+                          } else {
+                            rotacion.forEach(item => {
+                              const equiv = getChickenEquivalency(item.nombre);
+                              totalEq += equiv * item.cantidad;
+                              if (equiv === 1.0)   enteros += item.cantidad;
+                              if (equiv === 0.5)   medios  += item.cantidad;
+                              if (equiv === 0.25)  cuartos += item.cantidad;
+                              if (equiv === 0.125) octavos += item.cantidad;
+                            });
+                          }
+                          const pollosEnterosFinal = Math.floor(totalEq);
+                          const fraccionDecimal   = +(totalEq - pollosEnterosFinal).toFixed(3);
+                          const fraccionLabel = fraccionDecimal === 0 ? ''
+                            : fraccionDecimal >= 0.875 ? ' + 7/8'
+                            : fraccionDecimal >= 0.750 ? ' + 3/4'
+                            : fraccionDecimal >= 0.625 ? ' + 5/8'
+                            : fraccionDecimal >= 0.500 ? ' + 1/2'
+                            : fraccionDecimal >= 0.375 ? ' + 3/8'
+                            : fraccionDecimal >= 0.250 ? ' + 1/4'
+                            : ' + 1/8';
+                          return (
+                            <>
+                              {pollosEnterosFinal}{fraccionLabel} <span className="text-xs font-black">ent.</span>
+                              <br/>
+                              <span className="text-[10px] font-bold text-amber-700">
+                                {[enteros > 0 ? `${enteros} entero${enteros!==1?'s':''}` : null, medios > 0 ? `${medios} ½` : null, cuartos > 0 ? `${cuartos} ¼` : null, octavos > 0 ? `${octavos} ⅛` : null].filter(Boolean).join(' · ')}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </p>
                       <p className="text-[9px] text-amber-700/80 mt-2 leading-tight">Consolidado de equivalencias de pollo a la brasa vendido.</p>
                     </div>

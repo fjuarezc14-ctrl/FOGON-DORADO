@@ -48,6 +48,7 @@ export default function ComprasPage() {
     proveedor: '', ruc: '', tipoDocumento: 'Factura', serieNumero: '',
     baseImponible: '', igv: '', total: '', categoria: '', fechaEmision: '',
     metodoPago: 'Efectivo',
+    montoEfectivoMixto: '', montoTarjetaMixto: '', montoCreditoMixto: '',
   });
 
   const [apiStatus, setApiStatus] = useState({ modoDemo: true, apisunatActivo: false });
@@ -113,10 +114,14 @@ export default function ComprasPage() {
         categoria: formCompra.categoria || null,
         fechaEmision: formCompra.fechaEmision || null,
         metodoPago: formCompra.metodoPago || 'Efectivo',
+        montoEfectivo:  formCompra.metodoPago === 'Mixto' ? (parseFloat(formCompra.montoEfectivoMixto) || 0) : null,
+        montoTarjeta:   formCompra.metodoPago === 'Mixto' ? (parseFloat(formCompra.montoTarjetaMixto)  || 0) : null,
+        montoCredito:   formCompra.metodoPago === 'Mixto' ? (parseFloat(formCompra.montoCreditoMixto)  || 0) :
+                        formCompra.metodoPago === 'Crédito' ? parseFloat(formCompra.total) : null,
       });
       await fetchTodo();
       setModalManual(false);
-      setFormCompra({ proveedor: '', ruc: '', tipoDocumento: 'Factura', serieNumero: '', baseImponible: '', igv: '', total: '', categoria: '', fechaEmision: '', metodoPago: 'Efectivo' });
+      setFormCompra({ proveedor: '', ruc: '', tipoDocumento: 'Factura', serieNumero: '', baseImponible: '', igv: '', total: '', categoria: '', fechaEmision: '', metodoPago: 'Efectivo', montoEfectivoMixto: '', montoTarjetaMixto: '', montoCreditoMixto: '' });
       showToast('✅ Compra registrada correctamente.');
     } catch (err) {
       showToast('❌ Error al guardar: ' + err.message, 'error');
@@ -606,6 +611,61 @@ export default function ComprasPage() {
                     <option value="Mixto">🔄 Mixto</option>
                   </select>
                 </div>
+
+                {/* Desglose Mixto */}
+                {formCompra.metodoPago === 'Mixto' && (() => {
+                  const total = parseFloat(formCompra.total) || 0;
+                  const efec = parseFloat(formCompra.montoEfectivoMixto) || 0;
+                  const tarj = parseFloat(formCompra.montoTarjetaMixto) || 0;
+                  const cred = parseFloat(formCompra.montoCreditoMixto) || 0;
+                  const sumado = efec + tarj + cred;
+                  const diferencia = total - sumado;
+                  return (
+                    <div className="col-span-2 bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
+                      <p className="text-xs font-black text-blue-700 uppercase tracking-wide">Desglose Pago Mixto</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">💵 Efectivo</label>
+                          <input type="number" min="0" step="0.01"
+                            value={formCompra.montoEfectivoMixto}
+                            onChange={e => setFormCompra(f => ({ ...f, montoEfectivoMixto: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-400 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">💳 Tarjeta</label>
+                          <input type="number" min="0" step="0.01"
+                            value={formCompra.montoTarjetaMixto}
+                            onChange={e => setFormCompra(f => ({ ...f, montoTarjetaMixto: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-400 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">📋 Crédito</label>
+                          <input type="number" min="0" step="0.01"
+                            value={formCompra.montoCreditoMixto}
+                            onChange={e => setFormCompra(f => ({ ...f, montoCreditoMixto: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-400 bg-white"
+                          />
+                        </div>
+                      </div>
+                      <div className={`flex items-center justify-between text-xs font-black px-3 py-2 rounded-xl ${
+                        Math.abs(diferencia) < 0.01 ? 'bg-emerald-100 text-emerald-700' :
+                        diferencia > 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        <span>Suma ingresada: S/ {sumado.toFixed(2)}</span>
+                        <span>
+                          {Math.abs(diferencia) < 0.01 ? '✅ Cuadrado' :
+                           diferencia > 0 ? `Falta: S/ ${diferencia.toFixed(2)}` :
+                           `Excede en: S/ ${Math.abs(diferencia).toFixed(2)}`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Descomposición calculada */}
                 <div className="col-span-2 bg-white p-4 rounded-2xl border border-slate-200/60 grid grid-cols-2 gap-4">
