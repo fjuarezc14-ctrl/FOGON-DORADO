@@ -194,14 +194,18 @@ export default function CreditosPage({ currentUser }) {
                 <span className="text-slate-600">{c.telefono || 'Sin teléfono'}</span>
               </div>
 
-              <div className="flex items-center justify-between bg-slate-50 rounded-xl p-3 mb-4">
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-slate-400">Total Abonado</p>
-                  <p className="font-black text-emerald-600">S/ {(c.totalAbonado || 0).toFixed(2)}</p>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">Consumido</p>
+                  <p className="font-black text-sm text-slate-700">S/ {(c.totalConsumido || 0).toFixed(2)}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[10px] uppercase font-bold text-slate-400">Abonos</p>
-                  <p className="font-bold text-slate-700">{c.abonos?.length || 0}</p>
+                <div className="bg-emerald-50 rounded-xl p-2.5 text-center">
+                  <p className="text-[9px] uppercase font-bold text-emerald-500">Abonado</p>
+                  <p className="font-black text-sm text-emerald-600">S/ {(c.totalAbonado || 0).toFixed(2)}</p>
+                </div>
+                <div className={`rounded-xl p-2.5 text-center ${(c.saldo || 0) > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                  <p className={`text-[9px] uppercase font-bold ${(c.saldo || 0) > 0 ? 'text-rose-500' : 'text-slate-400'}`}>Saldo</p>
+                  <p className={`font-black text-sm ${(c.saldo || 0) > 0 ? 'text-rose-600' : 'text-slate-500'}`}>S/ {(c.saldo || 0).toFixed(2)}</p>
                 </div>
               </div>
 
@@ -295,12 +299,23 @@ export default function CreditosPage({ currentUser }) {
       {modalAbono && clienteAbono && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[400] flex items-center justify-center p-4" onClick={() => setModalAbono(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-black text-slate-800 text-lg">Registrar Abono</h2>
                 <p className="text-xs text-slate-500">{clienteAbono.nombre}</p>
               </div>
               <button onClick={() => setModalAbono(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            {/* Banner de saldo deudor */}
+            <div className={`flex items-center justify-between rounded-xl px-4 py-3 mb-4 ${(clienteAbono.saldo || 0) > 0 ? 'bg-rose-50 border border-rose-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+              <div>
+                <p className={`text-[10px] font-black uppercase ${(clienteAbono.saldo || 0) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>Saldo Deudor Actual</p>
+                <p className={`text-2xl font-black font-mono ${(clienteAbono.saldo || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>S/ {(clienteAbono.saldo || 0).toFixed(2)}</p>
+              </div>
+              {(clienteAbono.saldo || 0) > 0
+                ? <span className="text-3xl">⚠️</span>
+                : <span className="text-3xl">✅</span>
+              }
             </div>
 
             <div className="space-y-3">

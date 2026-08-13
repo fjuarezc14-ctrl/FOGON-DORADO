@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, TrendingUp, TrendingDown, DollarSign, XCircle, Users, Truck, Calendar, Search, Receipt, Printer, X, Wallet } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, DollarSign, XCircle, Users, Truck, Calendar, Search, Receipt, Printer, X, Wallet, Briefcase } from 'lucide-react';
+
 import { api } from '../api';
 
 
@@ -549,30 +550,34 @@ export default function ReportesPage() {
               <h3 className="font-black text-slate-800 uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
                 <Wallet className="w-4 h-4 text-emerald-600" /> Desglose de Recaudación en Caja (Periodo Seleccionado)
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3 text-center">
                   <span className="text-[10px] font-black uppercase text-emerald-800">💵 Efectivo Total</span>
-                  <p className="text-lg font-mono font-black text-emerald-700 mt-0.5">S/ {resumen.desgloseCaja.efectivo.toFixed(2)}</p>
+                  <p className="text-lg font-mono font-black text-emerald-700 mt-0.5">S/ {(resumen.desgloseCaja.efectivo ?? 0).toFixed(2)}</p>
                 </div>
                 <div className="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-3 text-center">
                   <span className="text-[10px] font-black uppercase text-blue-800">💳 Tarjeta / POS</span>
-                  <p className="text-lg font-mono font-black text-blue-700 mt-0.5">S/ {resumen.desgloseCaja.tarjeta.toFixed(2)}</p>
+                  <p className="text-lg font-mono font-black text-blue-700 mt-0.5">S/ {(resumen.desgloseCaja.tarjeta ?? 0).toFixed(2)}</p>
                 </div>
                 <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-3 text-center">
                   <span className="text-[10px] font-black uppercase text-purple-800">📱 Yape / Plin</span>
-                  <p className="text-lg font-mono font-black text-purple-700 mt-0.5">S/ {resumen.desgloseCaja.yape.toFixed(2)}</p>
+                  <p className="text-lg font-mono font-black text-purple-700 mt-0.5">S/ {(resumen.desgloseCaja.yape ?? 0).toFixed(2)}</p>
                 </div>
                 <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-3 text-center">
                   <span className="text-[10px] font-black uppercase text-indigo-800">🛵 PedidosYa</span>
-                  <p className="text-lg font-mono font-black text-indigo-700 mt-0.5">S/ {resumen.desgloseCaja.pedidosYa.toFixed(2)}</p>
+                  <p className="text-lg font-mono font-black text-indigo-700 mt-0.5">S/ {(resumen.desgloseCaja.pedidosYa ?? 0).toFixed(2)}</p>
                 </div>
                 <div className="bg-violet-50/70 border border-violet-200/80 rounded-2xl p-3 text-center">
-                  <span className="text-[10px] font-black uppercase text-violet-800">👤 Consumos Pers.</span>
-                  <p className="text-lg font-mono font-black text-violet-700 mt-0.5">S/ {resumen.desgloseCaja.consumos.toFixed(2)}</p>
+                  <span className="text-[10px] font-black uppercase text-violet-800">👤 Consumo Planilla</span>
+                  <p className="text-lg font-mono font-black text-violet-700 mt-0.5">S/ {(resumen.desgloseCaja.consumos ?? resumen.desgloseCaja.consumoPlanilla ?? 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-3 text-center">
+                  <span className="text-[10px] font-black uppercase text-sky-800">🤝 Crédito Comercial</span>
+                  <p className="text-lg font-mono font-black text-sky-700 mt-0.5">S/ {(resumen.desgloseCaja.credito ?? resumen.desgloseCaja.consumoClientes ?? 0).toFixed(2)}</p>
                 </div>
                 <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 text-center">
                   <span className="text-[10px] font-black uppercase text-amber-800">🎁 Cortesías</span>
-                  <p className="text-lg font-mono font-black text-amber-700 mt-0.5">S/ {resumen.desgloseCaja.cortesias.toFixed(2)}</p>
+                  <p className="text-lg font-mono font-black text-amber-700 mt-0.5">S/ {(resumen.desgloseCaja.cortesias ?? 0).toFixed(2)}</p>
                 </div>
               </div>
             </div>
@@ -947,9 +952,16 @@ export default function ReportesPage() {
       {activeTab === 'consumo' && (() => {
         const clienteMap = new Map(clientes.map(c => [c.id, c]));
 
-        // Segmentar ventas con componentes de crédito
-        const listadoPlanilla = ventas.filter(v => v.metodoPago === 'Consumo' || (v.clienteCreditoId !== null && (clienteMap.get(v.clienteCreditoId)?.esTrabajador || false)));
-        const listadoComercial = ventas.filter(v => v.clienteCreditoId !== null && !(clienteMap.get(v.clienteCreditoId)?.esTrabajador || false));
+        // Segmentar ventas con componentes de crédito (defensivo: ignorar clienteCreditoId inválido)
+        const listadoPlanilla = ventas.filter(v =>
+          v.metodoPago === 'Consumo' ||
+          (v.clienteCreditoId != null && (clienteMap.get(v.clienteCreditoId)?.esTrabajador === true))
+        );
+        const listadoComercial = ventas.filter(v =>
+          v.clienteCreditoId != null &&
+          clienteMap.has(v.clienteCreditoId) &&
+          !(clienteMap.get(v.clienteCreditoId)?.esTrabajador || false)
+        );
 
         // Acumulado Planilla por Colaborador
         const planillaPorColaborador = {};

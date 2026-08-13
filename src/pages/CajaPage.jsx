@@ -234,6 +234,10 @@ export default function CajaPage({ currentUser }) {
   const [deliveryMontoCredito, setDeliveryMontoCredito] = useState('');
   const [deliveryClienteCreditoSeleccionado, setDeliveryClienteCreditoSeleccionado] = useState(null);
   const [deliveryDescuentoPorcentaje, setDeliveryDescuentoPorcentaje] = useState('');
+  // Búsqueda de clientes en selectores de crédito
+  const [busquedaClienteCredito, setBusquedaClienteCredito] = useState('');
+  const [busquedaClienteCreditoDelivery, setBusquedaClienteCreditoDelivery] = useState('');
+
 
   // Modal cambiar método de pago
   const [cambioMetodoModal, setCambioMetodoModal] = useState(false);
@@ -2991,23 +2995,47 @@ export default function CajaPage({ currentUser }) {
                       </div>
 
                       {credVal > 0 && (
-                        <div className="bg-white border border-slate-200 rounded-xl p-3">
-                          <label className="block text-slate-500 font-bold mb-1.5 text-[9px] tracking-widest uppercase">Seleccionar Cliente para Crédito:</label>
-                          <select 
-                            value={clienteCreditoSeleccionado?.id || ''} 
+                        <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-widest uppercase">Cliente para Crédito:</label>
+                          <input
+                            type="text"
+                            placeholder="Buscar por nombre o documento..."
+                            value={busquedaClienteCredito}
+                            onChange={e => setBusquedaClienteCredito(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-amber-500"
+                          />
+                          <select
+                            value={clienteCreditoSeleccionado?.id || ''}
                             onChange={(e) => {
                               const client = clientes.find(c => String(c.id) === String(e.target.value));
                               setClienteCreditoSeleccionado(client || null);
                             }}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
+                            size={Math.min(5, clientes.filter(c =>
+                              !busquedaClienteCredito ||
+                              (c.nombre || '').toLowerCase().includes(busquedaClienteCredito.toLowerCase()) ||
+                              (c.numDoc || '').includes(busquedaClienteCredito)
+                            ).length + 1)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
                           >
-                            <option value="">-- Seleccionar Cliente --</option>
-                            {clientes.map(c => (
-                              <option key={c.id} value={c.id}>
-                                {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`}
-                              </option>
-                            ))}
+                            <option value="">-- Seleccionar --</option>
+                            {clientes
+                              .filter(c =>
+                                !busquedaClienteCredito ||
+                                (c.nombre || '').toLowerCase().includes(busquedaClienteCredito.toLowerCase()) ||
+                                (c.numDoc || '').includes(busquedaClienteCredito)
+                              )
+                              .map(c => (
+                                <option key={c.id} value={c.id}>
+                                  {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`} {(c.saldo || 0) > 0 ? `· Debe S/${(c.saldo).toFixed(2)}` : ''}
+                                </option>
+                              ))
+                            }
                           </select>
+                          {clienteCreditoSeleccionado && (
+                            <div className={`text-[10px] font-black px-2 py-1 rounded-lg ${(clienteCreditoSeleccionado.saldo || 0) > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              Saldo actual: S/ {(clienteCreditoSeleccionado.saldo || 0).toFixed(2)}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -3656,23 +3684,47 @@ export default function CajaPage({ currentUser }) {
                           </div>
 
                           {credVal > 0 && (
-                            <div className="bg-white border border-slate-200 rounded-xl p-2.5">
-                              <label className="block text-slate-500 font-bold mb-1 text-[8px] tracking-widest uppercase">Seleccionar Cliente para Crédito:</label>
-                              <select 
-                                value={deliveryClienteCreditoSeleccionado?.id || ''} 
+                            <div className="bg-white border border-slate-200 rounded-xl p-2.5 space-y-1.5">
+                              <label className="block text-slate-500 font-bold mb-1 text-[8px] tracking-widest uppercase">Cliente para Crédito:</label>
+                              <input
+                                type="text"
+                                placeholder="Buscar por nombre o doc..."
+                                value={busquedaClienteCreditoDelivery}
+                                onChange={e => setBusquedaClienteCreditoDelivery(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-amber-500"
+                              />
+                              <select
+                                value={deliveryClienteCreditoSeleccionado?.id || ''}
                                 onChange={(e) => {
                                   const client = clientes.find(c => String(c.id) === String(e.target.value));
                                   setDeliveryClienteCreditoSeleccionado(client || null);
                                 }}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
+                                size={Math.min(4, clientes.filter(c =>
+                                  !busquedaClienteCreditoDelivery ||
+                                  (c.nombre || '').toLowerCase().includes(busquedaClienteCreditoDelivery.toLowerCase()) ||
+                                  (c.numDoc || '').includes(busquedaClienteCreditoDelivery)
+                                ).length + 1)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
                               >
-                                <option value="">-- Seleccionar Cliente --</option>
-                                {clientes.map(c => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`}
-                                  </option>
-                                ))}
+                                <option value="">-- Seleccionar --</option>
+                                {clientes
+                                  .filter(c =>
+                                    !busquedaClienteCreditoDelivery ||
+                                    (c.nombre || '').toLowerCase().includes(busquedaClienteCreditoDelivery.toLowerCase()) ||
+                                    (c.numDoc || '').includes(busquedaClienteCreditoDelivery)
+                                  )
+                                  .map(c => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`} {(c.saldo || 0) > 0 ? `· Debe S/${(c.saldo).toFixed(2)}` : ''}
+                                    </option>
+                                  ))
+                                }
                               </select>
+                              {deliveryClienteCreditoSeleccionado && (
+                                <div className={`text-[10px] font-black px-2 py-1 rounded-lg ${(deliveryClienteCreditoSeleccionado.saldo || 0) > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                  Saldo actual: S/ {(deliveryClienteCreditoSeleccionado.saldo || 0).toFixed(2)}
+                                </div>
+                              )}
                             </div>
                           )}
 

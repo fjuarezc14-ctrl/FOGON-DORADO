@@ -481,9 +481,21 @@ app.get('/api/clientes', async (req, res) => {
       include: { AbonosCredito: { orderBy: { creadoEn: 'desc' } } },
     });
 
-    // Calcular saldo de cada cliente: total de ventas a crédito - abonos
+    // Obtener todas las ventas a crédito agrupadas por clienteCreditoId
+    const ventasCredito = await prisma.venta.findMany({
+      where: { clienteCreditoId: { not: null }, anulado: false },
+      select: { clienteCreditoId: true, montoCredito: true, total: true },
+    });
+    const consumoPorCliente = {};
+    ventasCredito.forEach(v => {
+      const id = v.clienteCreditoId;
+      consumoPorCliente[id] = (consumoPorCliente[id] || 0) + (v.montoCredito || v.total);
+    });
+
     const formateados = clientes.map(c => {
       const totalAbonado = c.AbonosCredito.reduce((s, a) => s + a.monto, 0);
+      const totalConsumido = consumoPorCliente[c.id] || 0;
+      const saldo = Math.max(0, totalConsumido - totalAbonado);
       return {
         id: c.id,
         nombre: c.nombre,
@@ -495,6 +507,8 @@ app.get('/api/clientes', async (req, res) => {
         usuarioId: c.usuarioId,
         activo: c.activo,
         totalAbonado,
+        totalConsumido,
+        saldo,
         abonos: c.AbonosCredito,
       };
     });
@@ -3780,7 +3794,9 @@ app.get('/api/reportes/contable', async (req, res) => {
         tarjeta: totalTarjeta,
         yape: totalYape,
         pedidosYa: ventas.filter(v => v.metodoPago === 'PedidosYa').reduce((s, v) => s + v.total, 0),
+        consumos: consumoPlanilla,
         consumoPlanilla,
+        credito: consumoClientes,
         consumoClientes,
         cortesias: ventas.filter(v => v.metodoPago === 'Cortesía').reduce((s, v) => s + (v.descuentoAplicado || v.total), 0),
       }
