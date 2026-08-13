@@ -189,4 +189,9 @@ export const api = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(r => r.json()),
   getVentasCredito: () => fetch(`${API_BASE}/api/clientes/ventas/credito`).then(r => r.json()),
+  getAbonos: (desde) => {
+    let url = `${API_BASE}/api/abonos`;
+    if (desde) url += `?desde=${encodeURIComponent(desde)}`;
+    return fetch(url).then(r => r.json());
+  },
 };

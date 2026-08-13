@@ -174,6 +174,7 @@ export default function SalonPage({ currentUser }) {
   // Modal de Autorización PIN
   const [authModal, setAuthModal] = useState({ open: false, pin: '', error: '', callback: null, promptText: '' });
   const [supervisorAprobador, setSupervisorAprobador] = useState(null);
+  const [precuentaMesa, setPrecuentaMesa] = useState(null);
 
   // Estados de Notificación en Tiempo Real
   const prevMesasRef = useRef([]);
@@ -1403,6 +1404,16 @@ export default function SalonPage({ currentUser }) {
                       )}
                     </div>
                   )}
+                  {mesaActual?.pedidoData && (
+                    <button
+                      type="button"
+                      onClick={() => setPrecuentaMesa(mesaActual)}
+                      className="w-full mb-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[10px] md:text-xs tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Receipt className="w-4 h-4" />
+                      Imprimir Precuenta
+                    </button>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2 md:gap-3">
                     {ticketActual.some(i => !i.yaEnviado) ? (
@@ -2133,7 +2144,102 @@ export default function SalonPage({ currentUser }) {
             </div>
           </div>
         </div>
-      )}
+       )}
+
+      {/* MODAL DE PRECUENTA DE MESA (IMPRESIÓN) */}
+      {precuentaMesa && (() => {
+        const items = precuentaMesa.pedidoData?.items || [];
+        const subtotal = items.reduce((s, i) => s + (i.cant * i.precio), 0);
+        const subtotalBase = parseFloat((subtotal / 1.105).toFixed(2));
+        const igv = parseFloat((subtotal - subtotalBase).toFixed(2));
+
+        return (
+          <div id="precuenta-print-container" className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar animate-slide-up relative">
+              <div className="flex justify-between items-center mb-6 shrink-0">
+                <div className="flex items-center gap-2 text-indigo-700">
+                  <Receipt className="w-6 h-6 shrink-0" />
+                  <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-none">Precuenta Mesa {precuentaMesa.num}</h3>
+                </div>
+                <button onClick={() => setPrecuentaMesa(null)} className="text-slate-400 hover:text-slate-900 p-1 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"><X className="w-5 h-5" /></button>
+              </div>
+
+              {/* Vista del ticket térmico */}
+              <div id="precuenta-ticket-print" className="bg-amber-50/70 border-2 border-dashed border-amber-200 rounded-2xl p-5 font-mono text-slate-800 text-xs shadow-sm mb-6 flex flex-col">
+                <div className="text-center border-b border-dashed border-slate-300 pb-3 mb-4">
+                  <h4 className="font-black text-sm text-slate-900 uppercase">NUEVO FOGÓN DORADO E.I.R.L.</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Av. Hoyos Rubio Nro. 338 · RUC: 20496009259</p>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1">PRECUENTA DE CONSUMO (NO VALIDO COMO COMPROBANTE)</p>
+                </div>
+
+                <div className="space-y-1.5 border-b border-dashed border-slate-300 pb-3 mb-4 text-slate-600 font-bold">
+                  <div className="flex justify-between"><span>MESA:</span><span className="text-slate-900 text-sm font-black">{precuentaMesa.num}</span></div>
+                  <div className="flex justify-between"><span>FECHA:</span><span>{new Date().toLocaleDateString('es-PE')}</span></div>
+                  <div className="flex justify-between"><span>HORA:</span><span>{new Date().toLocaleTimeString('es-PE')}</span></div>
+                  <div className="flex justify-between"><span>MOZO:</span><span className="uppercase">{currentUser?.nombre || meseroGlobal}</span></div>
+                </div>
+
+                {/* Detalle de productos */}
+                <div className="border-b border-dashed border-slate-300 pb-3 mb-4">
+                  <div className="grid grid-cols-12 gap-1 font-black text-slate-900 text-[10px] uppercase tracking-wider mb-2">
+                    <span className="col-span-2 text-center">CANT</span>
+                    <span className="col-span-7">PRODUCTO</span>
+                    <span className="col-span-3 text-right">TOTAL</span>
+                  </div>
+                  <div className="space-y-2">
+                    {items.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-1 text-[11px] font-bold text-slate-700 leading-tight">
+                        <span className="col-span-2 text-center font-black">{item.cant}</span>
+                        <span className="col-span-7 uppercase">{item.nombre}</span>
+                        <span className="col-span-3 text-right font-black">S/ {(item.cant * item.precio).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Totales */}
+                <div className="space-y-1.5 font-bold text-slate-700 border-b border-dashed border-slate-300 pb-3 mb-3">
+                  <div className="flex justify-between">
+                    <span>OP. GRAVADA:</span>
+                    <span>S/ {subtotalBase.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>I.G.V. (10%):</span>
+                    <span>S/ {igv.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-sm font-black text-slate-900 uppercase">
+                  <span>💰 TOTAL A PAGAR:</span>
+                  <span className="text-base text-indigo-700">S/ {subtotal.toFixed(2)}</span>
+                </div>
+
+                <div className="text-center text-[9px] text-slate-400 font-bold mt-6 border-t border-dashed border-slate-200 pt-3">
+                  Gracias por su preferencia · FOGÓN DORADO
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="grid grid-cols-2 gap-3 shrink-0">
+                <button
+                  onClick={() => setPrecuentaMesa(null)}
+                  className="py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs uppercase tracking-widest transition-colors"
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20"
+                >
+                  Imprimir Precuenta
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <style>{`
         .grid-mesas-dinamico {
@@ -2158,6 +2264,75 @@ export default function SalonPage({ currentUser }) {
           60% { transform: rotate(-5deg); }
           70% { transform: rotate(0); }
           100% { transform: rotate(0); }
+        }
+
+        @page {
+          size: auto;
+          margin: 0mm;
+        }
+        @media print {
+          /* Ocultar elementos de navegación y fondos */
+          aside, header, #sidebar-menu, #sidebar-backdrop, button, nav, .shrink-0 {
+            display: none !important;
+          }
+          /* Ocultar el resto del contenido de la página excepto el modal a imprimir */
+          main > *:not(section),
+          section > *:not(#precuenta-print-container) {
+            display: none !important;
+          }
+          /* Garantizar que el body y contenedores no tengan alturas fijas o desbordamientos */
+          html, body, #root, main, section {
+            background: white !important;
+            color: black !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+            width: auto !important;
+          }
+          /* Formatear el contenedor del ticket en 74mm en la esquina superior izquierda */
+          #precuenta-print-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 74mm !important;
+            height: auto !important;
+            display: block !important;
+            background: white !important;
+            z-index: 99999 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          #precuenta-print-container > div {
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            max-width: 74mm !important;
+            width: 74mm !important;
+            height: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          #precuenta-print-container div.bg-slate-950, 
+          #precuenta-print-container div.shrink-0 {
+            display: none !important;
+          }
+          #precuenta-ticket-print {
+            width: 74mm !important;
+            padding: 6px !important;
+            margin: 0 !important;
+            font-family: 'Arial', 'Helvetica', sans-serif !important;
+            font-size: 11px !important;
+            line-height: 1.3 !important;
+            color: #000000 !important;
+            font-weight: 850 !important;
+          }
+          #precuenta-ticket-print * {
+            color: #000000 !important;
+            font-weight: 850 !important;
+          }
+          #precuenta-ticket-print div {
+            page-break-inside: avoid !important;
+          }
         }
       `}</style>
     </section>

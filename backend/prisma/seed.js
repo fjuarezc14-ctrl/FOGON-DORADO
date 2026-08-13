@@ -310,6 +310,22 @@ async function main() {
     }
   }
 
+  // ── 4. Clientes de Crédito y Trabajadores por Defecto ─────
+  console.log('🌱 Cargando clientes de crédito iniciales...');
+  const clientesDefault = [
+    { nombre: 'Juan Pérez (Cliente Comercial)', tipoDoc: 'DNI', numDoc: '12345678', telefono: '987654321', direccion: 'Av. Larco 123', esTrabajador: false },
+    { nombre: 'Inversiones Cajamarca S.A.C.', tipoDoc: 'RUC', numDoc: '20123456789', telefono: '076-361234', direccion: 'Jr. Comercio 456', esTrabajador: false },
+    { nombre: 'Carlos Mesero (Personal)', tipoDoc: 'DNI', numDoc: '87654321', telefono: '912345678', direccion: 'Jr. Apurímac 789', esTrabajador: true },
+  ];
+  for (const c of clientesDefault) {
+    const existe = await prisma.cliente.findFirst({
+      where: { numDoc: c.numDoc }
+    });
+    if (!existe) {
+      await prisma.cliente.create({ data: c });
+    }
+  }
+
   console.log(`✅ Carta cargada: ${creados} nuevos productos, ${existentes} ya existían.`);
   console.log('✅ Seed completado correctamente.');
 }

@@ -57,6 +57,8 @@ export default function ReportesPage() {
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
   const [rotacion, setRotacion] = useState([]);
   const [compras, setCompras] = useState([]);
+  const [reportePollos, setReportePollos] = useState(null);
+  const [clientes, setClientes] = useState([]);
   const [gerencialModalOpen, setGerencialModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('resumen');
 
@@ -219,13 +221,15 @@ export default function ReportesPage() {
   const fetchReportes = useCallback(async (desde, hasta) => {
     setFiltrando(true);
     try {
-      const [data, cancs, mzs, vts, rot, cmps] = await Promise.all([
+      const [data, cancs, mzs, vts, rot, cmps, pollos, clients] = await Promise.all([
         api.getReporteContable(desde, hasta),
         api.getCancelaciones(desde, hasta),
         api.getReporteMozos(desde, hasta),
         api.getHistorialVentas(desde, hasta),
         api.getRotacion(desde, hasta),
         api.getCompras(desde, hasta),
+        api.getReportePollos(desde, hasta).catch(() => null),
+        api.getClientes().catch(() => []),
       ]);
       setResumen(data);
       setCancelaciones(cancs || []);
@@ -233,6 +237,8 @@ export default function ReportesPage() {
       setVentas(vts || []);
       setRotacion(rot || []);
       setCompras(cmps || []);
+      setReportePollos(pollos);
+      setClientes(clients || []);
     } catch(err) {
       console.error('Error cargando reportes:', err);
     } finally {
@@ -461,7 +467,7 @@ export default function ReportesPage() {
           { id: 'resumen', label: '📊 Resumen Financiero y RCE' },
           { id: 'rotacion', label: '🍽️ Rotación y Pollos' },
           { id: 'pedidosya', label: '🛵 Control PedidosYa' },
-          { id: 'consumo', label: '👤 Consumo de Personal (Planilla)' },
+          { id: 'consumo', label: '👥 Consumos y Créditos' },
           { id: 'mozos', label: '👥 Mozos y Cancelaciones' },
         ].map(tab => (
           <button
@@ -791,11 +797,39 @@ export default function ReportesPage() {
               };
               return (
                 <span className="bg-amber-100 text-amber-900 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider">
-                  Total Pollos Enteros: {calculateChickenTotal().toFixed(2)}
+                  Total Pollos Enteros: {reportePollos ? reportePollos.totalUnidadesEquivalentes.toFixed(2) : calculateChickenTotal().toFixed(2)}
                 </span>
               );
             })()}
           </div>
+
+          {reportePollos && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 md:p-5 bg-slate-50/50 border-b border-slate-100">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">🍗 Stock Inicial Pollos</span>
+                <p className="text-xl font-mono font-black text-slate-800 mt-1">{reportePollos.stockInicial} Unids.</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">📊 Ventas Equivalentes (Fórmula)</span>
+                <p className="text-xl font-mono font-black text-emerald-600 mt-1">{reportePollos.totalUnidadesEquivalentes.toFixed(2)} Unids.</p>
+                <p className="text-[8px] font-bold text-slate-400 mt-0.5">Σ (1/8*0.125 + 1/4*0.25 + 1/2*0.5 + 1*1.0)</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">🔄 Porcentaje Rotación</span>
+                <p className="text-xl font-mono font-black text-blue-600 mt-1">{reportePollos.porcentajeRotacion}%</p>
+                <p className="text-[8px] font-bold text-slate-400 mt-0.5">Equivalente / Stock Inicial</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">📋 Desglose Fracciones</span>
+                <div className="grid grid-cols-2 gap-1 text-[10px] font-bold text-slate-650 mt-1">
+                  <span>1/8: {reportePollos.totalOctavos}</span>
+                  <span>1/4: {reportePollos.totalCuartos}</span>
+                  <span>1/2: {reportePollos.totalMedios}</span>
+                  <span>Enteros: {reportePollos.totalEnteros}</span>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="table-scroll">
             <table className="w-full text-left min-w-[500px]">
               <thead className="bg-white text-slate-450 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
@@ -910,111 +944,220 @@ export default function ReportesPage() {
       )}
 
       {/* 4. CONSUMO DE PERSONAL (PLANILLA) */}
-      {activeTab === 'consumo' && (
-        <div className="space-y-6">
-          {/* Resumen por Persona */}
-          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm p-6">
-            <h3 className="font-black text-slate-800 uppercase text-xs tracking-wider mb-4 flex items-center gap-2">
-              <Users className="w-4 h-4 text-violet-600" /> Acumulado para Planilla (Descuentos)
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-              {(() => {
-                const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
-                const porMozo = {};
-                consumos.forEach(v => {
-                  const mName = v.mesero || v.nombreCliente || 'Sin Nombre';
-                  porMozo[mName] = (porMozo[mName] || 0) + (v.descuentoAplicado || v.total);
-                });
-                const entries = Object.entries(porMozo);
-                return entries.length > 0 ? entries.map(([mozo, total]) => (
-                  <div key={mozo} className="bg-violet-50/50 border border-violet-100 rounded-2xl p-4 text-center">
-                    <p className="text-[10px] text-slate-450 font-black uppercase truncate" title={mozo}>{mozo}</p>
-                    <p className="text-xl font-black text-violet-700 font-mono mt-1">S/ {total.toFixed(2)}</p>
-                  </div>
-                )) : (
-                  <div className="col-span-full py-4 text-center text-xs text-slate-400 font-bold">No hay acumulados en el periodo.</div>
-                );
-              })()}
-            </div>
-          </div>
+      {activeTab === 'consumo' && (() => {
+        const clienteMap = new Map(clientes.map(c => [c.id, c]));
 
-          {/* Listado detallado */}
-          <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden mb-8">
-            <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div>
-                <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
-                  <Users className="w-4 h-4 text-violet-600" /> Consumo Interno de Personal
-                </h2>
-                <p className="text-[10px] text-slate-400 mt-0.5">Historial completo de consumos registrados por el personal del restaurante.</p>
-              </div>
-              {(() => {
-                const totalC = ventas
-                  .filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía')
-                  .reduce((s, v) => s + (v.descuentoAplicado || v.total), 0);
-                return (
-                  <span className="bg-violet-100 text-violet-850 text-xs font-black px-4 py-2 rounded-full uppercase tracking-wider">
-                    Total Consumos: S/ {totalC.toFixed(2)}
+        // Segmentar ventas con componentes de crédito
+        const listadoPlanilla = ventas.filter(v => v.metodoPago === 'Consumo' || (v.clienteCreditoId !== null && (clienteMap.get(v.clienteCreditoId)?.esTrabajador || false)));
+        const listadoComercial = ventas.filter(v => v.clienteCreditoId !== null && !(clienteMap.get(v.clienteCreditoId)?.esTrabajador || false));
+
+        // Acumulado Planilla por Colaborador
+        const planillaPorColaborador = {};
+        listadoPlanilla.forEach(v => {
+          let nombre = 'Sin Nombre';
+          if (v.clienteCreditoId !== null) {
+            nombre = clienteMap.get(v.clienteCreditoId)?.nombre || v.nombreCliente || 'Sin Nombre';
+          } else {
+            nombre = v.mesero || v.nombreCliente || 'Sin Nombre';
+          }
+          const monto = v.montoCredito || v.descuentoAplicado || v.total;
+          planillaPorColaborador[nombre] = (planillaPorColaborador[nombre] || 0) + monto;
+        });
+
+        // Acumulado Comercial por Cliente
+        const clientesPorComercial = {};
+        listadoComercial.forEach(v => {
+          const cli = clienteMap.get(v.clienteCreditoId);
+          const nombre = cli?.nombre || v.nombreCliente || 'Cliente Comercial';
+          const doc = cli?.documento ? ` (${cli.documento})` : '';
+          const key = `${nombre}${doc}`;
+          const monto = v.montoCredito || v.total;
+          clientesPorComercial[key] = (clientesPorComercial[key] || 0) + monto;
+        });
+
+        const totalPlanilla = listadoPlanilla.reduce((sum, v) => sum + (v.montoCredito || v.descuentoAplicado || v.total), 0);
+        const totalComercial = listadoComercial.reduce((sum, v) => sum + (v.montoCredito || v.total), 0);
+
+        return (
+          <div className="space-y-8">
+            {/* Sección 1: Resumen de Acumulados */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Tarjeta Planilla */}
+              <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm p-6 flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-black text-violet-750 uppercase text-xs tracking-wider flex items-center gap-2">
+                    <Users className="w-4 h-4 text-violet-600" /> Acumulado para Planilla (Interno)
+                  </h3>
+                  <span className="bg-violet-100 text-violet-850 text-[10px] font-black px-2.5 py-1 rounded-full">
+                    S/ {totalPlanilla.toFixed(2)}
                   </span>
-                );
-              })()}
+                </div>
+                <div className="grid grid-cols-2 gap-3 flex-1">
+                  {Object.entries(planillaPorColaborador).length > 0 ? (
+                    Object.entries(planillaPorColaborador).map(([nombre, total]) => (
+                      <div key={nombre} className="bg-violet-50/40 border border-violet-100/50 rounded-2xl p-3 text-center">
+                        <p className="text-[9px] text-slate-450 font-black uppercase truncate" title={nombre}>{nombre}</p>
+                        <p className="text-sm font-black text-violet-700 font-mono mt-0.5">S/ {total.toFixed(2)}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="col-span-full text-center py-6 text-slate-400 text-xs font-bold uppercase">Sin consumos de planilla en este periodo.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Tarjeta Comercial */}
+              <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm p-6 flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-black text-teal-750 uppercase text-xs tracking-wider flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-teal-650" /> Acumulado Créditos Comerciales
+                  </h3>
+                  <span className="bg-teal-100 text-teal-855 text-[10px] font-black px-2.5 py-1 rounded-full">
+                    S/ {totalComercial.toFixed(2)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 flex-1">
+                  {Object.entries(clientesPorComercial).length > 0 ? (
+                    Object.entries(clientesPorComercial).map(([nombre, total]) => (
+                      <div key={nombre} className="bg-teal-50/40 border border-teal-100/50 rounded-2xl p-3 text-center">
+                        <p className="text-[9px] text-slate-450 font-black uppercase truncate" title={nombre}>{nombre}</p>
+                        <p className="text-sm font-black text-teal-750 font-mono mt-0.5">S/ {total.toFixed(2)}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="col-span-full text-center py-6 text-slate-400 text-xs font-bold uppercase">Sin créditos comerciales en este periodo.</p>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="table-scroll">
-              <table className="w-full text-left min-w-[700px]">
-                <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                  <tr>
-                    <th className="px-6 py-4">ID</th>
-                    <th className="px-6 py-4">Fecha / Hora</th>
-                    <th className="px-6 py-4">Colaborador / Personal</th>
-                    <th className="px-6 py-4">Detalle del Consumo</th>
-                    <th className="px-6 py-4 text-right">Total a Descontar</th>
-                    <th className="px-6 py-4 text-center">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
-                  {(() => {
-                    const consumos = ventas.filter(v => v.metodoPago === 'Consumo' || v.metodoPago === 'Cortesía');
-                    return consumos.length > 0 ? consumos.map(v => (
-                      <tr key={v.id} className="hover:bg-violet-50/20 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
-                        <td className="px-6 py-4 font-mono">
-                          {v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{v.hora}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-slate-900 font-bold uppercase">{v.mesero || v.nombreCliente || 'Sin Colaborador'}</span>
-                          {v.metodoPago === 'Cortesía' && <span className="ml-2 bg-amber-100 text-amber-800 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">Cortesía</span>}
-                        </td>
-                        <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
-                        <td className="px-6 py-4 text-right font-mono font-black text-violet-700">S/ {(v.descuentoAplicado || v.total).toFixed(2)}</td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => {
-                              // Clonamos la venta pero forzamos el texto de forma de pago interna para el ticket
-                              const printClone = {
-                                ...v,
-                                metodoPago: 'Consumo'
-                              };
-                              reimprimirComprobante(printClone);
-                            }}
-                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 mx-auto"
-                          >
-                            <Printer className="w-3 h-3" /> Ver Ticket
-                          </button>
-                        </td>
-                      </tr>
-                    )) : (
+
+            {/* Listado A: Crédito Clientes (Comerciales) */}
+            <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+              <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <div>
+                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-teal-650" /> Cuentas por Cobrar · Crédito Clientes
+                  </h2>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Ventas financiadas a clientes de confianza con cuenta corriente comercial.</p>
+                </div>
+                <span className="bg-teal-100 text-teal-850 text-xs font-black px-4 py-2 rounded-full uppercase tracking-wider">
+                  Total Clientes: S/ {totalComercial.toFixed(2)}
+                </span>
+              </div>
+              <div className="table-scroll">
+                <table className="w-full text-left min-w-[700px]">
+                  <thead className="bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-4">ID</th>
+                      <th className="px-6 py-4">Fecha / Hora</th>
+                      <th className="px-6 py-4">Cliente Comercial</th>
+                      <th className="px-6 py-4">Detalle Items</th>
+                      <th className="px-6 py-4 text-right">Monto Crédito</th>
+                      <th className="px-6 py-4 text-center">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                    {listadoComercial.length > 0 ? listadoComercial.map(v => {
+                      const cli = clienteMap.get(v.clienteCreditoId);
+                      return (
+                        <tr key={v.id} className="hover:bg-teal-50/20 transition-colors">
+                          <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
+                          <td className="px-6 py-4 font-mono">
+                            {v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{v.hora}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-slate-900 font-bold uppercase">{cli?.nombre || v.nombreCliente || 'Cliente Comercial'}</span>
+                            {cli?.documento && <span className="ml-2 bg-slate-100 text-slate-500 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold">{cli.documento}</span>}
+                          </td>
+                          <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
+                          <td className="px-6 py-4 text-right font-mono font-black text-teal-700">S/ {(v.montoCredito || v.total).toFixed(2)}</td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => reimprimirComprobante(v)}
+                              className="px-2.5 py-1.5 bg-slate-900 hover:bg-teal-650 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 mx-auto"
+                            >
+                              <Printer className="w-3 h-3" /> Ver Ticket
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }) : (
                       <tr>
                         <td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
-                          No se registraron consumos de personal en este periodo.
+                          No se registraron ventas a crédito comercial en este periodo.
                         </td>
                       </tr>
-                    );
-                  })()}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Listado B: Consumo de Planilla / Personal */}
+            <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+              <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                <div>
+                  <h2 className="font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2">
+                    <Users className="w-4 h-4 text-violet-650" /> Descuentos Planilla · Consumo de Personal
+                  </h2>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Historial completo de consumos registrados por colaboradores internos.</p>
+                </div>
+                <span className="bg-violet-100 text-violet-850 text-xs font-black px-4 py-2 rounded-full uppercase tracking-wider">
+                  Total Planilla: S/ {totalPlanilla.toFixed(2)}
+                </span>
+              </div>
+              <div className="table-scroll">
+                <table className="w-full text-left min-w-[700px]">
+                  <thead className="bg-white text-slate-450 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-4">ID</th>
+                      <th className="px-6 py-4">Fecha / Hora</th>
+                      <th className="px-6 py-4">Colaborador / Personal</th>
+                      <th className="px-6 py-4">Detalle Items</th>
+                      <th className="px-6 py-4 text-right">Monto Descuento</th>
+                      <th className="px-6 py-4 text-center">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
+                    {listadoPlanilla.length > 0 ? listadoPlanilla.map(v => {
+                      const cli = clienteMap.get(v.clienteCreditoId);
+                      const name = cli?.nombre || v.mesero || v.nombreCliente || 'Colaborador';
+                      return (
+                        <tr key={v.id} className="hover:bg-violet-50/20 transition-colors">
+                          <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
+                          <td className="px-6 py-4 font-mono">
+                            {v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{v.hora}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-slate-900 font-bold uppercase">{name}</span>
+                            <span className="ml-2 bg-violet-100 text-violet-800 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">Planilla</span>
+                          </td>
+                          <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
+                          <td className="px-6 py-4 text-right font-mono font-black text-violet-700">S/ {(v.montoCredito || v.descuentoAplicado || v.total).toFixed(2)}</td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => reimprimirComprobante(v)}
+                              className="px-2.5 py-1.5 bg-slate-900 hover:bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 mx-auto"
+                            >
+                              <Printer className="w-3 h-3" /> Ver Ticket
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }) : (
+                      <tr>
+                        <td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
+                          No se registraron consumos de planilla en este periodo.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 5. RENDIMIENTO MOZOS Y CANCELACIONES */}
       {activeTab === 'mozos' && (

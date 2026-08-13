@@ -226,6 +226,15 @@ export default function CajaPage({ currentUser }) {
   const [consumoPin, setConsumoPin] = useState('');
   const [consumoPinError, setConsumoPinError] = useState('');
 
+  // Créditos y Clientes
+  const [clientes, setClientes] = useState([]);
+  const [abonos, setAbonos] = useState([]);
+  const [clienteCreditoSeleccionado, setClienteCreditoSeleccionado] = useState(null);
+  const [montoCreditoMixto, setMontoCreditoMixto] = useState('');
+  const [deliveryMontoCredito, setDeliveryMontoCredito] = useState('');
+  const [deliveryClienteCreditoSeleccionado, setDeliveryClienteCreditoSeleccionado] = useState(null);
+  const [deliveryDescuentoPorcentaje, setDeliveryDescuentoPorcentaje] = useState('');
+
   // Modal cambiar método de pago
   const [cambioMetodoModal, setCambioMetodoModal] = useState(false);
   const [ventaACambiar, setVentaACambiar] = useState(null);
@@ -325,18 +334,22 @@ export default function CajaPage({ currentUser }) {
 
   const fetchCajaData = useCallback(async () => {
     try {
-      const [mesasData, resumenData, llevarData, ventasData, prods] = await Promise.all([
+      const [mesasData, resumenData, llevarData, ventasData, prods, clientsList, abonosList] = await Promise.all([
         api.getMesas(),
         api.getResumenVentas(),
         api.getPedidosLlevar(),
         api.getHistorialVentas(),
         api.getProductos(), // <-- Recargar productos dinámicamente para ofertas en vivo
+        api.getClientes().catch(() => []),
+        api.getAbonos().catch(() => []),
       ]);
       setMesas(mesasData);
       setPedidosLlevar(llevarData);
       setStats({ atendidas: resumenData.atendidas || 0, ingresos: resumenData.ingresos || 0 });
       setVentas(ventasData || []);
       setProductosMenu(prods); // <-- Actualizar el menú con precios de oferta en vivo
+      setClientes(clientsList || []);
+      setAbonos(abonosList || []);
     } catch (err) {
       console.error('Error cargando datos de caja:', err);
     } finally {
@@ -690,27 +703,41 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
+    if (metodoPago === 'Crédito') {
+      if (!clienteCreditoSeleccionado) {
+        alert('Debe seleccionar un cliente con línea de crédito para continuar.');
+        return;
+      }
+    }
+
     // Validar y calcular montos si es Pago Mixto
     let finalMontoEfectivo = 0;
     let finalMontoTarjeta = 0;
     let finalMontoYape = 0;
+    let finalMontoCredito = 0;
 
     if (metodoPago === 'Mixto') {
       const efecVal = parseFloat(mixtoEfectivo || 0);
       const tarjVal = parseFloat(mixtoTarjeta || 0);
       const yapeVal = parseFloat(mixtoYape || 0);
+      const credVal = parseFloat(montoCreditoMixto || 0);
 
-      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0) {
+      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0 || credVal < 0) {
         alert('Los montos de pago no pueden ser valores negativos.');
         return;
       }
 
-      if (tarjVal + yapeVal > total) {
-        alert('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
+      if (credVal > 0 && !clienteCreditoSeleccionado) {
+        alert('Debe seleccionar un cliente para la porción de pago a crédito.');
         return;
       }
 
-      const restante = total - (tarjVal + yapeVal);
+      if (tarjVal + yapeVal + credVal > total) {
+        alert('La suma de Tarjeta, Yape / Plin y Crédito no puede superar el total a pagar.');
+        return;
+      }
+
+      const restante = total - (tarjVal + yapeVal + credVal);
       if (efecVal < restante) {
         alert(`Monto insuficiente. Debes cubrir el total de S/ ${total.toFixed(2)}.\nFaltan S/ ${(restante - efecVal).toFixed(2)}`);
         return;
@@ -719,6 +746,7 @@ export default function CajaPage({ currentUser }) {
       finalMontoEfectivo = restante;
       finalMontoTarjeta = tarjVal;
       finalMontoYape = yapeVal;
+      finalMontoCredito = credVal;
     }
 
     setCobrando(true);
@@ -733,6 +761,8 @@ export default function CajaPage({ currentUser }) {
         montoEfectivo: finalMontoEfectivo,
         montoTarjeta: finalMontoTarjeta,
         montoYape: finalMontoYape,
+        montoCredito: metodoPago === 'Crédito' ? total : finalMontoCredito,
+        clienteCreditoId: clienteCreditoSeleccionado?.id || null,
         clienteDireccion: clienteDireccion || '',
         cortesiaItemIds: cortesiaItemIds
       });
@@ -746,6 +776,8 @@ export default function CajaPage({ currentUser }) {
       setMixtoEfectivo('');
       setMixtoTarjeta('');
       setMixtoYape('');
+      setMontoCreditoMixto('');
+      setClienteCreditoSeleccionado(null);
       setCortesiaItemIds([]);
 
       // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
@@ -1749,30 +1781,51 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
+    if (tipoDelivery !== 'PedidosYa' && deliveryMetodoPago === 'Crédito') {
+      if (!deliveryClienteCreditoSeleccionado) {
+        alert('Debe seleccionar un cliente con línea de crédito para continuar.');
+        return;
+      }
+    }
+
     // Validar y calcular montos si es Pago Mixto
     let deliveryFinalMontoEfectivo = 0;
     let deliveryFinalMontoTarjeta = 0;
     let deliveryFinalMontoYape = 0;
+    let deliveryFinalMontoCredito = 0;
+    
     const itemsTotal = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
     const shippingFee = parseFloat(deliveryMontoEnvio || 0);
-    const grandTotal = itemsTotal + shippingFee;
+
+    // Descuento porcentual para llevar/delivery
+    const descPct = parseFloat(deliveryDescuentoPorcentaje || 0);
+    const descuentoMonto = descPct > 0 ? parseFloat((itemsTotal * (descPct / 100)).toFixed(2)) : 0;
+    const totalConDescuento = Math.max(0, itemsTotal - descuentoMonto);
+    const grandTotal = totalConDescuento + shippingFee;
+    const descuentoFinal = descPct > 0 ? descuentoMonto : 0;
 
     if (tipoDelivery !== 'PedidosYa' && deliveryMetodoPago === 'Mixto') {
       const efecVal = parseFloat(deliveryMixtoEfectivo || 0);
       const tarjVal = parseFloat(deliveryMixtoTarjeta || 0);
       const yapeVal = parseFloat(deliveryMixtoYape || 0);
+      const credVal = parseFloat(deliveryMontoCredito || 0);
 
-      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0) {
+      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0 || credVal < 0) {
         alert('Los montos de pago no pueden ser valores negativos.');
         return;
       }
 
-      if (tarjVal + yapeVal > grandTotal) {
-        alert('La suma de Tarjeta y Yape / Plin no puede superar el total a pagar.');
+      if (credVal > 0 && !deliveryClienteCreditoSeleccionado) {
+        alert('Debe seleccionar un cliente para la porción de pago a crédito.');
         return;
       }
 
-      const restante = grandTotal - (tarjVal + yapeVal);
+      if (tarjVal + yapeVal + credVal > grandTotal) {
+        alert('La suma de Tarjeta, Yape / Plin y Crédito no puede superar el total a pagar.');
+        return;
+      }
+
+      const restante = grandTotal - (tarjVal + yapeVal + credVal);
       if (efecVal < restante) {
         alert(`Monto insuficiente. Debes cubrir el total de S/ ${grandTotal.toFixed(2)}.\nFaltan S/ ${(restante - efecVal).toFixed(2)}`);
         return;
@@ -1781,6 +1834,7 @@ export default function CajaPage({ currentUser }) {
       deliveryFinalMontoEfectivo = restante;
       deliveryFinalMontoTarjeta = tarjVal;
       deliveryFinalMontoYape = yapeVal;
+      deliveryFinalMontoCredito = credVal;
     }
 
     setEnviandoDelivery(true);
@@ -1810,11 +1864,15 @@ export default function CajaPage({ currentUser }) {
         montoEfectivo: deliveryFinalMontoEfectivo,
         montoTarjeta: deliveryFinalMontoTarjeta,
         montoYape: deliveryFinalMontoYape,
+        montoCredito: deliveryMetodoPago === 'Crédito' ? grandTotal : deliveryFinalMontoCredito,
+        clienteCreditoId: deliveryClienteCreditoSeleccionado?.id || null,
         numDocumento: tipoDelivery === 'PedidosYa' ? codigoFormateado : (deliveryNumDocumento || 'S/D'),
         nombreCliente: tipoDelivery === 'PedidosYa' ? 'PEDIDOS YA' : (deliveryClienteNombre || 'Consumidor Final'),
         clienteDireccion: tipoDelivery === 'DeliveryPropio' ? deliveryDireccion : (deliveryDireccion || ''),
         montoDelivery: shippingFee,
         telefono: deliveryTelefono || null,
+        descuentoPorcentaje: descPct,
+        descuentoDescripcion: descuentoFinal > 0 ? `Descuento manual ${descPct}%` : null,
       };
 
       const result = editingPedidoId 
@@ -1829,6 +1887,9 @@ export default function CajaPage({ currentUser }) {
       setDeliveryMixtoEfectivo('');
       setDeliveryMixtoTarjeta('');
       setDeliveryMixtoYape('');
+      setDeliveryMontoCredito('');
+      setDeliveryClienteCreditoSeleccionado(null);
+      setDeliveryDescuentoPorcentaje('');
       await fetchCajaData();
       
       // Si es Para Llevar o Delivery Propio con comprobante Boleta o Factura (o Ticket), activamos el ticket de impresión
@@ -1875,6 +1936,11 @@ export default function CajaPage({ currentUser }) {
   };
 
   const totalDelivery = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
+  const deliveryDescPct = parseFloat(deliveryDescuentoPorcentaje || 0);
+  const deliveryDescuentoMonto = deliveryDescPct > 0 ? parseFloat((totalDelivery * (deliveryDescPct / 100)).toFixed(2)) : 0;
+  const deliveryTotalConDescuento = Math.max(0, totalDelivery - deliveryDescuentoMonto);
+  const deliveryShippingFee = (tipoDelivery === 'DeliveryPropio') ? parseFloat(deliveryMontoEnvio || 0) : 0;
+  const grandTotalDelivery = deliveryTotalConDescuento + deliveryShippingFee;
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-slate-50">
@@ -2491,7 +2557,7 @@ export default function CajaPage({ currentUser }) {
         {(() => {
           const obtenerMontosVentaFrontend = (v) => {
             if (!v || v.anulado || v.estadoPedido === 'Cancelado') return { efec: 0, tarj: 0, yape: 0 };
-            if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa') return { efec: 0, tarj: 0, yape: 0 };
+            if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa' || v.metodoPago === 'Crédito') return { efec: 0, tarj: 0, yape: 0 };
 
             let efec = parseFloat(v.montoEfectivo || 0);
             let tarj = parseFloat(v.montoTarjeta || 0);
@@ -2503,10 +2569,12 @@ export default function CajaPage({ currentUser }) {
             if (v.metodoPago === 'Tarjeta') return { efec: 0, tarj: total, yape: 0 };
             if (v.metodoPago === 'Yape') return { efec: 0, tarj: 0, yape: total };
 
+            // Restar la parte a crédito si es mixto
+            const totalFisico = total - parseFloat(v.montoCredito || 0);
             const suma = efec + tarj + yape;
-            if (Math.abs(suma - total) > 0.01) {
-              if (suma === 0) efec = total;
-              else if (total > suma) efec += (total - suma);
+            if (Math.abs(suma - totalFisico) > 0.01) {
+              if (suma === 0) efec = totalFisico;
+              else if (totalFisico > suma) efec += (totalFisico - suma);
             }
             return { efec, tarj, yape };
           };
@@ -2514,6 +2582,9 @@ export default function CajaPage({ currentUser }) {
           const ventasFiltradas = ultimoCierre
             ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
             : ventas;
+          const abonosFiltrados = ultimoCierre
+            ? abonos.filter(a => new Date(a.creadoEn) > new Date(ultimoCierre))
+            : abonos;
           const activeAtendidas = ventasFiltradas.length;
 
           let activeEfectivo = 0;
@@ -2527,6 +2598,13 @@ export default function CajaPage({ currentUser }) {
             activeYape += yape;
           });
 
+          // Sumar abonos a la caja real
+          abonosFiltrados.forEach(a => {
+            activeEfectivo += a.montoEfectivo || 0;
+            activeTarjeta += a.montoTarjeta || 0;
+            activeYape += a.montoYape || 0;
+          });
+
           const activeIngresosCaja = activeEfectivo + activeTarjeta + activeYape;
           const activeIngresosPedidosYa = ventasFiltradas
             .filter(v => v.metodoPago === 'PedidosYa')
@@ -2537,9 +2615,24 @@ export default function CajaPage({ currentUser }) {
               const itemsVal = v.items?.reduce((s, i) => s + (i.cant * i.precio), 0) || 0;
               return sum + itemsVal;
             }, 0);
-          const activeConsumos = ventasFiltradas
-            .filter(v => v.metodoPago === 'Consumo')
-            .reduce((s, v) => s + v.total, 0);
+
+          const clienteMap = new Map(clientes.map(c => [c.id, c.esTrabajador]));
+          let activeConsumoPlanilla = 0;
+          let activeConsumoClientes = 0;
+
+          ventasFiltradas.forEach(v => {
+            if (v.metodoPago === 'Consumo') {
+              activeConsumoPlanilla += (v.descuentoAplicado || v.total);
+            } else if (v.clienteCreditoId !== null) {
+              const esTrab = clienteMap.get(v.clienteCreditoId) || false;
+              const montoCred = v.montoCredito || v.total;
+              if (esTrab) {
+                activeConsumoPlanilla += montoCred;
+              } else {
+                activeConsumoClientes += montoCred;
+              }
+            }
+          });
 
           return (
             <div className="bg-slate-900 rounded-3xl shadow-xl p-5 text-white flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
@@ -2606,15 +2699,28 @@ export default function CajaPage({ currentUser }) {
                   </div>
                 </div>
 
-                {/* Tarjeta: Consumo Personal — planilla */}
-                {activeConsumos > 0 && (
+                {/* Tarjeta: Crédito Clientes — comercial */}
+                {activeConsumoClientes > 0 && (
+                  <div className="bg-gradient-to-br from-teal-900 to-emerald-950 p-4 rounded-2xl relative overflow-hidden text-teal-200 border border-teal-850 shadow-md">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10" />
+                    <p className="text-[10px] font-black uppercase tracking-wider opacity-90 text-teal-350">👥 Créditos Comerciales</p>
+                    <p className="text-[9px] font-bold opacity-60 mt-0.5">Cuentas por cobrar clientes</p>
+                    <div className="flex items-center gap-2.5 mt-1.5 relative z-10">
+                      <div className="w-8 h-8 bg-teal-800 rounded-lg flex items-center justify-center"><Users className="w-4 h-4 text-teal-300" /></div>
+                      <p className="text-2xl font-black font-mono tracking-tighter text-white">S/ {activeConsumoClientes.toFixed(2)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tarjeta: Consumo Planilla — personal */}
+                {activeConsumoPlanilla > 0 && (
                   <div className="bg-gradient-to-br from-violet-900 to-indigo-950 p-4 rounded-2xl relative overflow-hidden text-violet-200 border border-violet-850 shadow-md">
                     <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10" />
-                    <p className="text-[10px] font-black uppercase tracking-wider opacity-90 text-violet-300">👤 Consumo Personal</p>
-                    <p className="text-[9px] font-bold opacity-60 mt-0.5">Planilla · descuento a fin de mes</p>
+                    <p className="text-[10px] font-black uppercase tracking-wider opacity-90 text-violet-300">👤 Consumo Planilla</p>
+                    <p className="text-[9px] font-bold opacity-60 mt-0.5">Descuento planilla colaboradores</p>
                     <div className="flex items-center gap-2.5 mt-1.5 relative z-10">
                       <div className="w-8 h-8 bg-violet-800 rounded-lg flex items-center justify-center"><Users className="w-4 h-4 text-violet-300" /></div>
-                      <p className="text-2xl font-black font-mono tracking-tighter text-white">S/ {activeConsumos.toFixed(2)}</p>
+                      <p className="text-2xl font-black font-mono tracking-tighter text-white">S/ {activeConsumoPlanilla.toFixed(2)}</p>
                     </div>
                   </div>
                 )}
@@ -2712,7 +2818,7 @@ export default function CajaPage({ currentUser }) {
                       { id: 'Efectivo', icon: Banknote, label: 'Efectivo' }, 
                       { id: 'Tarjeta', icon: CreditCard, label: 'Tarjeta' }, 
                       { id: 'Yape', icon: Wallet, label: 'Yape / Plin' },
-                      { id: 'Consumo', icon: Users, label: '👤 Consumo' },
+                      { id: 'Crédito', icon: Users, label: '💳 Crédito' },
                       { id: 'Cortesía', icon: Gift, label: '🎁 Cortesía' },
                       { id: 'Mixto', icon: Layers, label: '➕ Mixto' }
                     ].map(item => {
@@ -2724,7 +2830,7 @@ export default function CajaPage({ currentUser }) {
                           type="button"
                           onClick={() => {
                             setMetodoPago(item.id);
-                            if (item.id === 'Consumo' || item.id === 'Cortesía') {
+                            if (item.id === 'Crédito' || item.id === 'Cortesía') {
                               setTipoComprobante('Ticket');
                             }
                           }} 
@@ -2738,13 +2844,40 @@ export default function CajaPage({ currentUser }) {
                   </div>
                 </div>
 
+                {metodoPago === 'Crédito' && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-2">
+                    <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Seleccionar Cliente de Crédito:</label>
+                    <select 
+                      value={clienteCreditoSeleccionado?.id || ''} 
+                      onChange={(e) => {
+                        const client = clientes.find(c => String(c.id) === String(e.target.value));
+                        setClienteCreditoSeleccionado(client || null);
+                        if (client) {
+                          setClienteNombre(client.nombre);
+                          setNumDocumento(client.numDoc || '');
+                          setClienteDireccion(client.direccion || '');
+                        }
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-sm"
+                    >
+                      <option value="">-- Seleccionar Cliente --</option>
+                      {clientes.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {metodoPago === 'Mixto' && (() => {
                   const total = totalConCortesias;
                   const efecVal = parseFloat(mixtoEfectivo || 0);
                   const tarjVal = parseFloat(mixtoTarjeta || 0);
                   const yapeVal = parseFloat(mixtoYape || 0);
-                  const ingresado = efecVal + tarjVal + yapeVal;
-                  const restante = Math.max(0, total - (tarjVal + yapeVal));
+                  const credVal = parseFloat(montoCreditoMixto || 0);
+                  const ingresado = efecVal + tarjVal + yapeVal + credVal;
+                  const restante = Math.max(0, total - (tarjVal + yapeVal + credVal));
                   const vuelto = efecVal > restante ? efecVal - restante : 0;
                   const diferencia = total - ingresado;
                   
@@ -2754,9 +2887,22 @@ export default function CajaPage({ currentUser }) {
                         <span>Desglose de Pago Mixto</span>
                         <span>Total: S/ {total.toFixed(2)}</span>
                       </h4>
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
-                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">💵 Efectivo (S/)</label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">💵 Efectivo</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const resto = Math.max(0, total - (tarjVal + yapeVal + credVal));
+                                setMixtoEfectivo(resto > 0 ? resto.toFixed(2) : '');
+                              }}
+                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                              title="Completar el saldo restante"
+                            >
+                              Completar
+                            </button>
+                          </div>
                           <input
                             type="number"
                             min="0"
@@ -2768,7 +2914,20 @@ export default function CajaPage({ currentUser }) {
                           />
                         </div>
                         <div>
-                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">💳 Tarjeta (S/)</label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">💳 Tarjeta</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const resto = Math.max(0, total - (efecVal + yapeVal + credVal));
+                                setMixtoTarjeta(resto > 0 ? resto.toFixed(2) : '');
+                              }}
+                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                              title="Completar el saldo restante"
+                            >
+                              Completar
+                            </button>
+                          </div>
                           <input
                             type="number"
                             min="0"
@@ -2780,7 +2939,20 @@ export default function CajaPage({ currentUser }) {
                           />
                         </div>
                         <div>
-                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-wider uppercase">📱 Yape/Plin (S/)</label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">📱 Yape/Plin</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const resto = Math.max(0, total - (efecVal + tarjVal + credVal));
+                                setMixtoYape(resto > 0 ? resto.toFixed(2) : '');
+                              }}
+                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                              title="Completar el saldo restante"
+                            >
+                              Completar
+                            </button>
+                          </div>
                           <input
                             type="number"
                             min="0"
@@ -2791,7 +2963,54 @@ export default function CajaPage({ currentUser }) {
                             className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
                           />
                         </div>
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">👥 Crédito</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const resto = Math.max(0, total - (efecVal + tarjVal + yapeVal));
+                                setMontoCreditoMixto(resto > 0 ? resto.toFixed(2) : '');
+                              }}
+                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                              title="Completar el saldo restante"
+                            >
+                              Completar
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={montoCreditoMixto}
+                            onChange={(e) => setMontoCreditoMixto(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
                       </div>
+
+                      {credVal > 0 && (
+                        <div className="bg-white border border-slate-200 rounded-xl p-3">
+                          <label className="block text-slate-500 font-bold mb-1.5 text-[9px] tracking-widest uppercase">Seleccionar Cliente para Crédito:</label>
+                          <select 
+                            value={clienteCreditoSeleccionado?.id || ''} 
+                            onChange={(e) => {
+                              const client = clientes.find(c => String(c.id) === String(e.target.value));
+                              setClienteCreditoSeleccionado(client || null);
+                            }}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
+                          >
+                            <option value="">-- Seleccionar Cliente --</option>
+                            {clientes.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
                       <div className="bg-white/80 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-600">
                         <div className="flex justify-between">
                           <span>Ingresado:</span>
@@ -3224,6 +3443,22 @@ export default function CajaPage({ currentUser }) {
                       })
                   }
                 </div>
+
+                {itemsDelivery.length > 0 && (
+                  <div className="p-3 bg-blue-500/5 border-t border-dashed border-slate-200 flex justify-between items-center gap-3 shrink-0">
+                    <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> Descuento (%)</span>
+                    <input 
+                      type="number" 
+                      min="0"
+                      max="100"
+                      placeholder="0"
+                      value={deliveryDescuentoPorcentaje} 
+                      onChange={(e) => setDeliveryDescuentoPorcentaje(e.target.value)}
+                      className="w-20 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-center font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+
                 {/* Formulario de Facturación / Pago para Para Llevar y Delivery Propio */}
                 {(tipoDelivery === 'ParaLlevar' || tipoDelivery === 'DeliveryPropio') && (
                   <div className="p-4 bg-slate-50 border-t border-b border-slate-200 space-y-4 shrink-0">
@@ -3236,18 +3471,18 @@ export default function CajaPage({ currentUser }) {
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Comprobante:</label>
                         <select 
-                          value={(deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') ? 'Ticket' : deliveryTipoComprobante} 
+                          value={(deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía') ? 'Ticket' : deliveryTipoComprobante} 
                           onChange={(e) => {
                             setDeliveryTipoComprobante(e.target.value);
                             setDeliveryNumDocumento('');
                             setDeliveryClienteNombre('');
                           }} 
-                          disabled={deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía'}
+                          disabled={deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía'}
                           className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <option value="Ticket">{(deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') ? 'Ticket Interno (forzado)' : 'Ticket Interno'}</option>
-                          {deliveryMetodoPago !== 'Consumo' && deliveryMetodoPago !== 'Cortesía' && <option value="Boleta">Boleta (DNI)</option>}
-                          {deliveryMetodoPago !== 'Consumo' && deliveryMetodoPago !== 'Cortesía' && <option value="Factura">Factura (RUC)</option>}
+                          <option value="Ticket">{(deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía') ? 'Ticket Interno (forzado)' : 'Ticket Interno'}</option>
+                          {deliveryMetodoPago !== 'Crédito' && deliveryMetodoPago !== 'Cortesía' && <option value="Boleta">Boleta (DNI)</option>}
+                          {deliveryMetodoPago !== 'Crédito' && deliveryMetodoPago !== 'Cortesía' && <option value="Factura">Factura (RUC)</option>}
                         </select>
                       </div>
                       <div>
@@ -3256,7 +3491,7 @@ export default function CajaPage({ currentUser }) {
                           value={deliveryMetodoPago} 
                           onChange={(e) => {
                             setDeliveryMetodoPago(e.target.value);
-                            if (e.target.value === 'Consumo' || e.target.value === 'Cortesía') {
+                            if (e.target.value === 'Crédito' || e.target.value === 'Cortesía') {
                               setDeliveryTipoComprobante('Ticket');
                               setDeliveryNumDocumento('');
                             }
@@ -3266,38 +3501,48 @@ export default function CajaPage({ currentUser }) {
                           <option value="Efectivo">Efectivo</option>
                           <option value="Tarjeta">Tarjeta (Visa/MC)</option>
                           <option value="Yape">Yape / Plin</option>
-                          <option value="Consumo">👤 Consumo (Personal)</option>
+                          <option value="Crédito">💳 Crédito</option>
                           <option value="Cortesía">🎁 Cortesía</option>
                           <option value="Mixto">➕ Mixto</option>
                         </select>
                       </div>
                     </div>
-                    {/* PIN de administrador cuando se selecciona Consumo o Cortesía */}
-                    {(deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') && (
-                      <div className="bg-violet-50 border border-violet-200 rounded-2xl p-3 space-y-2">
-                        <p className="text-[10px] font-black text-violet-700 uppercase tracking-wider flex items-center gap-1.5">🔐 Autorización de Administrador requerida</p>
-                        <input
-                          type="password"
-                          inputMode="numeric"
-                          maxLength={6}
-                          placeholder="••••••"
-                          value={pinAdminDelivery || ''}
-                          onChange={(e) => setPinAdminDelivery(e.target.value)}
-                          className="w-full bg-white border border-violet-300 rounded-xl px-3 py-2 text-sm font-mono font-bold text-slate-800 placeholder:tracking-normal placeholder:text-slate-300 focus:outline-none focus:border-violet-500 text-center tracking-widest"
-                        />
+
+                    {deliveryMetodoPago === 'Crédito' && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 mt-2">
+                        <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-widest uppercase">Seleccionar Cliente de Crédito:</label>
+                        <select 
+                          value={deliveryClienteCreditoSeleccionado?.id || ''} 
+                          onChange={(e) => {
+                            const client = clientes.find(c => String(c.id) === String(e.target.value));
+                            setDeliveryClienteCreditoSeleccionado(client || null);
+                            if (client) {
+                              setDeliveryClienteNombre(client.nombre);
+                              setDeliveryNumDocumento(client.numDoc || '');
+                            }
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
+                        >
+                          <option value="">-- Seleccionar Cliente --</option>
+                          {clientes.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     )}
 
                     {/* Pago Mixto para Delivery */}
                     {deliveryMetodoPago === 'Mixto' && (() => {
-                      const itemsTotal = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
-                      const shippingFee = parseFloat(deliveryMontoEnvio || 0);
-                      const total = itemsTotal + shippingFee;
+                      const total = grandTotalDelivery;
+
                       const efecVal = parseFloat(deliveryMixtoEfectivo || 0);
                       const tarjVal = parseFloat(deliveryMixtoTarjeta || 0);
                       const yapeVal = parseFloat(deliveryMixtoYape || 0);
-                      const ingresado = efecVal + tarjVal + yapeVal;
-                      const restante = Math.max(0, total - (tarjVal + yapeVal));
+                      const credVal = parseFloat(deliveryMontoCredito || 0);
+                      const ingresado = efecVal + tarjVal + yapeVal + credVal;
+                      const restante = Math.max(0, total - (tarjVal + yapeVal + credVal));
                       const vuelto = efecVal > restante ? efecVal - restante : 0;
                       const diferencia = total - ingresado;
 
@@ -3307,9 +3552,22 @@ export default function CajaPage({ currentUser }) {
                             <span>Desglose de Pago Mixto</span>
                             <span>Total: S/ {total.toFixed(2)}</span>
                           </h4>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             <div>
-                              <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💵 Efec. (S/)</label>
+                              <div className="flex justify-between items-center mb-0.5">
+                                <label className="block text-slate-500 font-bold text-[8px] tracking-wider uppercase">💵 Efec.</label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const resto = Math.max(0, total - (tarjVal + yapeVal + credVal));
+                                    setDeliveryMixtoEfectivo(resto > 0 ? resto.toFixed(2) : '');
+                                  }}
+                                  className="text-[8px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                                  title="Completar el saldo restante"
+                                >
+                                  Completar
+                                </button>
+                              </div>
                               <input
                                 type="number"
                                 min="0"
@@ -3321,7 +3579,20 @@ export default function CajaPage({ currentUser }) {
                               />
                             </div>
                             <div>
-                              <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">💳 Tarj. (S/)</label>
+                              <div className="flex justify-between items-center mb-0.5">
+                                <label className="block text-slate-500 font-bold text-[8px] tracking-wider uppercase">💳 Tarj.</label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const resto = Math.max(0, total - (efecVal + yapeVal + credVal));
+                                    setDeliveryMixtoTarjeta(resto > 0 ? resto.toFixed(2) : '');
+                                  }}
+                                  className="text-[8px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                                  title="Completar el saldo restante"
+                                >
+                                  Completar
+                                </button>
+                              </div>
                               <input
                                 type="number"
                                 min="0"
@@ -3333,7 +3604,20 @@ export default function CajaPage({ currentUser }) {
                               />
                             </div>
                             <div>
-                              <label className="block text-slate-500 font-bold mb-0.5 text-[8px] tracking-wider uppercase">📱 Yape (S/)</label>
+                              <div className="flex justify-between items-center mb-0.5">
+                                <label className="block text-slate-500 font-bold text-[8px] tracking-wider uppercase">📱 Yape</label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const resto = Math.max(0, total - (efecVal + tarjVal + credVal));
+                                    setDeliveryMixtoYape(resto > 0 ? resto.toFixed(2) : '');
+                                  }}
+                                  className="text-[8px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                                  title="Completar el saldo restante"
+                                >
+                                  Completar
+                                </button>
+                              </div>
                               <input
                                 type="number"
                                 min="0"
@@ -3344,7 +3628,54 @@ export default function CajaPage({ currentUser }) {
                                 className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
                               />
                             </div>
+                            <div>
+                              <div className="flex justify-between items-center mb-0.5">
+                                <label className="block text-slate-500 font-bold text-[8px] tracking-wider uppercase">👥 Créd.</label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const resto = Math.max(0, total - (efecVal + tarjVal + yapeVal));
+                                    setDeliveryMontoCredito(resto > 0 ? resto.toFixed(2) : '');
+                                  }}
+                                  className="text-[8px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
+                                  title="Completar el saldo restante"
+                                >
+                                  Completar
+                                </button>
+                              </div>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={deliveryMontoCredito}
+                                onChange={(e) => setDeliveryMontoCredito(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
                           </div>
+
+                          {credVal > 0 && (
+                            <div className="bg-white border border-slate-200 rounded-xl p-2.5">
+                              <label className="block text-slate-500 font-bold mb-1 text-[8px] tracking-widest uppercase">Seleccionar Cliente para Crédito:</label>
+                              <select 
+                                value={deliveryClienteCreditoSeleccionado?.id || ''} 
+                                onChange={(e) => {
+                                  const client = clientes.find(c => String(c.id) === String(e.target.value));
+                                  setDeliveryClienteCreditoSeleccionado(client || null);
+                                }}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
+                              >
+                                <option value="">-- Seleccionar Cliente --</option>
+                                {clientes.map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
                           <div className="bg-white/80 p-2 rounded-lg border border-slate-100 grid grid-cols-2 gap-1 text-[9px] font-bold text-slate-500">
                             <div className="flex justify-between">
                               <span>Ingresado:</span>
@@ -3445,8 +3776,7 @@ export default function CajaPage({ currentUser }) {
                           <span className="font-mono font-black text-sm text-emerald-600 mt-1">
                             S/ {(() => {
                               const conC = parseFloat(deliveryConCuanto);
-                              const tot = totalDelivery + (tipoDelivery === 'DeliveryPropio' ? parseFloat(deliveryMontoEnvio || 0) : 0);
-                              return (!isNaN(conC) && conC >= tot) ? (conC - tot).toFixed(2) : '0.00';
+                              return (!isNaN(conC) && conC >= grandTotalDelivery) ? (conC - grandTotalDelivery).toFixed(2) : '0.00';
                             })()}
                           </span>
                         </div>
@@ -3458,19 +3788,25 @@ export default function CajaPage({ currentUser }) {
                 <div className="p-4 bg-white border-t border-slate-200 shrink-0">
                   <div className="space-y-1.5 mb-4 border-b border-dashed border-slate-100 pb-3 px-1">
                     <div className="flex justify-between text-xs text-slate-400">
-                      <span>Productos</span>
+                      <span>Subtotal Productos</span>
                       <span className="font-mono">S/ {totalDelivery.toFixed(2)}</span>
                     </div>
+                    {deliveryDescuentoMonto > 0 && (
+                      <div className="flex justify-between text-xs text-rose-600 font-bold">
+                        <span>Descuento ({deliveryDescPct}%)</span>
+                        <span className="font-mono">- S/ {deliveryDescuentoMonto.toFixed(2)}</span>
+                      </div>
+                    )}
                     {tipoDelivery === 'DeliveryPropio' && (
                       <div className="flex justify-between text-xs text-slate-400">
                         <span>Costo de Envío</span>
-                        <span className="font-mono">S/ {parseFloat(deliveryMontoEnvio || 0).toFixed(2)}</span>
+                        <span className="font-mono">S/ {deliveryShippingFee.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-end pt-1">
                       <span className="font-black text-slate-500 uppercase text-[10px] tracking-widest">Total a Pagar</span>
                       <span className="font-black font-mono text-2xl text-blue-700">
-                        S/ {(totalDelivery + (tipoDelivery === 'DeliveryPropio' ? parseFloat(deliveryMontoEnvio || 0) : 0)).toFixed(2)}
+                        S/ {grandTotalDelivery.toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -3756,9 +4092,13 @@ export default function CajaPage({ currentUser }) {
           ? ventas.filter(v => new Date(v.createdAt) > new Date(ultimoCierre))
           : ventas).filter(v => v.estadoPedido !== 'Cancelado');
 
+        const abonosFiltrados = ultimoCierre
+          ? abonos.filter(a => new Date(a.creadoEn) > new Date(ultimoCierre))
+          : abonos;
+
         const obtenerMontosVentaFrontend = (v) => {
           if (!v || v.anulado || v.estadoPedido === 'Cancelado') return { efec: 0, tarj: 0, yape: 0 };
-          if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa') return { efec: 0, tarj: 0, yape: 0 };
+          if (v.metodoPago === 'Cortesía' || v.metodoPago === 'Consumo' || v.metodoPago === 'PedidosYa' || v.metodoPago === 'Crédito') return { efec: 0, tarj: 0, yape: 0 };
 
           let efec = parseFloat(v.montoEfectivo || 0);
           let tarj = parseFloat(v.montoTarjeta || 0);
@@ -3770,10 +4110,12 @@ export default function CajaPage({ currentUser }) {
           if (v.metodoPago === 'Tarjeta') return { efec: 0, tarj: total, yape: 0 };
           if (v.metodoPago === 'Yape') return { efec: 0, tarj: 0, yape: total };
 
+          // Restar la parte a crédito si es mixto
+          const totalFisico = total - parseFloat(v.montoCredito || 0);
           const suma = efec + tarj + yape;
-          if (Math.abs(suma - total) > 0.01) {
-            if (suma === 0) efec = total;
-            else if (total > suma) efec += (total - suma);
+          if (Math.abs(suma - totalFisico) > 0.01) {
+            if (suma === 0) efec = totalFisico;
+            else if (totalFisico > suma) efec += (totalFisico - suma);
           }
           return { efec, tarj, yape };
         };
@@ -3789,12 +4131,34 @@ export default function CajaPage({ currentUser }) {
           totalYape += yape;
         });
 
+        // Sumar abonos a la caja real
+        abonosFiltrados.forEach(a => {
+          totalEfectivo += a.montoEfectivo || 0;
+          totalTarjeta += a.montoTarjeta || 0;
+          totalYape += a.montoYape || 0;
+        });
+
         const totalPedidosYa = ventasFiltradas
           .filter(v => v.metodoPago === 'PedidosYa')
           .reduce((s, v) => s + (v.total || 0), 0);
-        const totalConsumos = ventasFiltradas
-          .filter(v => v.metodoPago === 'Consumo')
-          .reduce((s, v) => s + (v.descuentoAplicado || v.total || 0), 0);
+
+        const clienteMap = new Map(clientes.map(c => [c.id, c.esTrabajador]));
+        let totalConsumoPlanilla = 0;
+        let totalConsumoClientes = 0;
+
+        ventasFiltradas.forEach(v => {
+          if (v.metodoPago === 'Consumo') {
+            totalConsumoPlanilla += (v.descuentoAplicado || v.total || 0);
+          } else if (v.clienteCreditoId !== null) {
+            const esTrab = clienteMap.get(v.clienteCreditoId) || false;
+            const montoCred = v.montoCredito || v.total || 0;
+            if (esTrab) {
+              totalConsumoPlanilla += montoCred;
+            } else {
+              totalConsumoClientes += montoCred;
+            }
+          }
+        });
 
         // Total Caja = ingresos reales cobrados en caja (efectivo + tarjeta + yape)
         const totalCalculado = totalEfectivo + totalTarjeta + totalYape;
@@ -3843,10 +4207,33 @@ export default function CajaPage({ currentUser }) {
                     <span>📱 YAPE / PLIN:</span>
                     <span className="font-black text-slate-900">S/ {totalYape.toFixed(2)}</span>
                   </div>
-                  {totalConsumos > 0 && (
-                    <div className="flex justify-between font-bold text-violet-700 border-t border-dashed border-violet-200 pt-2">
-                      <span>👤 CONSUMO PERSONAL:</span>
-                      <span className="font-black text-violet-800">S/ {totalConsumos.toFixed(2)}</span>
+                  {abonosFiltrados.length > 0 && (
+                    <div className="border-t border-dashed border-slate-200 pt-2 pb-1 text-slate-650 font-bold text-[10px]">
+                      <span className="text-[9px] text-slate-400">DETALLE DE ABONOS RECIBIDOS:</span>
+                      <div className="flex justify-between pl-2">
+                        <span>Abonos Efec:</span>
+                        <span>S/ {abonosFiltrados.reduce((s, a) => s + (a.montoEfectivo || 0), 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between pl-2">
+                        <span>Abonos Tarj:</span>
+                        <span>S/ {abonosFiltrados.reduce((s, a) => s + (a.montoTarjeta || 0), 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between pl-2">
+                        <span>Abonos Yape:</span>
+                        <span>S/ {abonosFiltrados.reduce((s, a) => s + (a.montoYape || 0), 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                  {totalConsumoClientes > 0 && (
+                    <div className="flex justify-between font-bold text-emerald-700 border-t border-dashed border-slate-205 pt-2">
+                      <span>👥 CRÉDITO CLIENTES:</span>
+                      <span className="font-black text-emerald-800">S/ {totalConsumoClientes.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {totalConsumoPlanilla > 0 && (
+                    <div className="flex justify-between font-bold text-violet-700 border-t border-dashed border-slate-205 pt-2">
+                      <span>👤 CONSUMO PLANILLA:</span>
+                      <span className="font-black text-violet-800">S/ {totalConsumoPlanilla.toFixed(2)}</span>
                     </div>
                   )}
                   {totalCortesias > 0 && (
