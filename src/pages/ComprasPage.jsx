@@ -48,7 +48,7 @@ export default function ComprasPage() {
     proveedor: '', ruc: '', tipoDocumento: 'Factura', serieNumero: '',
     baseImponible: '', igv: '', total: '', categoria: '', fechaEmision: '',
     metodoPago: 'Efectivo',
-    montoEfectivoMixto: '', montoTarjetaMixto: '', montoCreditoMixto: '',
+    montoEfectivoMixto: '', montoTarjetaMixto: '', montoYapeMixto: '',
   });
 
   const [apiStatus, setApiStatus] = useState({ modoDemo: true, apisunatActivo: false });
@@ -116,12 +116,11 @@ export default function ComprasPage() {
         metodoPago: formCompra.metodoPago || 'Efectivo',
         montoEfectivo:  formCompra.metodoPago === 'Mixto' ? (parseFloat(formCompra.montoEfectivoMixto) || 0) : null,
         montoTarjeta:   formCompra.metodoPago === 'Mixto' ? (parseFloat(formCompra.montoTarjetaMixto)  || 0) : null,
-        montoCredito:   formCompra.metodoPago === 'Mixto' ? (parseFloat(formCompra.montoCreditoMixto)  || 0) :
-                        formCompra.metodoPago === 'Crédito' ? parseFloat(formCompra.total) : null,
+        montoYape:      formCompra.metodoPago === 'Mixto' ? (parseFloat(formCompra.montoYapeMixto)     || 0) : null,
       });
       await fetchTodo();
       setModalManual(false);
-      setFormCompra({ proveedor: '', ruc: '', tipoDocumento: 'Factura', serieNumero: '', baseImponible: '', igv: '', total: '', categoria: '', fechaEmision: '', metodoPago: 'Efectivo', montoEfectivoMixto: '', montoTarjetaMixto: '', montoCreditoMixto: '' });
+      setFormCompra({ proveedor: '', ruc: '', tipoDocumento: 'Factura', serieNumero: '', baseImponible: '', igv: '', total: '', categoria: '', fechaEmision: '', metodoPago: 'Efectivo', montoEfectivoMixto: '', montoTarjetaMixto: '', montoYapeMixto: '' });
       showToast('✅ Compra registrada correctamente.');
     } catch (err) {
       showToast('❌ Error al guardar: ' + err.message, 'error');
@@ -602,12 +601,11 @@ export default function ComprasPage() {
                   <select
                     value={formCompra.metodoPago}
                     onChange={e => setFormCompra(f => ({ ...f, metodoPago: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-450 bg-white font-bold text-slate-800 h-[46px]"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-455 bg-white font-bold text-slate-800 h-[46px]"
                   >
                     <option value="Efectivo">💵 Efectivo</option>
                     <option value="Tarjeta">💳 Tarjeta</option>
                     <option value="Yape">📱 Yape / Plin</option>
-                    <option value="Crédito">👥 Crédito</option>
                     <option value="Mixto">🔄 Mixto</option>
                   </select>
                 </div>
@@ -617,8 +615,8 @@ export default function ComprasPage() {
                   const total = parseFloat(formCompra.total) || 0;
                   const efec = parseFloat(formCompra.montoEfectivoMixto) || 0;
                   const tarj = parseFloat(formCompra.montoTarjetaMixto) || 0;
-                  const cred = parseFloat(formCompra.montoCreditoMixto) || 0;
-                  const sumado = efec + tarj + cred;
+                  const yape = parseFloat(formCompra.montoYapeMixto) || 0;
+                  const sumado = efec + tarj + yape;
                   const diferencia = total - sumado;
                   return (
                     <div className="col-span-2 bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
@@ -643,10 +641,10 @@ export default function ComprasPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">📋 Crédito</label>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">📱 Yape / Plin</label>
                           <input type="number" min="0" step="0.01"
-                            value={formCompra.montoCreditoMixto}
-                            onChange={e => setFormCompra(f => ({ ...f, montoCreditoMixto: e.target.value }))}
+                            value={formCompra.montoYapeMixto}
+                            onChange={e => setFormCompra(f => ({ ...f, montoYapeMixto: e.target.value }))}
                             placeholder="0.00"
                             className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-400 bg-white"
                           />
