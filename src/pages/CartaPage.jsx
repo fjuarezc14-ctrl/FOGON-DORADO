@@ -282,9 +282,9 @@ export default function CartaPage({ currentUser }) {
       {/* ── PANEL DE OFERTAS (solo Admin) ─────────────────── */}
       {isAdmin && (
         <div className="mb-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl border border-amber-200/60 shadow-sm overflow-hidden">
-          <button
+          <div
             onClick={() => setOfertaTab(!ofertaTab)}
-            className="w-full flex items-center justify-between p-4 md:p-5 text-left"
+            className="w-full flex items-center justify-between p-4 md:p-5 text-left cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-amber-500 rounded-xl flex items-center justify-center text-slate-900 shadow-sm">
@@ -297,6 +297,20 @@ export default function CartaPage({ currentUser }) {
                 </p>
               </div>
             </div>
+
+            {/* Asegúrate de que el botón que va a la derecha tenga el e.stopPropagation() así: */}
+            <div className="flex items-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Aquí va la función original que tenía este botón (ej: abrir modal, agregar, etc.)
+                }}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-1.5 rounded-xl font-bold text-sm"
+              >
+                Acción
+              </button>
+            </div>
+          </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={(e) => { e.stopPropagation(); abrirOfertaModal(); }}
