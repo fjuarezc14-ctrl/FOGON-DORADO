@@ -298,19 +298,6 @@ export default function CartaPage({ currentUser }) {
               </div>
             </div>
 
-            {/* Asegúrate de que el botón que va a la derecha tenga el e.stopPropagation() así: */}
-            <div className="flex items-center">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Aquí va la función original que tenía este botón (ej: abrir modal, agregar, etc.)
-                }}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-1.5 rounded-xl font-bold text-sm"
-              >
-                Acción
-              </button>
-            </div>
-          </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={(e) => { e.stopPropagation(); abrirOfertaModal(); }}
@@ -320,7 +307,7 @@ export default function CartaPage({ currentUser }) {
               </button>
               {ofertaTab ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
             </div>
-          </button>
+          </div>
 
           {ofertaTab && (
             <div className="px-4 pb-4 md:px-5 md:pb-5 border-t border-amber-200/60">
