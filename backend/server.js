@@ -3996,81 +3996,13 @@ app.get('/api/reportes/rotacion', async (req, res) => {
 
 
 // ============================================================
-// INICIO DEL SERVIDOR
+// INICIO DEL SERVIDOR (DESACOPLADO DE TAREAS PESADAS DE MIGRACIÓN)
 // ============================================================
-async function ejecutarMigracionMontos() {
-  try {
-    console.log("⚡ Iniciando migración y auto-reparación de montos de pago históricos...");
-    await prisma.$executeRawUnsafe(`
-      UPDATE "Venta" 
-      SET "montoEfectivo" = "total" 
-      WHERE "metodoPago" = 'Efectivo' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
-    `);
-    await prisma.$executeRawUnsafe(`
-      UPDATE "Venta" 
-      SET "montoTarjeta" = "total" 
-      WHERE "metodoPago" = 'Tarjeta' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
-    `);
-    await prisma.$executeRawUnsafe(`
-      UPDATE "Venta" 
-      SET "montoYape" = "total" 
-      WHERE "metodoPago" = 'Yape' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
-    `);
-    await prisma.$executeRawUnsafe(`
-      UPDATE "Venta" 
-      SET "montoEfectivo" = "total" 
-      WHERE "metodoPago" = 'Mixto' AND "montoEfectivo" = 0 AND "montoTarjeta" = 0 AND "montoYape" = 0 AND "total" > 0;
-    `);
-    console.log("✅ Migración y auto-reparación de montos completada exitosamente.");
-  } catch (err) {
-    console.error("❌ Error al ejecutar migración de montos históricos:", err);
-  }
-}
-
-async function ejecutarMigracionEnsaladas() {
-  try {
-    console.log("⚡ Sincronizando estado de ensaladas/cremas para pedidos activos...");
-    const pedidosActivos = await prisma.pedido.findMany({
-      where: { estado: { in: ['Cocina', 'Servido'] } },
-      include: { items: true }
-    });
-    for (const p of pedidosActivos) {
-      if (p.estadoEnsalada !== 'Listo') {
-        const nuevoEstado = await evaluarEstadoEnsalada(p.items);
-        if (nuevoEstado !== p.estadoEnsalada) {
-          await prisma.pedido.update({
-            where: { id: p.id },
-            data: { estadoEnsalada: nuevoEstado }
-          });
-        }
-      }
-    }
-    console.log("✅ Sincronización de ensaladas/cremas completada.");
-  } catch (err) {
-    console.error("❌ Error al ejecutar migración de ensaladas:", err);
-  }
-}
-
-async function ejecutarMigracionRequiereGuarnicion() {
-  try {
-    const count = await prisma.producto.updateMany({
-      where: {
-        categoria: { in: ['Pollos', 'Pollos a la Brasa', 'Parrillas y Cortes', 'Parrilladas Mixtas', 'Combos', 'Ensaladas'] }
-      },
-      data: { requiereGuarnicion: true }
-    });
-    console.log(`✅ Sincronizado requiereGuarnicion para ${count.count} productos.`);
-  } catch (err) {
-    console.error("❌ Error en migración requiereGuarnicion:", err);
-  }
-}
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+
+app.listen(PORT, () => {
   console.log(`🚀 Backend Fogón Dorado v3 corriendo en http://localhost:${PORT}`);
-  await ejecutarMigracionMontos();
-  await ejecutarMigracionEnsaladas();
-  await ejecutarMigracionRequiereGuarnicion();
+  console.log(`ℹ️ Para ejecutar tareas de mantenimiento/reparación de datos: npm run db:repair`);
 });
 
 
