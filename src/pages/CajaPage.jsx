@@ -369,6 +369,8 @@ export default function CajaPage({ currentUser }) {
   const [activeComprobante, setActiveComprobante] = useState(null);
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
   const [cortesiaItemIds, setCortesiaItemIds] = useState([]);
+  const [modalConfirmarCobro, setModalConfirmarCobro] = useState(false);
+  const [datosConfirmacionCobro, setDatosConfirmacionCobro] = useState(null);
 
   // Campos para Delivery Propio y Para Llevar en modal
   const [deliveryTelefono, setDeliveryTelefono] = useState('');
@@ -866,6 +868,7 @@ export default function CajaPage({ currentUser }) {
   };
 
   const procesarCobroYFacturar = async () => {
+    if (cobrando) return;
     if (!mesaSeleccionada || !mesaSeleccionada.pedidoData) return;
     if (tipoComprobante === 'Factura') {
       if (!numDocumento || numDocumento.trim().length !== 11) {
@@ -975,9 +978,30 @@ export default function CajaPage({ currentUser }) {
       finalMontoCredito = total;
     }
 
-    setCobrando(true);
-    try {
-      const response = await api.cobrar({
+    const pagaConNum = parseMonto(pagaConEfectivoMesa) || total;
+    const vueltoNum = metodoPago === 'Efectivo' && pagaConNum > total ? (pagaConNum - total) : 0;
+
+    // Guardar los datos preparados para la confirmación
+    setDatosConfirmacionCobro({
+      mesaNum: mesaSeleccionada.num,
+      esDelivery: mesaSeleccionada.num === 'DELIVERY',
+      tipoComprobante,
+      nombreCliente: clienteNombre || 'PÚBLICO GENERAL',
+      numDocumento: numDocumento || null,
+      clienteDireccion: clienteDireccion || '',
+      metodoPago,
+      total,
+      pagaCon: pagaConNum,
+      vuelto: vueltoNum,
+      finalMontoEfectivo,
+      finalMontoTarjeta,
+      finalMontoYape,
+      finalMontoCredito,
+      finalClienteCreditoId,
+      finalCreditosDetalle,
+      cortesiaItemIds,
+      itemsParaImpresion: items,
+      payload: {
         pedidoIds: mesaSeleccionada.pedidoData.pedidoIds,
         tipoComprobante,
         numDocumento: numDocumento || null,
@@ -992,8 +1016,23 @@ export default function CajaPage({ currentUser }) {
         creditosDetalle: finalCreditosDetalle,
         clienteDireccion: clienteDireccion || '',
         cortesiaItemIds: cortesiaItemIds
-      });
+      }
+    });
 
+    // Abrir modal de confirmación antes de ejecutar la transacción
+    setModalConfirmarCobro(true);
+  };
+
+  const ejecutarCobroFinal = async () => {
+    if (cobrando || !datosConfirmacionCobro) return;
+    setCobrando(true);
+    try {
+      const { payload, total, itemsParaImpresion, mesaNum, tipoComprobante: tComp, numDocumento: nDoc, nombreCliente: nomCli, clienteDireccion: dirCli, metodoPago: mPago } = datosConfirmacionCobro;
+
+      const response = await api.cobrar(payload);
+
+      setModalConfirmarCobro(false);
+      setDatosConfirmacionCobro(null);
       setPagaConEfectivoMesa('');
       setModalOpen(false);
       setNumDocumento('');
@@ -1011,9 +1050,9 @@ export default function CajaPage({ currentUser }) {
       setCortesiaItemIds([]);
 
       // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
-      if (metodoPago !== 'Consumo') {
-        const itemsParaImpresion = items.map(item => {
-          if (cortesiaItemIds.includes(item.itemId)) {
+      if (mPago !== 'Consumo') {
+        const itemsFormat = (itemsParaImpresion || []).map(item => {
+          if (payload.cortesiaItemIds?.includes(item.itemId)) {
             return {
               ...item,
               precio: 0,
@@ -1026,12 +1065,12 @@ export default function CajaPage({ currentUser }) {
         abrirTicketImpresionDirecto(
           total,
           response,
-          tipoComprobante,
-          numDocumento || null,
-          clienteNombre || 'Consumidor Final',
-          clienteDireccion || '',
-          itemsParaImpresion,
-          mesaSeleccionada.num
+          tComp,
+          nDoc || null,
+          nomCli || 'Consumidor Final',
+          dirCli || '',
+          itemsFormat,
+          mesaNum
         );
       } else {
         alert(`✅ Consumo Personal registrado. Mesa liberada.`);
@@ -3789,6 +3828,113 @@ export default function CajaPage({ currentUser }) {
           </div>
         );
       })()}
+
+      {/* MODAL DE CONFIRMACIÓN DE COBRO */}
+      {modalConfirmarCobro && datosConfirmacionCobro && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[250] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-scale-in border border-slate-200">
+            {/* Header */}
+            <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base uppercase tracking-tight">Confirmar Cobro</h3>
+                  <p className="text-xs text-slate-400">Verifica los datos del pago</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalConfirmarCobro(false)}
+                disabled={cobrando}
+                className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Contenido / Resumen */}
+            <div className="p-6 space-y-4 bg-slate-50">
+              
+              {/* Tarjeta de información */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Origen / Mesa</span>
+                  <span className="text-sm font-black text-slate-900">
+                    {datosConfirmacionCobro.esDelivery ? '🛵 Para Llevar / Delivery' : `🍽️ Mesa ${datosConfirmacionCobro.mesaNum}`}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Comprobante</span>
+                  <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 uppercase">
+                    {datosConfirmacionCobro.tipoComprobante}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Cliente</span>
+                  <span className="text-xs font-bold text-slate-800 text-right max-w-[200px] truncate">
+                    {datosConfirmacionCobro.nombreCliente}
+                    {datosConfirmacionCobro.numDocumento && ` (${datosConfirmacionCobro.numDocumento})`}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Medio de Pago</span>
+                  <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 uppercase">
+                    {datosConfirmacionCobro.metodoPago}
+                  </span>
+                </div>
+              </div>
+
+              {/* Total y Vuelto */}
+              <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-inner">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black uppercase text-amber-400 tracking-wider">Total a Cobrar</span>
+                  <span className="text-3xl font-black font-mono tracking-tight text-white">
+                    S/ {datosConfirmacionCobro.total.toFixed(2)}
+                  </span>
+                </div>
+
+                {datosConfirmacionCobro.metodoPago === 'Efectivo' && datosConfirmacionCobro.pagaCon > datosConfirmacionCobro.total && (
+                  <div className="mt-3 pt-3 border-t border-slate-800 flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-400">Paga con: S/ {datosConfirmacionCobro.pagaCon.toFixed(2)}</span>
+                    <span className="text-emerald-400 font-mono font-black text-sm">Vuelto: S/ {datosConfirmacionCobro.vuelto.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="p-4 bg-white border-t border-slate-200 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setModalConfirmarCobro(false)}
+                disabled={cobrando}
+                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarCobroFinal}
+                disabled={cobrando}
+                className="flex-[2] py-3.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                {cobrando ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin"></span>
+                    <span>Procesando Cobro...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Confirmar y Cobrar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL PEDIDOS YA */}
       {deliveryModal && (

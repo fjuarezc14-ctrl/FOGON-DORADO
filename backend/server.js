@@ -3026,6 +3026,21 @@ app.post('/api/ventas', async (req, res) => {
   const idPrincipal = idsAPagar[idsAPagar.length - 1]; // El más reciente como venta principal
 
   try {
+    // 1. Validar si ya existe una venta asociada a estos pedidos (evita error de doble cobro por concurrencia)
+    const ventaExistente = await prisma.venta.findFirst({
+      where: { pedidoId: { in: idsAPagar } },
+    });
+    if (ventaExistente) {
+      return res.json({
+        ok: true,
+        ventaId: ventaExistente.id,
+        estadoNubefact: ventaExistente.estadoSunat,
+        serie: ventaExistente.serie,
+        numero: ventaExistente.numero,
+        yaCobrado: true
+      });
+    }
+
     const venta = await prisma.$transaction(async (tx) => {
       // Mover todos los items de los otros pedidos adicionales al pedido principal para que se consoliden en el detalle de la venta
       if (idsAPagar.length > 1) {
@@ -3284,8 +3299,24 @@ app.post('/api/ventas', async (req, res) => {
       }
     }
 
-    res.json({ ok: true, ventaId: venta.id, estadoNubefact: initEstadoSunat, serie: null, numero: null });
+    res.json({ ok: true, ventaId: venta.id, estadoNubefact: venta.estadoSunat, serie: venta.serie || null, numero: venta.numero || null });
   } catch (err) {
+    console.error('Error al procesar cobro:', err);
+    if (err.code === 'P2002' || (err.message && err.message.includes('pedidoId'))) {
+      const ventaExistente = await prisma.venta.findFirst({
+        where: { pedidoId: { in: idsAPagar } },
+      });
+      if (ventaExistente) {
+        return res.json({
+          ok: true,
+          ventaId: ventaExistente.id,
+          estadoNubefact: ventaExistente.estadoSunat,
+          serie: ventaExistente.serie,
+          numero: ventaExistente.numero,
+          yaCobrado: true
+        });
+      }
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -3504,24 +3535,47 @@ app.get('/api/ventas/resumen', async (req, res) => {
 // ============================================================
 
 app.get('/api/compras', async (req, res) => {
-  const { desde, hasta } = req.query;
+  const { desde, hasta, categoria, metodoPago, busqueda } = req.query;
   try {
-    let filtroFecha = {};
+    let whereClause = {};
+
     if (desde && hasta) {
       const nextDay = new Date(hasta + 'T00:00:00.000-05:00');
       nextDay.setDate(nextDay.getDate() + 1);
       const nextDayStr = nextDay.toISOString().split('T')[0];
-      filtroFecha = {
-        gte: new Date(desde + 'T03:00:00.000-05:00'),
+      whereClause.creadoEn = {
+        gte: new Date(desde + 'T00:00:00.000-05:00'),
         lte: new Date(nextDayStr + 'T02:59:59.999-05:00')
+      };
+    } else if (desde) {
+      whereClause.creadoEn = {
+        gte: new Date(desde + 'T00:00:00.000-05:00')
       };
     } else {
       const ahora = new Date();
       const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-      filtroFecha = { gte: inicioMes };
+      whereClause.creadoEn = { gte: inicioMes };
     }
+
+    if (categoria && categoria !== 'Todas') {
+      whereClause.categoria = categoria;
+    }
+
+    if (metodoPago && metodoPago !== 'Todos') {
+      whereClause.metodoPago = metodoPago;
+    }
+
+    if (busqueda && busqueda.trim()) {
+      const q = busqueda.trim();
+      whereClause.OR = [
+        { proveedor: { contains: q, mode: 'insensitive' } },
+        { ruc: { contains: q, mode: 'insensitive' } },
+        { serieNumero: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
     const compras = await prisma.compra.findMany({
-      where: { creadoEn: filtroFecha },
+      where: whereClause,
       orderBy: { creadoEn: 'desc' },
     });
     res.json(compras);
@@ -3752,6 +3806,46 @@ app.patch('/api/compras/:id/categoria', async (req, res) => {
       data: { categoria: categoria ? String(categoria) : null },
     });
     res.json(compra);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/compras/:id → Editar todos los datos de una compra/gasto
+app.put('/api/compras/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { proveedor, ruc, tipoDocumento, serieNumero, baseImponible, igv, total, categoria, fechaEmision, metodoPago } = req.body;
+  try {
+    const data = {};
+    if (proveedor !== undefined) data.proveedor = String(proveedor);
+    if (ruc !== undefined) data.ruc = ruc ? String(ruc) : null;
+    if (tipoDocumento !== undefined) data.tipoDocumento = String(tipoDocumento);
+    if (serieNumero !== undefined) data.serieNumero = serieNumero ? String(serieNumero) : null;
+    if (baseImponible !== undefined) data.baseImponible = parseFloat(baseImponible) || 0;
+    if (igv !== undefined) data.igv = parseFloat(igv) || 0;
+    if (total !== undefined) data.total = parseFloat(total) || 0;
+    if (categoria !== undefined) data.categoria = categoria ? String(categoria) : null;
+    if (fechaEmision !== undefined) data.fechaEmision = fechaEmision ? new Date(fechaEmision) : null;
+    if (metodoPago !== undefined) data.metodoPago = String(metodoPago);
+
+    const compra = await prisma.compra.update({
+      where: { id },
+      data,
+    });
+    res.json(compra);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/compras/:id → Eliminar una compra o gasto
+app.delete('/api/compras/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    await prisma.compra.delete({
+      where: { id },
+    });
+    res.json({ ok: true, mensaje: 'Gasto/Compra eliminada exitosamente.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
