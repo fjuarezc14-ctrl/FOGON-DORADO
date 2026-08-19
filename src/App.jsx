@@ -280,15 +280,50 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem('currentUser');
-    if (saved) {
-      try {
-        setCurrentUser(JSON.parse(saved));
-      } catch(e) {
-        localStorage.removeItem('currentUser');
+    const initSession = async () => {
+      const saved = localStorage.getItem('currentUser');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.id) {
+            // Validar directamente contra el servidor
+            const status = await api.checkUserStatus(parsed.id);
+            if (!status || !status.exists || !status.activo) {
+              localStorage.removeItem('currentUser');
+              setCurrentUser(null);
+            } else if (parsed.pinSignature && status.pinSignature && parsed.pinSignature !== status.pinSignature) {
+              localStorage.removeItem('currentUser');
+              setCurrentUser(null);
+              alert('⚠️ La contraseña/PIN de tu cuenta ha sido modificada por el administrador. Por favor, inicia sesión con tu nuevo PIN.');
+            } else {
+              // Sincronizar roles y permisos actualizados de la BD
+              const updatedUser = {
+                ...parsed,
+                nombre: status.nombre || parsed.nombre,
+                rol: status.rol || parsed.rol,
+                permisos: status.permisos || parsed.permisos || [],
+                pinSignature: status.pinSignature || parsed.pinSignature,
+              };
+              setCurrentUser(updatedUser);
+              localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+            }
+          } else {
+            localStorage.removeItem('currentUser');
+            setCurrentUser(null);
+          }
+        } catch (e) {
+          console.error('Error inicializando sesión:', e);
+          try {
+            setCurrentUser(JSON.parse(saved));
+          } catch (err) {
+            localStorage.removeItem('currentUser');
+          }
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    initSession();
   }, []);
 
   const handleLoginSuccess = (user) => {
@@ -301,20 +336,34 @@ function App() {
     localStorage.removeItem('currentUser');
   };
 
-  // Validar si el usuario activo ha sido eliminado de la DB
+  // Polling de seguridad activo: detectar si el usuario fue eliminado, desactivado o si cambió su PIN/rol
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.id) return;
     const interval = setInterval(async () => {
       try {
         const res = await api.checkUserStatus(currentUser.id);
-        if (res && res.exists === false) {
+        if (!res || !res.exists || !res.activo) {
           handleLogout();
           alert('⚠️ Tu usuario ha sido eliminado o desactivado. Sesión cerrada.');
+        } else if (currentUser.pinSignature && res.pinSignature && currentUser.pinSignature !== res.pinSignature) {
+          handleLogout();
+          alert('⚠️ La contraseña/PIN de tu cuenta fue modificada por el administrador. Sesión cerrada.');
+        } else if (res.rol !== currentUser.rol || JSON.stringify(res.permisos) !== JSON.stringify(currentUser.permisos)) {
+          // Sincronizar en tiempo real los permisos modificados
+          const syncedUser = {
+            ...currentUser,
+            nombre: res.nombre,
+            rol: res.rol,
+            permisos: res.permisos,
+            pinSignature: res.pinSignature,
+          };
+          setCurrentUser(syncedUser);
+          localStorage.setItem('currentUser', JSON.stringify(syncedUser));
         }
       } catch (err) {
-        console.error('Error validando sesión:', err);
+        console.error('Error validando sesión periódica:', err);
       }
-    }, 10000);
+    }, 8000);
     return () => clearInterval(interval);
   }, [currentUser]);
 

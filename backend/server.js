@@ -1,11 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
 const prisma = new PrismaClient();
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000; // 5 minutos
+
+function generarPinSignature(pin, userId) {
+  return crypto.createHash('sha256').update(`${pin || ''}_${userId}_salt_fogon_auth`).digest('hex').substring(0, 16);
+}
 
 // ============================================================
 // STORE EN MEMORIA: ALERTAS DE CANCELACIÓN PARA COCINA Y BARRA
@@ -2536,6 +2541,7 @@ app.post('/api/usuarios/login', async (req, res) => {
       return res.status(401).json({ error: 'PIN incorrecto. Inténtalo de nuevo.' });
     }
     const { pin: userPin, ...safeUser } = user;
+    safeUser.pinSignature = generarPinSignature(user.pin, user.id);
     res.json({ ok: true, user: safeUser });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2572,7 +2578,15 @@ app.get('/api/usuarios/check/:id', async (req, res) => {
     if (!user || !user.activo) {
       return res.json({ exists: false });
     }
-    res.json({ exists: true, activo: user.activo });
+    res.json({
+      exists: true,
+      activo: user.activo,
+      id: user.id,
+      nombre: user.nombre,
+      rol: user.rol,
+      permisos: user.permisos,
+      pinSignature: generarPinSignature(user.pin, user.id)
+    });
   } catch (err) {
     res.json({ exists: false, error: err.message });
   }
