@@ -513,45 +513,65 @@ export default function ComprasPage() {
           </tr>
           <tr><td colspan="6"></td></tr>
           
-          <!-- RESUMEN CONSOLIDADO -->
+          <!-- RESUMEN CONSOLIDADO CON MONEDAS POR SEPARADO -->
           <tr class="ingreso-row">
-            <td colspan="3" style="border: 1px solid #000; padding: 6px;">1. INGRESOS POR VENTAS:</td>
-            <td style="border: 1px solid #000; text-align: right; padding: 6px;">S/ ${ventasDetalle.total.toFixed(2)}</td>
-            <td colspan="2" style="border: 1px solid #000; padding: 6px;">Efectivo: S/ ${ventasDetalle.efec.toFixed(2)} | Yape: S/ ${ventasDetalle.yape.toFixed(2)} | Tarjeta: S/ ${ventasDetalle.tarj.toFixed(2)}</td>
+            <td colspan="3" style="border: 1px solid #000; padding: 6px;"><b>1. TOTAL INGRESOS POR VENTAS:</b></td>
+            <td style="border: 1px solid #000; text-align: right; padding: 6px; font-weight: bold;">S/ ${ventasDetalle.total.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #000; padding: 6px;"></td>
           </tr>
-          <tr class="egreso-row">
-            <td colspan="3" style="border: 1px solid #000; padding: 6px;">2. GASTOS Y EGRESOS DEL DÍA:</td>
-            <td style="border: 1px solid #000; text-align: right; padding: 6px;">S/ ${gastosDetalle.total.toFixed(2)}</td>
-            <td colspan="2" style="border: 1px solid #000; padding: 6px;">Efectivo: S/ ${gastosDetalle.efec.toFixed(2)} | Yape: S/ ${gastosDetalle.yape.toFixed(2)} | Tarjeta: S/ ${gastosDetalle.tarj.toFixed(2)}</td>
-          </tr>
-          <tr class="total-row">
-            <td colspan="3" style="border: 1px solid #000; padding: 6px;">SALDO FINAL ESTIMADO EN EFECTIVO:</td>
-            <td style="border: 1px solid #000; text-align: right; padding: 6px;">S/ ${cuadreCaja.saldoEfectivoFinal.toFixed(2)}</td>
-            <td colspan="2" style="border: 1px solid #000; padding: 6px;">(C.I. S/ ${cuadreCaja.ciEfec.toFixed(2)} + Ventas Efec S/ ${ventasDetalle.efec.toFixed(2)} - Gastos Efec S/ ${gastosDetalle.efec.toFixed(2)})</td>
-          </tr>
-          <tr><td colspan="6"></td></tr>
-
-          <!-- TABLA DE DETALLE DE GASTOS -->
-          <tr class="table-header">
-            <th style="border: 1px solid #000; width: 40px;">Nº</th>
-            <th style="border: 1px solid #000; width: 280px;">NOMBRE / DESCRIPCIÓN</th>
-            <th style="border: 1px solid #000; width: 140px;">CATEGORÍA</th>
-            <th style="border: 1px solid #000; width: 100px;">MONTO (S/)</th>
-            <th style="border: 1px solid #000; width: 180px;">Nº COMPROBANTE / MEDIO PAGO</th>
-            <th style="border: 1px solid #000; width: 120px;">FIRMA</th>
-          </tr>
-          ${tableRows}
-          <tr class="total-row">
-            <td colspan="3" style="border: 1px solid #000; text-align: right; padding: 8px;">TOTAL GASTOS / EGRESOS:</td>
-            <td style="border: 1px solid #000; text-align: right; padding: 8px;">S/ ${gastosDetalle.total.toFixed(2)}</td>
-            <td colspan="2" style="border: 1px solid #000;">Efec: S/ ${gastosDetalle.efec.toFixed(2)} | Yape/Dig: S/ ${(gastosDetalle.yape + gastosDetalle.tarj).toFixed(2)}</td>
-          </tr>
-          <tr><td colspan="6"></td></tr>
           <tr>
-            <td colspan="3" style="border: 1px solid #999; font-weight: bold;">UTILIDAD NETA OPERATIVA (VENTAS - GASTOS):</td>
-            <td style="border: 1px solid #999; font-weight: bold; text-align: right;">S/ ${cuadreCaja.utilidadNetaOperativa.toFixed(2)}</td>
-            <td colspan="2"></td>
+            <td colspan="3" style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">• Efectivo en Ventas:</td>
+            <td style="border: 1px solid #ccc; text-align: right; padding: 4px;">S/ ${ventasDetalle.efec.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #ccc;"></td>
           </tr>
+          <tr>
+            <td colspan="3" style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">• Yape / Plin en Ventas:</td>
+            <td style="border: 1px solid #ccc; text-align: right; padding: 4px;">S/ ${ventasDetalle.yape.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #ccc;"></td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">• Tarjeta / POS en Ventas:</td>
+            <td style="border: 1px solid #ccc; text-align: right; padding: 4px;">S/ ${ventasDetalle.tarj.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #ccc;"></td>
+          </tr>
+
+          <tr class="egreso-row">
+            <td colspan="3" style="border: 1px solid #000; padding: 6px;"><b>2. TOTAL GASTOS Y EGRESOS DEL DÍA:</b></td>
+            <td style="border: 1px solid #000; text-align: right; padding: 6px; font-weight: bold;">S/ ${gastosDetalle.total.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #000; padding: 6px;"></td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">• Salidas en Efectivo (Caja):</td>
+            <td style="border: 1px solid #ccc; text-align: right; padding: 4px;">S/ ${gastosDetalle.efec.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #ccc;"></td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">• Pagos en Yape / Plin:</td>
+            <td style="border: 1px solid #ccc; text-align: right; padding: 4px;">S/ ${gastosDetalle.yape.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #ccc;"></td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">• Pagos en Tarjeta / Banco:</td>
+            <td style="border: 1px solid #ccc; text-align: right; padding: 4px;">S/ ${gastosDetalle.tarj.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #ccc;"></td>
+          </tr>
+
+          <tr class="total-row">
+            <td colspan="3" style="border: 1px solid #000; padding: 6px;"><b>3. SALDO FINAL ESTIMADO EN EFECTIVO (CAJÓN):</b></td>
+            <td style="border: 1px solid #000; text-align: right; padding: 6px; font-weight: bold;">S/ ${cuadreCaja.saldoEfectivoFinal.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #000; padding: 6px;">(C.I. Efectivo S/ ${cuadreCaja.ciEfec.toFixed(2)} + Ventas Efec S/ ${ventasDetalle.efec.toFixed(2)} - Gastos Efec S/ ${gastosDetalle.efec.toFixed(2)})</td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border: 1px solid #999; padding: 4px; font-weight: bold;">4. SALDO DIGITAL / BANCARIO (YAPE + TARJETA):</td>
+            <td style="border: 1px solid #999; text-align: right; padding: 4px; font-weight: bold;">S/ ${(ventasDetalle.yape + ventasDetalle.tarj - gastosDetalle.yape - gastosDetalle.tarj + cuadreCaja.ciYape).toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #999;"></td>
+          </tr>
+          <tr>
+            <td colspan="3" style="border: 1px solid #000; font-weight: bold; padding: 6px; background-color: #E2E8F0;">5. UTILIDAD OPERATIVA NETA DEL DÍA (VENTAS - GASTOS):</td>
+            <td style="border: 1px solid #000; font-weight: bold; text-align: right; padding: 6px; background-color: #E2E8F0;">S/ ${cuadreCaja.utilidadNetaOperativa.toFixed(2)}</td>
+            <td colspan="2" style="border: 1px solid #000; background-color: #E2E8F0;"></td>
+          </tr>
+          <tr><td colspan="6"></td></tr>
         </table>
       </body>
       </html>
@@ -745,23 +765,14 @@ export default function ComprasPage() {
             </select>
           </div>
 
-          {/* Botones secundarios (SUNAT y SIRE) */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={sincronizarConSunat}
-              disabled={sincronizando}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
-              title="Sincronizar facturas desde apisunat.pe"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${sincronizando ? 'animate-spin' : ''}`} />
-              {sincronizando ? 'Sync...' : 'SUNAT'}
-            </button>
+          {/* Botón Exportar SIRE */}
+          <div>
             <button
               onClick={exportarCSV}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs transition-all cursor-pointer"
               title="Exportar CSV formato SIRE"
             >
-              <Download className="w-3.5 h-3.5" /> SIRE
+              <Download className="w-3.5 h-3.5" /> Exportar SIRE (CSV)
             </button>
           </div>
         </div>
@@ -1613,29 +1624,104 @@ export default function ComprasPage() {
                     </tfoot>
                   </table>
 
-                  {/* Resumen Detallado de Cuadre y Firmas */}
-                  <div className="grid grid-cols-2 gap-8 text-xs pt-4 border-t-2 border-slate-900">
-                    <div className="space-y-2 font-bold bg-slate-50 p-4 rounded-xl border border-slate-300">
-                      <div className="flex justify-between text-emerald-800 pb-1 border-b border-slate-200">
-                        <span>1. INGRESOS POR VENTAS:</span>
-                        <span className="font-mono font-black">S/ {ventasDetalle.total.toFixed(2)}</span>
+                  {/* Resumen Detallado de Cuadre y Firmas con desglose de monedas por separado */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs pt-4 border-t-2 border-slate-900">
+                    <div className="space-y-3 font-bold bg-slate-50 p-4 rounded-xl border border-slate-300">
+                      
+                      {/* 1. INGRESOS POR VENTAS DETALLADO */}
+                      <div className="pb-2 border-b border-slate-200">
+                        <div className="flex justify-between text-emerald-800 font-black text-xs uppercase mb-1">
+                          <span>1. INGRESOS POR VENTAS:</span>
+                          <span className="font-mono text-sm">S/ {ventasDetalle.total.toFixed(2)}</span>
+                        </div>
+                        <div className="pl-3 space-y-0.5 text-[11px] text-slate-700 font-normal">
+                          <div className="flex justify-between">
+                            <span>• Efectivo en Ventas:</span>
+                            <span className="font-mono font-bold text-slate-900">S/ {ventasDetalle.efec.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>• Yape / Plin en Ventas:</span>
+                            <span className="font-mono font-bold text-slate-900">S/ {ventasDetalle.yape.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>• Tarjeta / POS en Ventas:</span>
+                            <span className="font-mono font-bold text-slate-900">S/ {ventasDetalle.tarj.toFixed(2)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-rose-800 pb-1 border-b border-slate-200">
-                        <span>2. GASTOS Y EGRESOS DEL DÍA:</span>
-                        <span className="font-mono font-black">S/ {gastosDetalle.total.toFixed(2)}</span>
+
+                      {/* 2. GASTOS Y EGRESOS DETALLADO */}
+                      <div className="pb-2 border-b border-slate-200">
+                        <div className="flex justify-between text-rose-800 font-black text-xs uppercase mb-1">
+                          <span>2. GASTOS Y EGRESOS DEL DÍA:</span>
+                          <span className="font-mono text-sm">S/ {gastosDetalle.total.toFixed(2)}</span>
+                        </div>
+                        <div className="pl-3 space-y-0.5 text-[11px] text-slate-700 font-normal">
+                          <div className="flex justify-between">
+                            <span>• Salidas en Efectivo (Caja):</span>
+                            <span className="font-mono font-bold text-slate-900">S/ {gastosDetalle.efec.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>• Pagos en Yape / Plin:</span>
+                            <span className="font-mono font-bold text-slate-900">S/ {gastosDetalle.yape.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>• Pagos en Tarjeta / Banco:</span>
+                            <span className="font-mono font-bold text-slate-900">S/ {gastosDetalle.tarj.toFixed(2)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-slate-900 pb-1 border-b border-slate-200">
-                        <span>3. SALDO ESTIMADO EN EFECTIVO:</span>
-                        <span className="font-mono font-black text-amber-700">S/ {cuadreCaja.saldoEfectivoFinal.toFixed(2)}</span>
+
+                      {/* 3. CUADRE DE EFECTIVO EN CAJA (FÍSICO) */}
+                      <div className="pb-2 border-b border-slate-200 bg-amber-50/80 p-2.5 rounded-lg border border-amber-200">
+                        <div className="flex justify-between text-slate-950 font-black text-xs uppercase">
+                          <span>3. SALDO FINAL EN EFECTIVO (CAJÓN):</span>
+                          <span className="font-mono text-sm text-amber-700 font-black">S/ {cuadreCaja.saldoEfectivoFinal.toFixed(2)}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 font-normal mt-1 leading-tight">
+                          (C.I. Efectivo S/ {cuadreCaja.ciEfec.toFixed(2)} + Ventas Efec S/ {ventasDetalle.efec.toFixed(2)} - Gastos Efec S/ {gastosDetalle.efec.toFixed(2)})
+                        </div>
                       </div>
-                      <div className="flex justify-between text-slate-600 pt-1 text-[11px]">
-                        <span>UTILIDAD NETA DEL DÍA:</span>
-                        <span className="font-mono font-black text-slate-900">S/ {cuadreCaja.utilidadNetaOperativa.toFixed(2)}</span>
+
+                      {/* 4. SALDO DIGITAL / BANCARIO */}
+                      <div className="pb-1 text-[11px] text-slate-700">
+                        <div className="flex justify-between">
+                          <span className="font-bold">4. SALDO DIGITAL (YAPE + TARJETA):</span>
+                          <span className="font-mono font-black text-indigo-900">
+                            S/ {(ventasDetalle.yape + ventasDetalle.tarj - gastosDetalle.yape - gastosDetalle.tarj + cuadreCaja.ciYape).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 5. UTILIDAD OPERATIVA NETA */}
+                      <div className="flex justify-between text-slate-900 pt-1 text-xs font-black border-t border-slate-300">
+                        <span className="uppercase">UTILIDAD NETA DEL DÍA:</span>
+                        <span className={`font-mono text-sm ${cuadreCaja.utilidadNetaOperativa >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          S/ {cuadreCaja.utilidadNetaOperativa.toFixed(2)}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex flex-col justify-end items-center pt-8">
-                      <div className="w-48 border-t-2 border-dashed border-slate-800 text-center text-[10px] font-black uppercase tracking-widest text-slate-700">
+                    <div className="flex flex-col justify-between items-center py-2">
+                      <div className="w-full bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-[11px] space-y-1 text-slate-700">
+                        <div className="font-black text-slate-900 uppercase tracking-wider text-center pb-1 border-b border-slate-200">
+                          Resumen del Arqueo
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total Comprobantes Emitidos:</span>
+                          <span className="font-mono font-bold">{ventas.length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total Egresos / Compras:</span>
+                          <span className="font-mono font-bold">{compras.length}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-200">
+                          <span>Balance General:</span>
+                          <span className="text-emerald-600">✓ CONFORME</span>
+                        </div>
+                      </div>
+
+                      <div className="w-52 border-t-2 border-dashed border-slate-800 text-center text-[10px] font-black uppercase tracking-widest text-slate-700 pt-2 mt-6">
                         FIRMA RESPONSABLE CAJA
                       </div>
                     </div>

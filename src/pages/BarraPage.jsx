@@ -278,10 +278,10 @@ export default function BarraPage() {
                         <button
                           onClick={() => marcarListoBarra(p.pedidoId)}
                           disabled={despachando}
-                          className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-xs cursor-pointer animate-pulse"
+                          className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 text-xs cursor-pointer animate-pulse border border-amber-600/30"
                         >
-                          <AlertTriangle className="w-4 h-4" />
-                          ¡Confirmar Despacho!
+                          <CheckCheck className="w-4 h-4 text-slate-950" />
+                          ¿Confirmar Despacho?
                         </button>
                         <button
                           onClick={() => setConfirmandoPedidoId(null)}
