@@ -22,6 +22,32 @@ const parseDeliveryInfo = (code) => {
   };
 };
 
+const parsearCreditoSplit = (ofertaDescripcion, defaultClienteId, defaultMonto) => {
+  if (ofertaDescripcion && typeof ofertaDescripcion === 'string') {
+    const match = ofertaDescripcion.match(/\[CREDITO_SPLIT:(.*?)\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(item => ({
+            clienteId: parseInt(item.clienteId || item.id),
+            nombre: item.nombre || '',
+            monto: parseFloat(item.monto || 0)
+          })).filter(item => !isNaN(item.clienteId) && item.monto > 0);
+        }
+      } catch (e) {
+        console.error('Error parseando CREDITO_SPLIT:', e);
+      }
+    }
+  }
+  const defId = parseInt(defaultClienteId);
+  const defM = parseFloat(defaultMonto || 0);
+  if (!isNaN(defId) && defId > 0 && defM > 0) {
+    return [{ clienteId: defId, monto: defM, nombre: '' }];
+  }
+  return [];
+};
+
 export default function ReportesPage() {
   const getPrimerDiaMes = () => {
     const ahora = new Date();
@@ -983,43 +1009,76 @@ export default function ReportesPage() {
       {activeTab === 'consumo' && (() => {
         const clienteMap = new Map(clientes.map(c => [c.id, c]));
 
-        // Segmentar ventas con componentes de crédito (defensivo: ignorar clienteCreditoId inválido)
-        const listadoPlanilla = ventas.filter(v =>
-          v.metodoPago === 'Consumo' ||
-          (v.clienteCreditoId != null && (clienteMap.get(v.clienteCreditoId)?.esTrabajador === true))
-        );
-        const listadoComercial = ventas.filter(v =>
-          v.clienteCreditoId != null &&
-          clienteMap.has(v.clienteCreditoId) &&
-          !(clienteMap.get(v.clienteCreditoId)?.esTrabajador || false)
-        );
+        const listadoPlanilla = [];
+        const listadoComercial = [];
 
-        // Acumulado Planilla por Colaborador
-        const planillaPorColaborador = {};
-        listadoPlanilla.forEach(v => {
-          let nombre = 'Sin Nombre';
-          if (v.clienteCreditoId !== null) {
-            nombre = clienteMap.get(v.clienteCreditoId)?.nombre || v.nombreCliente || 'Sin Nombre';
+        ventas.forEach(v => {
+          if (v.anulado || v.estadoPedido === 'Cancelado') return;
+
+          if (v.metodoPago === 'Consumo') {
+            listadoPlanilla.push({
+              id: v.id,
+              fecha: v.fecha,
+              createdAt: v.createdAt,
+              hora: v.hora,
+              nombre: v.nombreCliente || v.mesero || 'Consumo Personal',
+              documento: '',
+              itemsResumen: v.itemsResumen,
+              monto: v.descuentoAplicado || v.total,
+              rawVenta: v
+            });
           } else {
-            nombre = v.mesero || v.nombreCliente || 'Sin Nombre';
+            const splits = v.creditoSplit || parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+            if (splits.length > 0) {
+              splits.forEach(s => {
+                const cli = clienteMap.get(s.clienteId);
+                const esTrab = cli?.esTrabajador || false;
+                const nombre = cli?.nombre || s.nombre || v.nombreCliente || 'Cliente Crédito';
+                const doc = cli?.numDoc || cli?.documento || '';
+                const item = {
+                  id: v.id,
+                  fecha: v.fecha,
+                  createdAt: v.createdAt,
+                  hora: v.hora,
+                  nombre,
+                  documento: doc,
+                  itemsResumen: v.itemsResumen,
+                  monto: s.monto,
+                  rawVenta: v
+                };
+                if (esTrab) listadoPlanilla.push(item);
+                else listadoComercial.push(item);
+              });
+            } else if (v.metodoPago === 'Crédito') {
+              listadoComercial.push({
+                id: v.id,
+                fecha: v.fecha,
+                createdAt: v.createdAt,
+                hora: v.hora,
+                nombre: v.nombreCliente || 'Cliente Comercial',
+                documento: '',
+                itemsResumen: v.itemsResumen,
+                monto: v.total,
+                rawVenta: v
+              });
+            }
           }
-          const monto = v.montoCredito || v.descuentoAplicado || v.total;
-          planillaPorColaborador[nombre] = (planillaPorColaborador[nombre] || 0) + monto;
         });
 
-        // Acumulado Comercial por Cliente
+        // Acumulados
+        const planillaPorColaborador = {};
+        listadoPlanilla.forEach(item => {
+          planillaPorColaborador[item.nombre] = (planillaPorColaborador[item.nombre] || 0) + item.monto;
+        });
+
         const clientesPorComercial = {};
-        listadoComercial.forEach(v => {
-          const cli = clienteMap.get(v.clienteCreditoId);
-          const nombre = cli?.nombre || v.nombreCliente || 'Cliente Comercial';
-          const doc = cli?.documento ? ` (${cli.documento})` : '';
-          const key = `${nombre}${doc}`;
-          const monto = v.montoCredito || v.total;
-          clientesPorComercial[key] = (clientesPorComercial[key] || 0) + monto;
+        listadoComercial.forEach(item => {
+          const key = item.documento ? `${item.nombre} (${item.documento})` : item.nombre;
+          clientesPorComercial[key] = (clientesPorComercial[key] || 0) + item.monto;
         });
 
-        const totalPlanilla = listadoPlanilla.reduce((sum, v) => sum + (v.montoCredito || v.descuentoAplicado || v.total), 0);
-        const totalComercial = listadoComercial.reduce((sum, v) => sum + (v.montoCredito || v.total), 0);
+        const totalPlanilla = listadoPlanilla.reduce((sum, item) => sum + item.monto, 0);
+        const totalComercial = listadoComercial.reduce((sum, item) => sum + item.monto, 0);
 
         return (
           <div className="space-y-8">
@@ -1100,23 +1159,22 @@ export default function ReportesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
-                    {listadoComercial.length > 0 ? listadoComercial.map(v => {
-                      const cli = clienteMap.get(v.clienteCreditoId);
+                    {listadoComercial.length > 0 ? listadoComercial.map((item, idx) => {
                       return (
-                        <tr key={v.id} className="hover:bg-teal-50/20 transition-colors">
-                          <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
+                        <tr key={`${item.id}-${idx}`} className="hover:bg-teal-50/20 transition-colors">
+                          <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{item.id}</td>
                           <td className="px-6 py-4 font-mono">
-                            {v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{v.hora}</span>
+                            {item.fecha || new Date(item.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{item.hora}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="text-slate-900 font-bold uppercase">{cli?.nombre || v.nombreCliente || 'Cliente Comercial'}</span>
-                            {cli?.documento && <span className="ml-2 bg-slate-100 text-slate-500 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold">{cli.documento}</span>}
+                            <span className="text-slate-900 font-bold uppercase">{item.nombre}</span>
+                            {item.documento && <span className="ml-2 bg-slate-100 text-slate-500 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold">{item.documento}</span>}
                           </td>
-                          <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
-                          <td className="px-6 py-4 text-right font-mono font-black text-teal-700">S/ {(v.montoCredito || v.total).toFixed(2)}</td>
+                          <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={item.itemsResumen}>{item.itemsResumen}</td>
+                          <td className="px-6 py-4 text-right font-mono font-black text-teal-700">S/ {item.monto.toFixed(2)}</td>
                           <td className="px-6 py-4 text-center">
                             <button
-                              onClick={() => reimprimirComprobante(v)}
+                              onClick={() => reimprimirComprobante(item.rawVenta)}
                               className="px-2.5 py-1.5 bg-slate-900 hover:bg-teal-650 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 mx-auto"
                             >
                               <Printer className="w-3 h-3" /> Ver Ticket
@@ -1162,24 +1220,22 @@ export default function ReportesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 text-sm bg-white font-bold text-slate-700">
-                    {listadoPlanilla.length > 0 ? listadoPlanilla.map(v => {
-                      const cli = clienteMap.get(v.clienteCreditoId);
-                      const name = cli?.nombre || v.mesero || v.nombreCliente || 'Colaborador';
+                    {listadoPlanilla.length > 0 ? listadoPlanilla.map((item, idx) => {
                       return (
-                        <tr key={v.id} className="hover:bg-violet-50/20 transition-colors">
-                          <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{v.id}</td>
+                        <tr key={`${item.id}-${idx}`} className="hover:bg-violet-50/20 transition-colors">
+                          <td className="px-6 py-4 font-mono text-xs text-slate-900">#VT-{item.id}</td>
                           <td className="px-6 py-4 font-mono">
-                            {v.fecha || new Date(v.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{v.hora}</span>
+                            {item.fecha || new Date(item.createdAt).toLocaleDateString('es-PE')} · <span className="text-slate-400 text-xs">{item.hora}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="text-slate-900 font-bold uppercase">{name}</span>
+                            <span className="text-slate-900 font-bold uppercase">{item.nombre}</span>
                             <span className="ml-2 bg-violet-100 text-violet-800 text-[9px] px-1.5 py-0.5 rounded font-black uppercase">Planilla</span>
                           </td>
-                          <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={v.itemsResumen}>{v.itemsResumen}</td>
-                          <td className="px-6 py-4 text-right font-mono font-black text-violet-700">S/ {(v.montoCredito || v.descuentoAplicado || v.total).toFixed(2)}</td>
+                          <td className="px-6 py-4 text-xs text-slate-500 uppercase max-w-xs truncate" title={item.itemsResumen}>{item.itemsResumen}</td>
+                          <td className="px-6 py-4 text-right font-mono font-black text-violet-700">S/ {item.monto.toFixed(2)}</td>
                           <td className="px-6 py-4 text-center">
                             <button
-                              onClick={() => reimprimirComprobante(v)}
+                              onClick={() => reimprimirComprobante(item.rawVenta)}
                               className="px-2.5 py-1.5 bg-slate-900 hover:bg-violet-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 mx-auto"
                             >
                               <Printer className="w-3 h-3" /> Ver Ticket
@@ -1190,7 +1246,7 @@ export default function ReportesPage() {
                     }) : (
                       <tr>
                         <td colSpan="6" className="text-center py-12 text-slate-400 font-bold uppercase text-xs">
-                          No se registraron consumos de planilla en este periodo.
+                          No se registraron consumos de personal en este periodo.
                         </td>
                       </tr>
                     )}

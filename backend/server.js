@@ -29,6 +29,33 @@ const BARRA_CATEGORIAS = [
   'Postres',
 ];
 
+// Helper para parsear la distribución de crédito en ventas con múltiples clientes
+function parsearCreditoSplit(ofertaDescripcion, defaultClienteId, defaultMonto) {
+  if (ofertaDescripcion && typeof ofertaDescripcion === 'string') {
+    const match = ofertaDescripcion.match(/\[CREDITO_SPLIT:(.*?)\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(item => ({
+            clienteId: parseInt(item.clienteId || item.id),
+            nombre: item.nombre || '',
+            monto: parseFloat(item.monto || 0)
+          })).filter(item => !isNaN(item.clienteId) && item.monto > 0);
+        }
+      } catch (e) {
+        console.error('Error parseando CREDITO_SPLIT:', e);
+      }
+    }
+  }
+  const defId = parseInt(defaultClienteId);
+  const defM = parseFloat(defaultMonto || 0);
+  if (!isNaN(defId) && defId > 0 && defM > 0) {
+    return [{ clienteId: defId, monto: defM, nombre: '' }];
+  }
+  return [];
+}
+
 // Helper universal para desglosar y asegurar que el 100% de la venta real en Caja sume correctamente
 function obtenerMontosVenta(v) {
   if (!v || v.anulado || v.pedido?.estado === 'Cancelado') {
@@ -481,15 +508,30 @@ app.get('/api/clientes', async (req, res) => {
       include: { AbonosCredito: { orderBy: { creadoEn: 'desc' } } },
     });
 
-    // Obtener todas las ventas a crédito agrupadas por clienteCreditoId
+    // Obtener todas las ventas con crédito o split de crédito
     const ventasCredito = await prisma.venta.findMany({
-      where: { clienteCreditoId: { not: null }, anulado: false },
-      select: { clienteCreditoId: true, montoCredito: true, total: true },
+      where: {
+        OR: [
+          { clienteCreditoId: { not: null } },
+          { metodoPago: 'Crédito' },
+          { ofertaDescripcion: { contains: '[CREDITO_SPLIT:' } }
+        ],
+        anulado: false
+      },
+      select: { clienteCreditoId: true, montoCredito: true, total: true, ofertaDescripcion: true, metodoPago: true },
     });
+
     const consumoPorCliente = {};
     ventasCredito.forEach(v => {
-      const id = v.clienteCreditoId;
-      consumoPorCliente[id] = (consumoPorCliente[id] || 0) + (v.montoCredito || v.total);
+      const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+      if (splits.length > 0) {
+        splits.forEach(s => {
+          consumoPorCliente[s.clienteId] = (consumoPorCliente[s.clienteId] || 0) + s.monto;
+        });
+      } else if (v.clienteCreditoId) {
+        const monto = v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0);
+        consumoPorCliente[v.clienteCreditoId] = (consumoPorCliente[v.clienteCreditoId] || 0) + monto;
+      }
     });
 
     const formateados = clientes.map(c => {
@@ -585,30 +627,54 @@ app.get('/api/clientes/:id', async (req, res) => {
     });
     if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado.' });
 
-    // Buscar todas las ventas a crédito de este cliente
-    const ventasCredito = await prisma.venta.findMany({
-      where: { clienteCreditoId: id, anulado: false },
+    // Buscar todas las ventas que contengan crédito para este cliente (directo o por split)
+    const ventasPosibles = await prisma.venta.findMany({
+      where: {
+        OR: [
+          { clienteCreditoId: id },
+          { ofertaDescripcion: { contains: '[CREDITO_SPLIT:' } }
+        ],
+        anulado: false
+      },
       include: { pedido: true },
       orderBy: { createdAt: 'desc' },
     });
 
-    const totalConsumido = ventasCredito.reduce((s, v) => s + (v.montoCredito || v.total), 0);
+    const ventasCredito = [];
+    ventasPosibles.forEach(v => {
+      const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+      const miSplit = splits.find(s => s.clienteId === id);
+      if (miSplit) {
+        ventasCredito.push({
+          id: v.id,
+          fecha: v.createdAt.toISOString(),
+          total: v.total,
+          montoCredito: miSplit.monto,
+          estado: v.pedido?.estado || 'Pagado',
+          tipoComprobante: v.tipoComprobante,
+        });
+      } else if (v.clienteCreditoId === id && splits.length === 0) {
+        ventasCredito.push({
+          id: v.id,
+          fecha: v.createdAt.toISOString(),
+          total: v.total,
+          montoCredito: v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0),
+          estado: v.pedido?.estado || 'Pagado',
+          tipoComprobante: v.tipoComprobante,
+        });
+      }
+    });
+
+    const totalConsumido = ventasCredito.reduce((s, v) => s + v.montoCredito, 0);
     const totalAbonado = cliente.AbonosCredito.reduce((s, a) => s + a.monto, 0);
-    const saldo = totalConsumido - totalAbonado;
+    const saldo = Math.max(0, totalConsumido - totalAbonado);
 
     res.json({
       ...cliente,
       totalConsumido,
       totalAbonado,
       saldo,
-      ventasCredito: ventasCredito.map(v => ({
-        id: v.id,
-        fecha: v.createdAt.toISOString(),
-        total: v.total,
-        montoCredito: v.montoCredito || 0,
-        estado: v.pedido?.estado || 'Pagado',
-        tipoComprobante: v.tipoComprobante,
-      })),
+      ventasCredito,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2939,6 +3005,7 @@ app.post('/api/ventas', async (req, res) => {
     montoYape,
     montoCredito,
     clienteCreditoId,
+    creditosDetalle,
     cortesiaItemIds
   } = req.body;
   const idsAPagar = pedidoIds || [pedidoId];
@@ -2995,25 +3062,73 @@ app.post('/api/ventas', async (req, res) => {
       let finalMontoTarjeta = 0;
       let finalMontoYape = 0;
       let finalMontoCredito = 0;
+      let finalClienteCreditoId = clienteCreditoId ? parseInt(clienteCreditoId) : null;
+      let validCreditosSplits = [];
+
+      if ((metodoPago === 'Crédito' || metodoPago === 'Mixto') && creditosDetalle && Array.isArray(creditosDetalle) && creditosDetalle.length > 0) {
+        validCreditosSplits = creditosDetalle
+          .map(c => ({
+            clienteId: parseInt(c.clienteId || c.id),
+            nombre: String(c.nombre || '').trim(),
+            monto: parseFloat(c.monto || 0)
+          }))
+          .filter(c => !isNaN(c.clienteId) && c.clienteId > 0 && c.monto > 0);
+      }
 
       if (metodoPago === 'Mixto') {
-        // Mixto ahora puede incluir crédito como componente
         finalMontoEfectivo = parseFloat(montoEfectivo || 0);
         finalMontoTarjeta = parseFloat(montoTarjeta || 0);
         finalMontoYape = parseFloat(montoYape || 0);
-        finalMontoCredito = parseFloat(montoCredito || 0);
+        if (validCreditosSplits.length > 0) {
+          finalMontoCredito = validCreditosSplits.reduce((s, c) => s + c.monto, 0);
+          finalClienteCreditoId = validCreditosSplits[0].clienteId;
+        } else {
+          finalMontoCredito = parseFloat(montoCredito || 0);
+          finalClienteCreditoId = finalMontoCredito > 0 ? (clienteCreditoId ? parseInt(clienteCreditoId) : null) : null;
+        }
       } else if (metodoPago === 'Efectivo') {
         finalMontoEfectivo = finalTotal;
+        finalMontoTarjeta = 0;
+        finalMontoYape = 0;
+        finalMontoCredito = 0;
+        finalClienteCreditoId = null;
+        validCreditosSplits = [];
       } else if (metodoPago === 'Tarjeta') {
+        finalMontoEfectivo = 0;
         finalMontoTarjeta = finalTotal;
+        finalMontoYape = 0;
+        finalMontoCredito = 0;
+        finalClienteCreditoId = null;
+        validCreditosSplits = [];
       } else if (metodoPago === 'Yape') {
+        finalMontoEfectivo = 0;
+        finalMontoTarjeta = 0;
         finalMontoYape = finalTotal;
+        finalMontoCredito = 0;
+        finalClienteCreditoId = null;
+        validCreditosSplits = [];
       } else if (metodoPago === 'Crédito') {
-        finalMontoCredito = finalTotal;
+        finalMontoEfectivo = 0;
+        finalMontoTarjeta = 0;
+        finalMontoYape = 0;
+        if (validCreditosSplits.length > 0) {
+          finalMontoCredito = validCreditosSplits.reduce((s, c) => s + c.monto, 0);
+          finalClienteCreditoId = validCreditosSplits[0].clienteId;
+        } else {
+          finalMontoCredito = finalTotal;
+          finalClienteCreditoId = clienteCreditoId ? parseInt(clienteCreditoId) : null;
+        }
+      } else if (metodoPago === 'Cortesía' || metodoPago === 'Consumo') {
+        finalMontoEfectivo = 0;
+        finalMontoTarjeta = 0;
+        finalMontoYape = 0;
+        finalMontoCredito = 0;
+        finalClienteCreditoId = null;
+        validCreditosSplits = [];
       }
 
-      if (finalMontoCredito > 0 && !clienteCreditoId) {
-        throw new Error('Debe seleccionar un cliente para registrar la venta a crédito.');
+      if (finalMontoCredito > 0 && !finalClienteCreditoId) {
+        throw new Error('Debe seleccionar al menos un cliente para registrar la venta a crédito.');
       }
 
       // Calcular correlativo para apisunat.pe si es Boleta o Factura
@@ -3032,12 +3147,22 @@ app.post('/api/ventas', async (req, res) => {
         descDescrip = descDescrip ? `${descDescrip} + Cortesía de ítems` : 'Cortesía de ítems';
       }
 
+      // Si hay splits múltiples de crédito, anexar la etiqueta a ofertaDescripcion solo si aplica
+      if ((metodoPago === 'Crédito' || (metodoPago === 'Mixto' && finalMontoCredito > 0)) && validCreditosSplits.length > 0) {
+        const splitTag = `[CREDITO_SPLIT:${JSON.stringify(validCreditosSplits)}]`;
+        descDescrip = descDescrip ? `${descDescrip} ${splitTag}` : splitTag;
+      }
+
       const ventaCreada = await tx.venta.create({
         data: {
           pedidoId: idPrincipal,
           tipoComprobante,
           numDocumento,
-          nombreCliente: metodoPago === 'Cortesía' ? (nombreCliente || 'CONSUMO PERSONAL / CORTESÍA') : nombreCliente,
+          nombreCliente: (metodoPago === 'Cortesía' || metodoPago === 'Consumo') 
+            ? (nombreCliente || 'CONSUMO PERSONAL / CORTESÍA') 
+            : ((!nombreCliente || nombreCliente === 'PÚBLICO GENERAL') && validCreditosSplits.length > 0)
+              ? validCreditosSplits.map(c => c.nombre).filter(Boolean).join(', ') || 'PÚBLICO GENERAL'
+              : (nombreCliente || 'PÚBLICO GENERAL'),
           clienteDireccion: clienteDireccion || '',
           total: finalTotal,
           igv,
@@ -3047,7 +3172,7 @@ app.post('/api/ventas', async (req, res) => {
           montoTarjeta: finalMontoTarjeta,
           montoYape: finalMontoYape,
           montoCredito: finalMontoCredito,
-          clienteCreditoId: clienteCreditoId ? parseInt(clienteCreditoId) : null,
+          clienteCreditoId: finalClienteCreditoId,
           estadoNubefact: initEstadoSunat,
           estadoSunat: initEstadoSunat,
           serie,
@@ -3203,6 +3328,11 @@ app.get('/api/ventas', async (req, res) => {
       montoEfectivo: v.montoEfectivo,
       montoTarjeta: v.montoTarjeta,
       montoYape: v.montoYape,
+      montoCredito: v.montoCredito || 0,
+      clienteCreditoId: v.clienteCreditoId || null,
+      ofertaDescripcion: v.ofertaDescripcion || null,
+      descuentoAplicado: v.descuentoAplicado || 0,
+      creditoSplit: parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, v.montoCredito || (v.metodoPago === 'Crédito' ? v.total : 0)),
       anulado: v.anulado || v.pedido?.estado === 'Cancelado',
       motivoAnulacion: v.motivoAnulacion || v.pedido?.motivoCancela || null,
       anuladoPor: v.anuladoPor || v.pedido?.canceladoPor || null,
@@ -3306,13 +3436,21 @@ app.get('/api/ventas/resumen', async (req, res) => {
     ventas.forEach(v => {
       if (v.metodoPago === 'Consumo') {
         consumoPlanilla += (v.descuentoAplicado || v.total);
-      } else if (v.clienteCreditoId !== null) {
-        const esTrab = clienteMap.get(v.clienteCreditoId) || false;
-        const montoCred = v.montoCredito || v.total;
-        if (esTrab) {
-          consumoPlanilla += montoCred;
-        } else {
-          consumoClientes += montoCred;
+      } else {
+        const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+        if (splits.length > 0) {
+          splits.forEach(s => {
+            const esTrab = clienteMap.get(s.clienteId) || false;
+            if (esTrab) {
+              consumoPlanilla += s.monto;
+            } else {
+              consumoClientes += s.monto;
+            }
+          });
+        } else if (v.metodoPago === 'Crédito') {
+          consumoClientes += v.total;
+        } else if (parseFloat(v.montoCredito || 0) > 0) {
+          consumoClientes += parseFloat(v.montoCredito);
         }
       }
     });
@@ -3774,13 +3912,21 @@ app.get('/api/reportes/contable', async (req, res) => {
     ventas.forEach(v => {
       if (v.metodoPago === 'Consumo') {
         consumoPlanilla += (v.descuentoAplicado || v.total);
-      } else if (v.clienteCreditoId !== null) {
-        const esTrab = clienteMap.get(v.clienteCreditoId) || false;
-        const montoCred = v.montoCredito || v.total;
-        if (esTrab) {
-          consumoPlanilla += montoCred;
-        } else {
-          consumoClientes += montoCred;
+      } else {
+        const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+        if (splits.length > 0) {
+          splits.forEach(s => {
+            const esTrab = clienteMap.get(s.clienteId) || false;
+            if (esTrab) {
+              consumoPlanilla += s.monto;
+            } else {
+              consumoClientes += s.monto;
+            }
+          });
+        } else if (v.metodoPago === 'Crédito') {
+          consumoClientes += v.total;
+        } else if (parseFloat(v.montoCredito || 0) > 0) {
+          consumoClientes += parseFloat(v.montoCredito);
         }
       }
     });

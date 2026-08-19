@@ -1,7 +1,199 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check, Users, Layers, Ban, AlertTriangle } from 'lucide-react';
+import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check, Users, Layers, Ban, AlertTriangle, Trash2, Lock, KeyRound } from 'lucide-react';
 
 import { api } from '../api';
+
+// Helper para parsear la distribución de crédito en ventas con múltiples clientes
+const parsearCreditoSplit = (ofertaDescripcion, defaultClienteId, defaultMonto) => {
+  if (ofertaDescripcion && typeof ofertaDescripcion === 'string') {
+    const match = ofertaDescripcion.match(/\[CREDITO_SPLIT:(.*?)\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(item => ({
+            clienteId: parseInt(item.clienteId || item.id),
+            nombre: item.nombre || '',
+            monto: parseFloat(item.monto || 0)
+          })).filter(item => !isNaN(item.clienteId) && item.monto > 0);
+        }
+      } catch (e) {
+        console.error('Error parseando CREDITO_SPLIT:', e);
+      }
+    }
+  }
+  const defId = parseInt(defaultClienteId);
+  const defM = parseFloat(defaultMonto || 0);
+  if (!isNaN(defId) && defId > 0 && defM > 0) {
+    return [{ clienteId: defId, monto: defM, nombre: '' }];
+  }
+  return [];
+};
+
+// Helper seguro para parsear montos ingresados por el usuario
+const parseMonto = (val) => {
+  if (val === null || val === undefined || val === '') return 0;
+  const s = String(val).trim().replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : Math.max(0, n);
+};
+
+// Componente Selector de Cliente con Buscador Integrado y Card de Saldo
+function SelectorClienteCreditoCombobox({
+  clientes = [],
+  clienteSeleccionado,
+  onSelectCliente,
+  label = "Cliente para Crédito:",
+  placeholder = "Buscar por nombre, DNI o RUC..."
+}) {
+  const [busqueda, setBusqueda] = useState('');
+  const [abierto, setAbierto] = useState(false);
+
+  const filtrados = (clientes || []).filter(c => {
+    if (!busqueda.trim()) return true;
+    const term = busqueda.toLowerCase().trim();
+    const nom = (c.nombre || '').toLowerCase();
+    const doc = (c.numDoc || '').toLowerCase();
+    return nom.includes(term) || doc.includes(term);
+  });
+
+  return (
+    <div className="space-y-1 relative">
+      {label && (
+        <div className="flex justify-between items-center mb-1">
+          <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase">{label}</label>
+          {clienteSeleccionado && (
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+              (clienteSeleccionado.saldo || 0) > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              {(clienteSeleccionado.saldo || 0) > 0 ? `Debe S/ ${(clienteSeleccionado.saldo || 0).toFixed(2)}` : 'Al día'}
+            </span>
+          )}
+        </div>
+      )}
+
+      {clienteSeleccionado ? (
+        <div className="bg-amber-50/60 border-2 border-amber-300 rounded-xl p-2 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+              clienteSeleccionado.esTrabajador ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+              <Users className="w-3.5 h-3.5" />
+            </div>
+            <div className="truncate">
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-black text-slate-900 uppercase truncate leading-tight">
+                  {clienteSeleccionado.nombre}
+                </p>
+                <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded shrink-0 ${
+                  clienteSeleccionado.esTrabajador ? 'bg-purple-600 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {clienteSeleccionado.esTrabajador ? 'STAFF' : 'CLIENTE'}
+                </span>
+              </div>
+              <p className="text-[10px] font-medium text-slate-500 truncate">
+                {clienteSeleccionado.tipoDoc || 'DOC'}: {clienteSeleccionado.numDoc || 'S/D'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onSelectCliente(null);
+              setBusqueda('');
+              setAbierto(true);
+            }}
+            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-1 shrink-0"
+            title="Cambiar cliente"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+            <input
+              type="text"
+              placeholder={placeholder}
+              value={busqueda}
+              onFocus={() => setAbierto(true)}
+              onChange={(e) => {
+                setBusqueda(e.target.value);
+                setAbierto(true);
+              }}
+              className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-7 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 shadow-sm"
+            />
+            {busqueda && (
+              <button
+                type="button"
+                onClick={() => setBusqueda('')}
+                className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {abierto && (
+            <>
+              <div 
+                className="fixed inset-0 z-[120]" 
+                onClick={() => setAbierto(false)} 
+              />
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-[130] max-h-48 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
+                {filtrados.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-slate-400 font-bold">
+                    No se encontraron clientes
+                  </div>
+                ) : (
+                  filtrados.map(c => {
+                    const debe = (c.saldo || 0) > 0;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectCliente(c);
+                          setAbierto(false);
+                          setBusqueda('');
+                        }}
+                        className="w-full text-left p-1.5 rounded-xl hover:bg-amber-50/80 transition-colors flex items-center justify-between gap-2 border border-transparent hover:border-amber-200"
+                      >
+                        <div className="truncate">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-800 uppercase truncate">
+                              {c.nombre}
+                            </span>
+                            <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded ${
+                              c.esTrabajador ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {c.esTrabajador ? 'STAFF' : 'CLIENTE'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {c.tipoDoc || 'DOC'}: {c.numDoc || 'S/D'}
+                          </span>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded ${
+                            debe ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
+                          }`}>
+                            {debe ? `Debe S/ ${(c.saldo).toFixed(2)}` : 'S/ 0.00'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const PRODUCT_OPTIONS_CONFIG = {
   "Combo Criollo (Almuerzo)": {
@@ -230,6 +422,8 @@ export default function CajaPage({ currentUser }) {
   const [clientes, setClientes] = useState([]);
   const [abonos, setAbonos] = useState([]);
   const [clienteCreditoSeleccionado, setClienteCreditoSeleccionado] = useState(null);
+  const [clientesCreditoMixto, setClientesCreditoMixto] = useState([{ clienteId: '', monto: '', nombre: '' }]);
+  const [incluirCreditoMixto, setIncluirCreditoMixto] = useState(false);
   const [montoCreditoMixto, setMontoCreditoMixto] = useState('');
   const [deliveryMontoCredito, setDeliveryMontoCredito] = useState('');
   const [deliveryClienteCreditoSeleccionado, setDeliveryClienteCreditoSeleccionado] = useState(null);
@@ -237,6 +431,7 @@ export default function CajaPage({ currentUser }) {
   // Búsqueda de clientes en selectores de crédito
   const [busquedaClienteCredito, setBusquedaClienteCredito] = useState('');
   const [busquedaClienteCreditoDelivery, setBusquedaClienteCreditoDelivery] = useState('');
+  const [pagaConEfectivoMesa, setPagaConEfectivoMesa] = useState('');
 
 
   // Modal cambiar método de pago
@@ -269,8 +464,9 @@ export default function CajaPage({ currentUser }) {
   const [mostrarTodoElDia, setMostrarTodoElDia] = useState(true);
   const [historialColapsado, setHistorialColapsado] = useState(false);
 
-  // PIN para autorizar Consumo en modal de Delivery/Para Llevar
+  // PIN y Cortesías en modal de Delivery/Para Llevar
   const [pinAdminDelivery, setPinAdminDelivery] = useState('');
+  const [cortesiaDeliveryIndices, setCortesiaDeliveryIndices] = useState([]);
 
   // Modal de autorización de cancelación para Llevar/Delivery
   const [cancelLlevarModalOpen, setCancelLlevarModalOpen] = useState(false);
@@ -714,36 +910,54 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
-    // Validar y calcular montos si es Pago Mixto
+    // Validar y calcular montos
     let finalMontoEfectivo = 0;
     let finalMontoTarjeta = 0;
     let finalMontoYape = 0;
     let finalMontoCredito = 0;
+    let finalCreditosDetalle = [];
+    let finalClienteCreditoId = null;
 
-    if (metodoPago === 'Mixto') {
-      const efecVal = parseFloat(mixtoEfectivo || 0);
-      const tarjVal = parseFloat(mixtoTarjeta || 0);
-      const yapeVal = parseFloat(mixtoYape || 0);
-      const credVal = parseFloat(montoCreditoMixto || 0);
+    if (metodoPago === 'Efectivo') {
+      finalMontoEfectivo = total;
+    } else if (metodoPago === 'Tarjeta') {
+      finalMontoTarjeta = total;
+    } else if (metodoPago === 'Yape') {
+      finalMontoYape = total;
+    } else if (metodoPago === 'Mixto') {
+      const efecVal = parseMonto(mixtoEfectivo);
+      const tarjVal = parseMonto(mixtoTarjeta);
+      const yapeVal = parseMonto(mixtoYape);
+      
+      let credVal = 0;
+      if (incluirCreditoMixto) {
+        const validos = (clientesCreditoMixto || []).filter(c => c.clienteId && parseMonto(c.monto) > 0);
+        if (validos.length === 0) {
+          alert('⚠️ Has marcado la opción de incluir crédito en Pago Mixto. Debes seleccionar al menos un cliente de crédito e ingresar su monto.');
+          return;
+        }
 
-      if (efecVal < 0 || tarjVal < 0 || yapeVal < 0 || credVal < 0) {
-        alert('Los montos de pago no pueden ser valores negativos.');
+        credVal = validos.reduce((s, c) => s + parseMonto(c.monto), 0);
+        finalCreditosDetalle = validos.map(c => {
+          const found = clientes.find(cli => String(cli.id) === String(c.clienteId));
+          return {
+            clienteId: parseInt(c.clienteId),
+            nombre: found?.nombre || c.nombre || '',
+            monto: parseMonto(c.monto)
+          };
+        });
+        finalClienteCreditoId = finalCreditosDetalle[0].clienteId;
+      }
+
+      if (tarjVal + yapeVal + credVal > (total + 0.01)) {
+        alert('⚠️ La suma de Tarjeta, Yape / Plin y Crédito no puede superar el total a pagar. El vuelto solo aplica sobre Efectivo.');
         return;
       }
 
-      if (credVal > 0 && !clienteCreditoSeleccionado) {
-        alert('Debe seleccionar un cliente para la porción de pago a crédito.');
-        return;
-      }
-
-      if (tarjVal + yapeVal + credVal > total) {
-        alert('La suma de Tarjeta, Yape / Plin y Crédito no puede superar el total a pagar.');
-        return;
-      }
-
-      const restante = total - (tarjVal + yapeVal + credVal);
-      if (efecVal < restante) {
-        alert(`Monto insuficiente. Debes cubrir el total de S/ ${total.toFixed(2)}.\nFaltan S/ ${(restante - efecVal).toFixed(2)}`);
+      const restante = Math.max(0, total - (tarjVal + yapeVal + credVal));
+      if (efecVal < (restante - 0.01)) {
+        const faltante = Math.max(0, total - (efecVal + tarjVal + yapeVal + credVal));
+        alert(`⚠️ Monto insuficiente. Debes cubrir el total de S/ ${total.toFixed(2)}.\nFaltan S/ ${faltante.toFixed(2)}`);
         return;
       }
 
@@ -751,6 +965,14 @@ export default function CajaPage({ currentUser }) {
       finalMontoTarjeta = tarjVal;
       finalMontoYape = yapeVal;
       finalMontoCredito = credVal;
+    } else if (metodoPago === 'Crédito') {
+      finalCreditosDetalle = [{
+        clienteId: clienteCreditoSeleccionado.id,
+        nombre: clienteCreditoSeleccionado.nombre,
+        monto: total
+      }];
+      finalClienteCreditoId = clienteCreditoSeleccionado.id;
+      finalMontoCredito = total;
     }
 
     setCobrando(true);
@@ -765,12 +987,14 @@ export default function CajaPage({ currentUser }) {
         montoEfectivo: finalMontoEfectivo,
         montoTarjeta: finalMontoTarjeta,
         montoYape: finalMontoYape,
-        montoCredito: metodoPago === 'Crédito' ? total : finalMontoCredito,
-        clienteCreditoId: clienteCreditoSeleccionado?.id || null,
+        montoCredito: finalMontoCredito,
+        clienteCreditoId: finalClienteCreditoId,
+        creditosDetalle: finalCreditosDetalle,
         clienteDireccion: clienteDireccion || '',
         cortesiaItemIds: cortesiaItemIds
       });
 
+      setPagaConEfectivoMesa('');
       setModalOpen(false);
       setNumDocumento('');
       setClienteNombre('');
@@ -782,6 +1006,8 @@ export default function CajaPage({ currentUser }) {
       setMixtoYape('');
       setMontoCreditoMixto('');
       setClienteCreditoSeleccionado(null);
+      setClientesCreditoMixto([{ clienteId: '', monto: '', nombre: '' }]);
+      setIncluirCreditoMixto(false);
       setCortesiaItemIds([]);
 
       // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
@@ -1173,6 +1399,7 @@ export default function CajaPage({ currentUser }) {
     setDeliveryNumDocumento('');
     setTipoDelivery('PedidosYa');
     setPinAdminDelivery('');
+    setCortesiaDeliveryIndices([]);
     setDeliveryModal(true);
   };
 
@@ -1253,6 +1480,7 @@ export default function CajaPage({ currentUser }) {
     }
 
     setPinAdminDelivery('');
+    setCortesiaDeliveryIndices([]);
     setDeliveryModal(true);
   };
 
@@ -1771,15 +1999,16 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
-    // Validar PIN de administrador si el método de pago es Consumo o Cortesía
-    if (deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía') {
+    // Validar PIN de administrador si el método de pago es Consumo o Cortesía, o si hay ítems de cortesía
+    const tieneCortesias = deliveryMetodoPago === 'Consumo' || deliveryMetodoPago === 'Cortesía' || cortesiaDeliveryIndices.length > 0;
+    if (tieneCortesias) {
       if (!pinAdminDelivery.trim()) {
-        alert(`Debes ingresar el PIN del administrador para registrar una ${deliveryMetodoPago === 'Cortesía' ? 'Cortesía' : 'Consumo de Personal'}.`);
+        alert(`⚠️ Debes ingresar el PIN del administrador/cajero para autorizar ${deliveryMetodoPago === 'Consumo' ? 'un Consumo de Personal' : 'la Cortesía'}.`);
         return;
       }
       const authResult = await api.validateAuth(pinAdminDelivery.trim());
       if (!authResult || !authResult.ok) {
-        alert(`❌ PIN incorrecto. Solo el administrador puede autorizar una ${deliveryMetodoPago === 'Cortesía' ? 'Cortesía' : 'Consumo de Personal'}.`);
+        alert(`❌ PIN incorrecto. Solo el administrador/cajero puede autorizar ${deliveryMetodoPago === 'Consumo' ? 'un Consumo de Personal' : 'la Cortesía'}.`);
         setPinAdminDelivery('');
         return;
       }
@@ -1792,20 +2021,33 @@ export default function CajaPage({ currentUser }) {
       }
     }
 
+    // Mapear items finales marcando a S/ 0.00 los que sean de cortesía
+    const itemsFinales = itemsDelivery.map((item, idx) => {
+      const esCortesia = deliveryMetodoPago === 'Cortesía' || cortesiaDeliveryIndices.includes(idx);
+      if (esCortesia) {
+        return {
+          ...item,
+          precio: 0,
+          notas: item.notas ? `${item.notas} [CORTESÍA]` : '[CORTESÍA]'
+        };
+      }
+      return item;
+    });
+
     // Validar y calcular montos si es Pago Mixto
     let deliveryFinalMontoEfectivo = 0;
     let deliveryFinalMontoTarjeta = 0;
     let deliveryFinalMontoYape = 0;
     let deliveryFinalMontoCredito = 0;
     
-    const itemsTotal = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
-    const shippingFee = parseFloat(deliveryMontoEnvio || 0);
+    const itemsTotal = itemsFinales.reduce((s, i) => s + i.cant * i.precio, 0);
+    const shippingFee = (tipoDelivery === 'DeliveryPropio' && deliveryMetodoPago !== 'Cortesía') ? parseFloat(deliveryMontoEnvio || 0) : 0;
 
     // Descuento porcentual para llevar/delivery
     const descPct = parseFloat(deliveryDescuentoPorcentaje || 0);
-    const descuentoMonto = descPct > 0 ? parseFloat((itemsTotal * (descPct / 100)).toFixed(2)) : 0;
+    const descuentoMonto = (descPct > 0 && itemsTotal > 0) ? parseFloat((itemsTotal * (descPct / 100)).toFixed(2)) : 0;
     const totalConDescuento = Math.max(0, itemsTotal - descuentoMonto);
-    const grandTotal = totalConDescuento + shippingFee;
+    const grandTotal = deliveryMetodoPago === 'Cortesía' ? 0.00 : (totalConDescuento + shippingFee);
     const descuentoFinal = descPct > 0 ? descuentoMonto : 0;
 
     if (tipoDelivery !== 'PedidosYa' && deliveryMetodoPago === 'Mixto') {
@@ -1860,8 +2102,8 @@ export default function CajaPage({ currentUser }) {
       const payload = {
         codigoPedidosYa: codigoFormateado,
         cajero: cajeroNombre,
-        items: itemsDelivery,
-        total: itemsTotal,
+        items: itemsFinales,
+        total: grandTotal,
         tipoDelivery,
         tipoComprobante: tipoDelivery === 'PedidosYa' ? 'Ticket' : deliveryTipoComprobante,
         metodoPago: tipoDelivery === 'PedidosYa' ? 'PedidosYa' : deliveryMetodoPago,
@@ -1894,12 +2136,14 @@ export default function CajaPage({ currentUser }) {
       setDeliveryMontoCredito('');
       setDeliveryClienteCreditoSeleccionado(null);
       setDeliveryDescuentoPorcentaje('');
+      setPinAdminDelivery('');
+      setCortesiaDeliveryIndices([]);
       await fetchCajaData();
       
       // Si es Para Llevar o Delivery Propio con comprobante Boleta o Factura (o Ticket), activamos el ticket de impresión
       if (tipoDelivery !== 'PedidosYa') {
         // Para que en la impresión figuren los items reales del ticket
-        const itemsImpresion = [...itemsDelivery];
+        const itemsImpresion = [...itemsFinales];
         if (shippingFee > 0) {
           itemsImpresion.push({
             id: '9999',
@@ -1939,12 +2183,16 @@ export default function CajaPage({ currentUser }) {
     }
   };
 
-  const totalDelivery = itemsDelivery.reduce((s, i) => s + i.cant * i.precio, 0);
+  const cortesiaDeliveryItemsTotal = itemsDelivery.reduce((s, i, idx) => {
+    if (deliveryMetodoPago === 'Cortesía' || cortesiaDeliveryIndices.includes(idx)) return s;
+    return s + i.cant * i.precio;
+  }, 0);
+  const totalDelivery = deliveryMetodoPago === 'Cortesía' ? 0 : cortesiaDeliveryItemsTotal;
   const deliveryDescPct = parseFloat(deliveryDescuentoPorcentaje || 0);
-  const deliveryDescuentoMonto = deliveryDescPct > 0 ? parseFloat((totalDelivery * (deliveryDescPct / 100)).toFixed(2)) : 0;
+  const deliveryDescuentoMonto = (deliveryDescPct > 0 && totalDelivery > 0) ? parseFloat((totalDelivery * (deliveryDescPct / 100)).toFixed(2)) : 0;
   const deliveryTotalConDescuento = Math.max(0, totalDelivery - deliveryDescuentoMonto);
-  const deliveryShippingFee = (tipoDelivery === 'DeliveryPropio') ? parseFloat(deliveryMontoEnvio || 0) : 0;
-  const grandTotalDelivery = deliveryTotalConDescuento + deliveryShippingFee;
+  const deliveryShippingFee = (tipoDelivery === 'DeliveryPropio' && deliveryMetodoPago !== 'Cortesía') ? parseFloat(deliveryMontoEnvio || 0) : 0;
+  const grandTotalDelivery = deliveryMetodoPago === 'Cortesía' ? 0 : (deliveryTotalConDescuento + deliveryShippingFee);
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-slate-50">
@@ -2054,7 +2302,18 @@ export default function CajaPage({ currentUser }) {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
-                          onClick={() => { setMesaSeleccionada(m); setCortesiaItemIds([]); setModalOpen(true); }}
+                          onClick={() => {
+                            setMesaSeleccionada(m);
+                            setCortesiaItemIds([]);
+                            setClienteCreditoSeleccionado(null);
+                            setClientesCreditoMixto([{ clienteId: '', monto: '', nombre: '' }]);
+                            setIncluirCreditoMixto(false);
+                            setMontoCreditoMixto('');
+                            setMixtoEfectivo('');
+                            setMixtoTarjeta('');
+                            setMixtoYape('');
+                            setModalOpen(true);
+                          }}
                           className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md group-hover:scale-105 active:scale-95 group-hover:bg-amber-500 group-hover:text-slate-900"
                         >Cobrar</button>
                       </td>
@@ -2574,7 +2833,8 @@ export default function CajaPage({ currentUser }) {
             if (v.metodoPago === 'Yape') return { efec: 0, tarj: 0, yape: total };
 
             // Restar la parte a crédito si es mixto
-            const totalFisico = total - parseFloat(v.montoCredito || 0);
+            const creditAmount = parseFloat(v.montoCredito || 0);
+            const totalFisico = Math.max(0, total - creditAmount);
             const suma = efec + tarj + yape;
             if (Math.abs(suma - totalFisico) > 0.01) {
               if (suma === 0) efec = totalFisico;
@@ -2625,18 +2885,29 @@ export default function CajaPage({ currentUser }) {
           let activeConsumoClientes = 0;
 
           ventasFiltradas.forEach(v => {
+            if (v.anulado || v.estadoPedido === 'Cancelado') return;
             if (v.metodoPago === 'Consumo') {
-              activeConsumoPlanilla += (v.descuentoAplicado || v.total);
-            } else if (v.clienteCreditoId !== null) {
-              const esTrab = clienteMap.get(v.clienteCreditoId) || false;
-              const montoCred = v.montoCredito || v.total;
-              if (esTrab) {
-                activeConsumoPlanilla += montoCred;
-              } else {
-                activeConsumoClientes += montoCred;
+              activeConsumoPlanilla += (v.descuentoAplicado || v.total || 0);
+            } else {
+              const splits = v.creditoSplit || parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+              if (splits.length > 0) {
+                splits.forEach(s => {
+                  const esTrab = clienteMap.get(s.clienteId) || false;
+                  if (esTrab) {
+                    activeConsumoPlanilla += s.monto;
+                  } else {
+                    activeConsumoClientes += s.monto;
+                  }
+                });
+              } else if (v.metodoPago === 'Crédito') {
+                activeConsumoClientes += (v.total || 0);
+              } else if (parseFloat(v.montoCredito || 0) > 0) {
+                activeConsumoClientes += parseFloat(v.montoCredito);
               }
             }
           });
+
+          const totalCreditosTurno = activeConsumoClientes + activeConsumoPlanilla;
 
           return (
             <div className="bg-slate-900 rounded-3xl shadow-xl p-5 text-white flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar">
@@ -2703,33 +2974,34 @@ export default function CajaPage({ currentUser }) {
                   </div>
                 </div>
 
-                {/* Tarjeta: Crédito Clientes — comercial */}
-                {activeConsumoClientes > 0 && (
-                  <div className="bg-gradient-to-br from-teal-900 to-emerald-950 p-4 rounded-2xl relative overflow-hidden text-teal-200 border border-teal-850 shadow-md">
-                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10" />
-                    <p className="text-[10px] font-black uppercase tracking-wider opacity-90 text-teal-350">👥 Créditos Comerciales</p>
-                    <p className="text-[9px] font-bold opacity-60 mt-0.5">Cuentas por cobrar clientes</p>
-                    <div className="flex items-center gap-2.5 mt-1.5 relative z-10">
-                      <div className="w-8 h-8 bg-teal-800 rounded-lg flex items-center justify-center"><Users className="w-4 h-4 text-teal-300" /></div>
-                      <p className="text-2xl font-black font-mono tracking-tighter text-white">S/ {activeConsumoClientes.toFixed(2)}</p>
+                {/* Tarjeta Siempre Visible: Créditos y Consumos del Turno */}
+                <div className="bg-gradient-to-br from-teal-900/90 via-slate-900 to-indigo-950 p-4 rounded-2xl relative overflow-hidden text-teal-200 border border-teal-800/60 shadow-lg">
+                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-teal-500 rounded-full opacity-10" />
+                  <div className="flex justify-between items-start mb-2 relative z-10">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
+                        <Wallet className="w-3.5 h-3.5 text-teal-400" /> Créditos del Turno
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-0.5">Comerciales + Descuento Planilla</p>
+                    </div>
+                    <span className="font-mono text-xs font-black text-white bg-teal-950/80 px-2 py-0.5 rounded-lg border border-teal-800">
+                      S/ {totalCreditosTurno.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-teal-800/40 text-[9px] font-bold">
+                    <div className="bg-slate-900/60 p-2.5 rounded-xl border border-teal-900/50 flex flex-col justify-between">
+                      <span className="text-teal-400 text-[8px] uppercase tracking-wider block">👥 Clientes</span>
+                      <span className="font-mono text-sm text-white font-black block mt-1">S/ {activeConsumoClientes.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-slate-900/60 p-2.5 rounded-xl border border-violet-900/50 flex flex-col justify-between">
+                      <span className="text-violet-300 text-[8px] uppercase tracking-wider block">👤 Planilla</span>
+                      <span className="font-mono text-sm text-white font-black block mt-1">S/ {activeConsumoPlanilla.toFixed(2)}</span>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* Tarjeta: Consumo Planilla — personal */}
-                {activeConsumoPlanilla > 0 && (
-                  <div className="bg-gradient-to-br from-violet-900 to-indigo-950 p-4 rounded-2xl relative overflow-hidden text-violet-200 border border-violet-850 shadow-md">
-                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-10" />
-                    <p className="text-[10px] font-black uppercase tracking-wider opacity-90 text-violet-300">👤 Consumo Planilla</p>
-                    <p className="text-[9px] font-bold opacity-60 mt-0.5">Descuento planilla colaboradores</p>
-                    <div className="flex items-center gap-2.5 mt-1.5 relative z-10">
-                      <div className="w-8 h-8 bg-violet-800 rounded-lg flex items-center justify-center"><Users className="w-4 h-4 text-violet-300" /></div>
-                      <p className="text-2xl font-black font-mono tracking-tighter text-white">S/ {activeConsumoPlanilla.toFixed(2)}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Tarjeta: Cortesías antiguas — solo si hay */}
+                {/* Tarjeta: Cortesías — solo si hay */}
                 {activeCortesias > 0 && (
                   <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-4 rounded-2xl relative overflow-hidden text-slate-300 border border-slate-700 shadow-md">
                     <div className="absolute -right-4 -top-4 w-20 h-20 bg-white rounded-full opacity-5" />
@@ -2848,212 +3120,498 @@ export default function CajaPage({ currentUser }) {
                   </div>
                 </div>
 
+                {/* FORMATO 1: PAGO EN EFECTIVO CON CALCULADORA Y VUELTO */}
+                {metodoPago === 'Efectivo' && (() => {
+                  const total = totalConCortesias;
+                  const pagaCon = parseFloat(pagaConEfectivoMesa || 0);
+                  const vuelto = (pagaCon >= total && pagaCon > 0) ? (pagaCon - total) : 0;
+                  const faltante = (pagaCon > 0 && pagaCon < total) ? (total - pagaCon) : 0;
+
+                  return (
+                    <div className="bg-emerald-500/5 border border-emerald-500/25 p-4 rounded-3xl space-y-3 animate-fade-in shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <Banknote className="w-4 h-4 text-emerald-600" />
+                          Cobro en Efectivo
+                        </span>
+                        <span className="text-xs font-black font-mono text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                          Total: S/ {total.toFixed(2)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <label className="block text-slate-600 font-bold mb-1 text-[10px] tracking-wider uppercase">
+                            Paga con (S/):
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={pagaConEfectivoMesa}
+                            onChange={(e) => setPagaConEfectivoMesa(e.target.value)}
+                            placeholder={`S/ ${total.toFixed(2)}`}
+                            className="w-full bg-white border-2 border-emerald-300 focus:border-emerald-500 rounded-xl px-3 py-2 text-base font-mono font-black text-slate-900 focus:outline-none shadow-inner"
+                          />
+                        </div>
+
+                        <div className="flex flex-col justify-end bg-white border border-emerald-200/80 rounded-xl px-3.5 py-2 shadow-xs">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                            {faltante > 0 ? 'Falta Pagar:' : 'Vuelto al Cliente:'}
+                          </span>
+                          <span className={`font-mono font-black text-xl leading-tight ${faltante > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            S/ {faltante > 0 ? faltante.toFixed(2) : vuelto.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Botones de billetes y montos rápidos */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1">Billetes:</span>
+                        <button
+                          type="button"
+                          onClick={() => setPagaConEfectivoMesa(total.toFixed(2))}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase transition-all active:scale-95 shadow-xs"
+                        >
+                          Exacto S/ {total.toFixed(2)}
+                        </button>
+                        {[10, 20, 50, 100, 200].map(monto => (
+                          <button
+                            key={monto}
+                            type="button"
+                            onClick={() => setPagaConEfectivoMesa(monto.toFixed(2))}
+                            className="px-2.5 py-1 bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 text-slate-700 font-bold rounded-lg text-[10px] transition-all active:scale-95 shadow-xs font-mono"
+                          >
+                            S/ {monto}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* FORMATO 2: PAGO CON TARJETA */}
+                {metodoPago === 'Tarjeta' && (
+                  <div className="bg-blue-500/5 border border-blue-500/25 p-4 rounded-3xl space-y-2 animate-fade-in shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <CreditCard className="w-4 h-4 text-blue-600" />
+                        Cobro con Tarjeta (POS)
+                      </span>
+                      <span className="text-xs font-black font-mono text-blue-700 bg-blue-100/80 px-2.5 py-0.5 rounded-lg border border-blue-200">
+                        Total: S/ {totalConCortesias.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                      El monto total de <strong className="font-mono text-blue-700 font-black">S/ {totalConCortesias.toFixed(2)}</strong> se registrará pagado íntegramente mediante tarjeta (Visa, Mastercard u otro POS).
+                    </p>
+                  </div>
+                )}
+
+                {/* FORMATO 3: PAGO CON YAPE / PLIN */}
+                {metodoPago === 'Yape' && (
+                  <div className="bg-purple-500/5 border border-purple-500/25 p-4 rounded-3xl space-y-2 animate-fade-in shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-purple-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Wallet className="w-4 h-4 text-purple-600" />
+                        Cobro con Yape / Plin
+                      </span>
+                      <span className="text-xs font-black font-mono text-purple-700 bg-purple-100/80 px-2.5 py-0.5 rounded-lg border border-purple-200">
+                        Total: S/ {totalConCortesias.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                      El monto total de <strong className="font-mono text-purple-700 font-black">S/ {totalConCortesias.toFixed(2)}</strong> se registrará pagado íntegramente mediante billetera digital (QR / Número celular).
+                    </p>
+                  </div>
+                )}
+
                 {metodoPago === 'Crédito' && (
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-2">
-                    <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Seleccionar Cliente de Crédito:</label>
-                    <select 
-                      value={clienteCreditoSeleccionado?.id || ''} 
-                      onChange={(e) => {
-                        const client = clientes.find(c => String(c.id) === String(e.target.value));
-                        setClienteCreditoSeleccionado(client || null);
-                        if (client) {
-                          setClienteNombre(client.nombre);
-                          setNumDocumento(client.numDoc || '');
-                          setClienteDireccion(client.direccion || '');
+                    <SelectorClienteCreditoCombobox
+                      clientes={clientes}
+                      clienteSeleccionado={clienteCreditoSeleccionado}
+                      onSelectCliente={(c) => {
+                        setClienteCreditoSeleccionado(c);
+                        if (c) {
+                          setClienteNombre(c.nombre);
+                          setNumDocumento(c.numDoc || '');
+                          setClienteDireccion(c.direccion || '');
                         }
                       }}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-sm"
-                    >
-                      <option value="">-- Seleccionar Cliente --</option>
-                      {clientes.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`}
-                        </option>
-                      ))}
-                    </select>
+                      label="Seleccionar Cliente de Crédito:"
+                    />
                   </div>
                 )}
 
                 {metodoPago === 'Mixto' && (() => {
                   const total = totalConCortesias;
-                  const efecVal = parseFloat(mixtoEfectivo || 0);
-                  const tarjVal = parseFloat(mixtoTarjeta || 0);
-                  const yapeVal = parseFloat(mixtoYape || 0);
-                  const credVal = parseFloat(montoCreditoMixto || 0);
-                  const ingresado = efecVal + tarjVal + yapeVal + credVal;
-                  const restante = Math.max(0, total - (tarjVal + yapeVal + credVal));
-                  const vuelto = efecVal > restante ? efecVal - restante : 0;
-                  const diferencia = total - ingresado;
-                  
+                  const efecVal = parseMonto(mixtoEfectivo);
+                  const tarjVal = parseMonto(mixtoTarjeta);
+                  const yapeVal = parseMonto(mixtoYape);
+
+                  // Crédito calculado de las filas de clientes si el checkbox está activo
+                  const credVal = incluirCreditoMixto 
+                    ? (clientesCreditoMixto || []).reduce((s, c) => s + parseMonto(c.monto), 0)
+                    : 0;
+
+                  const totalIngresado = efecVal + tarjVal + yapeVal + credVal;
+                  const restanteFisico = Math.max(0, total - (tarjVal + yapeVal + credVal));
+                  const vuelto = efecVal > restanteFisico ? efecVal - restanteFisico : 0;
+                  const faltante = Math.max(0, total - (Math.min(efecVal, restanteFisico) + tarjVal + yapeVal + credVal));
+                  const cuadraExacto = faltante <= 0.01 && (tarjVal + yapeVal + credVal) <= (total + 0.01);
+
+                  // Porcentajes para barra visual
+                  const pctEfec = total > 0 ? Math.min(100, (Math.min(efecVal, restanteFisico) / total) * 100) : 0;
+                  const pctTarj = total > 0 ? Math.min(100, (tarjVal / total) * 100) : 0;
+                  const pctYape = total > 0 ? Math.min(100, (yapeVal / total) * 100) : 0;
+                  const pctCred = total > 0 ? Math.min(100, (credVal / total) * 100) : 0;
+                  const noEfectivoExcedido = (tarjVal + yapeVal + credVal) > (total + 0.01);
+
                   return (
-                    <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl shadow-sm space-y-4">
-                      <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex justify-between">
-                        <span>Desglose de Pago Mixto</span>
-                        <span>Total: S/ {total.toFixed(2)}</span>
-                      </h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">💵 Efectivo</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const resto = Math.max(0, total - (tarjVal + yapeVal + credVal));
-                                setMixtoEfectivo(resto > 0 ? resto.toFixed(2) : '');
-                              }}
-                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
-                              title="Completar el saldo restante"
-                            >
-                              Completar
-                            </button>
-                          </div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={mixtoEfectivo}
-                            onChange={(e) => setMixtoEfectivo(e.target.value)}
-                            placeholder="0.00"
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
-                          />
+                    <div className="bg-slate-900/5 border border-slate-200 p-4 rounded-3xl shadow-sm space-y-4">
+                      {/* Header y Barra Visual */}
+                      <div className="space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-black uppercase tracking-wider">
+                          <span className="text-slate-800 flex items-center gap-1.5">
+                            <Calculator className="w-4 h-4 text-amber-500" /> Desglose de Pago Mixto
+                          </span>
+                          <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200 text-[11px] font-black">
+                            Total a Cobrar: S/ {total.toFixed(2)}
+                          </span>
                         </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">💳 Tarjeta</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const resto = Math.max(0, total - (efecVal + yapeVal + credVal));
-                                setMixtoTarjeta(resto > 0 ? resto.toFixed(2) : '');
-                              }}
-                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
-                              title="Completar el saldo restante"
-                            >
-                              Completar
-                            </button>
-                          </div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={mixtoTarjeta}
-                            onChange={(e) => setMixtoTarjeta(e.target.value)}
-                            placeholder="0.00"
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
-                          />
+
+                        {/* Barra de Progreso Multicolor */}
+                        <div className="h-3.5 w-full bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
+                          {pctEfec > 0 && (
+                            <div style={{ width: `${pctEfec}%` }} className="bg-emerald-500 h-full transition-all duration-300" title={`Efectivo: S/ ${efecVal.toFixed(2)}`} />
+                          )}
+                          {pctTarj > 0 && (
+                            <div style={{ width: `${pctTarj}%` }} className="bg-blue-500 h-full transition-all duration-300" title={`Tarjeta: S/ ${tarjVal.toFixed(2)}`} />
+                          )}
+                          {pctYape > 0 && (
+                            <div style={{ width: `${pctYape}%` }} className="bg-purple-500 h-full transition-all duration-300" title={`Yape/Plin: S/ ${yapeVal.toFixed(2)}`} />
+                          )}
+                          {pctCred > 0 && (
+                            <div style={{ width: `${pctCred}%` }} className="bg-teal-500 h-full transition-all duration-300" title={`Crédito: S/ ${credVal.toFixed(2)}`} />
+                          )}
                         </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">📱 Yape/Plin</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const resto = Math.max(0, total - (efecVal + tarjVal + credVal));
-                                setMixtoYape(resto > 0 ? resto.toFixed(2) : '');
-                              }}
-                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
-                              title="Completar el saldo restante"
-                            >
-                              Completar
-                            </button>
-                          </div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={mixtoYape}
-                            onChange={(e) => setMixtoYape(e.target.value)}
-                            placeholder="0.00"
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="block text-slate-500 font-bold text-[9px] tracking-wider uppercase">👥 Crédito</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const resto = Math.max(0, total - (efecVal + tarjVal + yapeVal));
-                                setMontoCreditoMixto(resto > 0 ? resto.toFixed(2) : '');
-                              }}
-                              className="text-[9px] font-black text-amber-600 hover:text-amber-700 bg-amber-50 px-1 py-0.2 rounded cursor-pointer transition-all active:scale-95"
-                              title="Completar el saldo restante"
-                            >
-                              Completar
-                            </button>
-                          </div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={montoCreditoMixto}
-                            onChange={(e) => setMontoCreditoMixto(e.target.value)}
-                            placeholder="0.00"
-                            className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-mono font-bold text-slate-800 text-xs focus:outline-none focus:border-amber-500"
-                          />
+
+                        {/* Leyenda interactiva de la barra */}
+                        <div className="flex flex-wrap gap-2.5 text-[9px] font-bold text-slate-500">
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Efectivo</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Tarjeta</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 inline-block" /> Yape/Plin</span>
+                          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-500 inline-block" /> Crédito</span>
                         </div>
                       </div>
 
-                      {credVal > 0 && (
-                        <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
-                          <label className="block text-slate-500 font-bold mb-1 text-[9px] tracking-widest uppercase">Cliente para Crédito:</label>
-                          <input
-                            type="text"
-                            placeholder="Buscar por nombre o documento..."
-                            value={busquedaClienteCredito}
-                            onChange={e => setBusquedaClienteCredito(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-amber-500"
-                          />
-                          <select
-                            value={clienteCreditoSeleccionado?.id || ''}
-                            onChange={(e) => {
-                              const client = clientes.find(c => String(c.id) === String(e.target.value));
-                              setClienteCreditoSeleccionado(client || null);
-                            }}
-                            size={Math.min(5, clientes.filter(c =>
-                              !busquedaClienteCredito ||
-                              (c.nombre || '').toLowerCase().includes(busquedaClienteCredito.toLowerCase()) ||
-                              (c.numDoc || '').includes(busquedaClienteCredito)
-                            ).length + 1)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none focus:border-amber-500 font-bold text-slate-800 text-xs"
-                          >
-                            <option value="">-- Seleccionar --</option>
-                            {clientes
-                              .filter(c =>
-                                !busquedaClienteCredito ||
-                                (c.nombre || '').toLowerCase().includes(busquedaClienteCredito.toLowerCase()) ||
-                                (c.numDoc || '').includes(busquedaClienteCredito)
-                              )
-                              .map(c => (
-                                <option key={c.id} value={c.id}>
-                                  {c.nombre} {c.esTrabajador ? '(STAFF)' : `(${c.tipoDoc}: ${c.numDoc || 'S/D'})`} {(c.saldo || 0) > 0 ? `· Debe S/${(c.saldo).toFixed(2)}` : ''}
-                                </option>
-                              ))
-                            }
-                          </select>
-                          {clienteCreditoSeleccionado && (
-                            <div className={`text-[10px] font-black px-2 py-1 rounded-lg ${(clienteCreditoSeleccionado.saldo || 0) > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                              Saldo actual: S/ {(clienteCreditoSeleccionado.saldo || 0).toFixed(2)}
-                            </div>
-                          )}
+                      {/* Alerta de exceso de métodos no efectivo */}
+                      {noEfectivoExcedido && (
+                        <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-2xl text-[10px] font-bold flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>Tarjeta, Yape y Crédito suman S/ {(tarjVal + yapeVal + credVal).toFixed(2)}, lo cual supera el total de la cuenta (S/ {total.toFixed(2)}). El vuelto solo se genera con pago en Efectivo.</span>
                         </div>
                       )}
 
-                      <div className="bg-white/80 p-2.5 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-[10px] font-bold text-slate-600">
-                        <div className="flex justify-between">
-                          <span>Ingresado:</span>
-                          <span className="font-mono text-slate-800">S/ {ingresado.toFixed(2)}</span>
+                      {/* Grid de Inputs de Métodos de Pago: 3 Métodos Directos */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {/* 1. EFECTIVO */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm hover:border-emerald-400 transition-all flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-center mb-1.5">
+                              <label className="text-slate-700 font-black text-[11px] tracking-wider uppercase flex items-center gap-1">
+                                💵 Efectivo
+                              </label>
+                              {efecVal > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMixtoEfectivo('')}
+                                  className="text-[9px] font-bold text-slate-400 hover:text-rose-600"
+                                >
+                                  Limpiar
+                                </button>
+                              )}
+                            </div>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-black text-sm">S/</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={mixtoEfectivo}
+                                onChange={(e) => setMixtoEfectivo(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 font-mono font-black text-slate-900 text-base focus:outline-none focus:border-emerald-500 focus:bg-white transition-all"
+                              />
+                            </div>
+                          </div>
+                          {/* Chips de billetes */}
+                          <div className="flex gap-1 mt-2.5">
+                            {[10, 20, 50, 100].map(billete => (
+                              <button
+                                key={billete}
+                                type="button"
+                                onClick={() => {
+                                  const actual = parseMonto(mixtoEfectivo);
+                                  setMixtoEfectivo((actual + billete).toFixed(2));
+                                }}
+                                className="flex-1 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 text-slate-600 font-mono font-bold text-[9px] rounded-lg transition-all active:scale-95"
+                              >
+                                +{billete}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span>Faltante:</span>
-                          <span className={`font-mono ${diferencia > 0 ? 'text-red-650' : 'text-emerald-600'}`}>
-                            S/ {Math.max(0, diferencia).toFixed(2)}
+
+                        {/* 2. TARJETA */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm hover:border-blue-400 transition-all flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-center mb-1.5">
+                              <label className="text-slate-700 font-black text-[11px] tracking-wider uppercase flex items-center gap-1">
+                                💳 Tarjeta
+                              </label>
+                              {tarjVal > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMixtoTarjeta('')}
+                                  className="text-[9px] font-bold text-slate-400 hover:text-rose-600"
+                                >
+                                  Limpiar
+                                </button>
+                              )}
+                            </div>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-black text-sm">S/</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={mixtoTarjeta}
+                                onChange={(e) => setMixtoTarjeta(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 font-mono font-black text-slate-900 text-base focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-2.5 flex justify-end">
+                            <span className="text-[10px] text-slate-400 font-medium">Pago POS / Tarjeta</span>
+                          </div>
+                        </div>
+
+                        {/* 3. YAPE / PLIN */}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm hover:border-purple-400 transition-all flex flex-col justify-between">
+                          <div>
+                            <div className="flex justify-between items-center mb-1.5">
+                              <label className="text-slate-700 font-black text-[11px] tracking-wider uppercase flex items-center gap-1">
+                                📱 Yape / Plin
+                              </label>
+                              {yapeVal > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMixtoYape('')}
+                                  className="text-[9px] font-bold text-slate-400 hover:text-rose-600"
+                                >
+                                  Limpiar
+                                </button>
+                              )}
+                            </div>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-black text-sm">S/</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={mixtoYape}
+                                onChange={(e) => setMixtoYape(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 font-mono font-black text-slate-900 text-base focus:outline-none focus:border-purple-500 focus:bg-white transition-all"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-2.5 flex justify-end">
+                            <span className="text-[10px] text-slate-400 font-medium">Billetera Digital</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CHECKBOX PARA HABILITAR PAGO A CRÉDITO */}
+                      <div 
+                        onClick={() => {
+                          const nextState = !incluirCreditoMixto;
+                          setIncluirCreditoMixto(nextState);
+                          if (!nextState) {
+                            setClientesCreditoMixto([{ clienteId: '', monto: '', nombre: '' }]);
+                          }
+                        }}
+                        className={`border-2 rounded-2xl p-4 transition-all cursor-pointer flex items-center justify-between shadow-sm select-none ${
+                          incluirCreditoMixto 
+                            ? 'bg-teal-500/10 border-teal-500 text-teal-950' 
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={incluirCreditoMixto}
+                            onChange={(e) => {
+                              setIncluirCreditoMixto(e.target.checked);
+                              if (!e.target.checked) {
+                                setClientesCreditoMixto([{ clienteId: '', monto: '', nombre: '' }]);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-5 h-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+                          />
+                          <div>
+                            <p className="font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
+                              <Users className="w-4 h-4 text-teal-600" /> ¿Incluir Pago con Crédito a Clientes?
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-medium">
+                              {incluirCreditoMixto 
+                                ? 'Sección de crédito activada. Asigna el monto a cada cliente deudor a continuación.' 
+                                : 'Marca esta casilla para seleccionar uno o varios clientes y asignarles monto a crédito.'}
+                            </p>
+                          </div>
+                        </div>
+                        {incluirCreditoMixto && (
+                          <span className="font-mono font-black text-sm text-teal-900 bg-teal-100 px-3 py-1 rounded-xl border border-teal-200">
+                            Total Crédito: S/ {credVal.toFixed(2)}
                           </span>
+                        )}
+                      </div>
+
+                      {/* SECCIÓN DESPLEGABLE: ASIGNACIÓN DE CLIENTES A CRÉDITO */}
+                      {incluirCreditoMixto && (
+                        <div className="bg-teal-500/5 border-2 border-teal-500/30 rounded-3xl p-4 space-y-3.5 shadow-sm animate-fade-in">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-teal-200/80 pb-3">
+                            <div>
+                              <h4 className="text-xs font-black uppercase text-teal-900 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-teal-700" />
+                                Clientes Deudores Asignados al Crédito
+                              </h4>
+                              <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                                Selecciona al cliente e ingresa el monto que se cargará a su cuenta de crédito.
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-black px-3 py-1 rounded-full border shadow-sm bg-teal-100 text-teal-900 border-teal-300">
+                              Suma Crédito: S/ {credVal.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="space-y-3">
+                            {(clientesCreditoMixto || []).map((row, idx) => {
+                              const currentClient = clientes.find(c => String(c.id) === String(row.clienteId));
+                              const filaSinCliente = !row.clienteId && parseMonto(row.monto) > 0;
+
+                              return (
+                                <div key={idx} className={`bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm transition-all ${
+                                  filaSinCliente ? 'border-rose-400 ring-2 ring-rose-100' : 'border-slate-200'
+                                }`}>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1.5">
+                                      <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center text-[9px] font-black">
+                                        {idx + 1}
+                                      </span>
+                                      Cliente de Crédito
+                                    </span>
+                                    {clientesCreditoMixto.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setClientesCreditoMixto(prev => prev.filter((_, i) => i !== idx));
+                                        }}
+                                        className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                                        title="Eliminar cliente"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <SelectorClienteCreditoCombobox
+                                    clientes={clientes}
+                                    clienteSeleccionado={currentClient}
+                                    onSelectCliente={(c) => {
+                                      setClientesCreditoMixto(prev => {
+                                        const next = [...prev];
+                                        next[idx] = {
+                                          ...next[idx],
+                                          clienteId: c ? c.id : '',
+                                          nombre: c ? c.nombre : ''
+                                        };
+                                        return next;
+                                      });
+                                    }}
+                                    label=""
+                                    placeholder="Buscar por nombre, DNI o RUC..."
+                                  />
+
+                                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <span className="text-[10px] font-black text-slate-600 uppercase shrink-0">Monto a cargar a este cliente:</span>
+                                    <div className="relative flex-1">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs">S/</span>
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="0.00"
+                                        value={row.monto}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setClientesCreditoMixto(prev => {
+                                            const next = [...prev];
+                                            next[idx] = { ...next[idx], monto: val };
+                                            return next;
+                                          });
+                                        }}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-2.5 py-1.5 font-mono font-black text-slate-800 text-sm focus:outline-none focus:border-teal-500 focus:bg-white"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setClientesCreditoMixto(prev => [...prev, { clienteId: '', monto: '', nombre: '' }]);
+                            }}
+                            className="w-full py-2.5 bg-white hover:bg-teal-50 text-teal-800 font-black text-xs uppercase rounded-2xl border-2 border-dashed border-teal-300 hover:border-teal-500 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Dividir crédito con otro cliente
+                          </button>
                         </div>
+                      )}
+
+                      {/* RESUMEN FINAL DEL PAGO MIXTO */}
+                      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2 text-xs">
+                        <div className="flex justify-between items-center text-slate-600 font-medium">
+                          <span>Total de la Cuenta:</span>
+                          <span className="font-mono font-black text-slate-900 text-sm">S/ {total.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-600 font-medium">
+                          <span>Total Ingresado (Efectivo + Tarjeta + Yape + Crédito):</span>
+                          <span className="font-mono font-black text-slate-900 text-sm">S/ {totalIngresado.toFixed(2)}</span>
+                        </div>
+                        
+                        {faltante > 0.01 && (
+                          <div className="flex justify-between items-center text-amber-700 bg-amber-50 p-2.5 rounded-xl font-bold border border-amber-200">
+                            <span>⏳ Saldo Faltante por Cubrir:</span>
+                            <span className="font-mono font-black text-sm">S/ {faltante.toFixed(2)}</span>
+                          </div>
+                        )}
+
                         {vuelto > 0 && (
-                          <div className="flex justify-between col-span-2 border-t border-slate-100 pt-1.5 mt-0.5 text-xs text-emerald-700 font-black">
-                            <span>💸 Vuelto a Entregar:</span>
-                            <span className="font-mono">S/ {vuelto.toFixed(2)}</span>
+                          <div className="flex justify-between items-center text-emerald-800 bg-emerald-50 p-2.5 rounded-xl font-bold border border-emerald-200">
+                            <span>💸 Vuelto a Entregar al Cliente:</span>
+                            <span className="font-mono font-black text-base">S/ {vuelto.toFixed(2)}</span>
+                          </div>
+                        )}
+
+                        {cuadraExacto && (
+                          <div className="flex justify-between items-center text-emerald-700 bg-emerald-50 p-2 rounded-xl font-black text-[11px] border border-emerald-200">
+                            <span>✓ Cuenta completamente cubierta</span>
+                            <span>S/ {total.toFixed(2)}</span>
                           </div>
                         )}
                       </div>
@@ -3062,35 +3620,42 @@ export default function CajaPage({ currentUser }) {
                 })()}
 
                 {(metodoPago === 'Consumo' || metodoPago === 'Cortesía' || tieneCortesiasIndividuales) && (
-                  <div className="space-y-4">
+                  <div className="space-y-3 bg-amber-500/10 border-2 border-amber-500/30 p-4 rounded-3xl shadow-sm animate-fade-in">
                     {tieneCortesiasIndividuales && (
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl text-[10px] text-emerald-800 font-bold flex items-start gap-2.5">
+                      <div className="bg-white/80 border border-emerald-500/30 p-3 rounded-2xl text-[11px] text-emerald-900 font-bold flex items-start gap-2.5 shadow-sm">
                         <Gift className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                         <div>
-                          <p className="font-black uppercase tracking-wider mb-0.5">🎁 Cortesía Parcial Seleccionada</p>
-                          <p className="font-semibold text-slate-650 leading-normal">Se ha(n) marcado {cortesiaItemIds.length} producto(s) como cortesía. El valor de estos productos ha sido reducido a S/ 0.00. Se requiere PIN de Supervisor para proceder.</p>
+                          <p className="font-black uppercase tracking-wider mb-0.5 text-emerald-700">🎁 Cortesía de Ítems Seleccionada</p>
+                          <p className="text-slate-600 font-medium leading-tight">Se ha(n) marcado {cortesiaItemIds.length} producto(s) a S/ 0.00. Ingresa el PIN de Administrador / Cajero para autorizar el cobro.</p>
                         </div>
                       </div>
                     )}
-                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm space-y-2">
-                      <label className="block text-slate-550 font-bold text-[10px] tracking-widest uppercase">🔐 PIN DE AUTORIZACIÓN (ADMINISTRADOR):</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={consumoPin}
-                        onChange={(e) => {
-                          setConsumoPin(e.target.value);
-                          setConsumoPinError('');
-                        }}
-                        placeholder="INGRESA PIN DE ADMIN"
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-center text-lg font-black tracking-[0.5em] text-slate-800 focus:outline-none transition-all"
-                        style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
-                        autoComplete="off"
-                        name="consumo-pin-auth"
-                      />
+                    <div className="space-y-2">
+                      <label className="block text-slate-700 font-black text-[11px] tracking-wider uppercase flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600" />
+                        PIN DE AUTORIZACIÓN (ADMINISTRADOR / CAJERO):
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          value={consumoPin}
+                          onChange={(e) => {
+                            setConsumoPin(e.target.value.replace(/\D/g, '').slice(0, 6));
+                            setConsumoPinError('');
+                          }}
+                          placeholder="INGRESA PIN DE ADMIN"
+                          className="w-full bg-white border-2 border-amber-300 focus:border-amber-500 rounded-2xl px-4 py-3 text-center text-xl font-mono font-black tracking-[0.4em] text-slate-900 focus:outline-none focus:ring-4 focus:ring-amber-500/20 transition-all shadow-inner"
+                          autoComplete="off"
+                          name="consumo-pin-auth"
+                        />
+                      </div>
                       {consumoPinError && (
-                        <p className="text-red-650 text-[10px] font-black uppercase tracking-wider">{consumoPinError}</p>
+                        <p className="text-rose-600 text-xs font-black bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl text-center">
+                          ⚠️ {consumoPinError}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -3210,6 +3775,12 @@ export default function CajaPage({ currentUser }) {
             </div>
 
             <div className="p-4 bg-white border-t border-slate-200 shrink-0">
+              {(metodoPago === 'Consumo' || metodoPago === 'Cortesía' || tieneCortesiasIndividuales) && !consumoPin.trim() && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs font-bold text-amber-900 flex items-center justify-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Se requiere ingresar el PIN de autorización para poder emitir el cobro.</span>
+                </div>
+              )}
               <button onClick={procesarCobroYFacturar} disabled={cobrando} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-black uppercase tracking-widest rounded-2xl text-sm transition-all shadow-lg shadow-emerald-500/20 flex justify-center items-center gap-2 disabled:opacity-50">
                 {cobrando ? <span className="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></span> : <><CheckCircle className="w-5 h-5" /> Emitir {tipoComprobante} y Liberar Mesa</>}
               </button>
@@ -3439,23 +4010,78 @@ export default function CajaPage({ currentUser }) {
                     ? <p className="text-center text-slate-400 text-xs font-medium py-8">Toca un producto para agregarlo</p>
                     : itemsDelivery.map((item, idx) => {
                         const prodOriginal = productosMenu.find(p => String(p.id) === String(item.id));
+                        const esCortesiaItem = cortesiaDeliveryIndices.includes(idx) || deliveryMetodoPago === 'Cortesía';
                         const tieneDescuento = prodOriginal && prodOriginal.precio > item.precio;
+
                         return (
-                          <div key={idx} className="py-2 border-b border-dashed border-slate-100 last:border-0">
+                          <div key={idx} className={`py-2.5 px-2 border-b border-dashed last:border-0 rounded-xl transition-all ${
+                            esCortesiaItem ? 'bg-emerald-50/70 border-emerald-200' : 'border-slate-100'
+                          }`}>
                             <div className="flex items-center justify-between">
                               <div className="flex-1 pr-2">
-                                <p className="font-bold text-slate-800 text-xs uppercase leading-tight">{item.nombre}</p>
-                                <div className="flex items-baseline gap-1.5 mt-0.5">
-                                  {tieneDescuento && (
-                                    <span className="line-through text-slate-400 font-semibold text-xs">S/ {(item.cant * prodOriginal.precio).toFixed(2)}</span>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className={`font-bold text-xs uppercase leading-tight ${esCortesiaItem ? 'text-emerald-950 line-through' : 'text-slate-800'}`}>
+                                    {item.nombre}
+                                  </p>
+                                  {esCortesiaItem && (
+                                    <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded-md border border-emerald-300 flex items-center gap-0.5">
+                                      <Gift className="w-2.5 h-2.5" /> Cortesía
+                                    </span>
                                   )}
-                                  <span className="font-mono text-blue-600 font-bold text-sm">S/ {(item.cant * item.precio).toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                  {esCortesiaItem ? (
+                                    <>
+                                      <span className="line-through text-slate-400 font-semibold text-xs font-mono">
+                                        S/ {(item.cant * item.precio).toFixed(2)}
+                                      </span>
+                                      <span className="font-mono text-emerald-700 font-black text-sm">
+                                        S/ 0.00
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {tieneDescuento && (
+                                        <span className="line-through text-slate-400 font-semibold text-xs font-mono">
+                                          S/ {(item.cant * prodOriginal.precio).toFixed(2)}
+                                        </span>
+                                      )}
+                                      <span className="font-mono text-blue-600 font-bold text-sm">
+                                        S/ {(item.cant * item.precio).toFixed(2)}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 bg-slate-100 rounded-lg p-1 border border-slate-200 shrink-0">
-                                <button type="button" onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
-                                <span className="font-bold text-slate-900 w-5 text-center text-sm">{item.cant}</span>
-                                <button type="button" onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {/* Botón individual de cortesía (si el método global no es Cortesía) */}
+                                {deliveryMetodoPago !== 'Cortesía' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (cortesiaDeliveryIndices.includes(idx)) {
+                                        setCortesiaDeliveryIndices(prev => prev.filter(i => i !== idx));
+                                      } else {
+                                        setCortesiaDeliveryIndices(prev => [...prev, idx]);
+                                      }
+                                    }}
+                                    className={`p-1.5 rounded-lg border text-[9px] font-black uppercase transition-all flex items-center gap-1 ${
+                                      cortesiaDeliveryIndices.includes(idx)
+                                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                                        : 'bg-white text-slate-400 border-slate-200 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300'
+                                    }`}
+                                    title={cortesiaDeliveryIndices.includes(idx) ? 'Quitar cortesía' : 'Marcar este producto como Cortesía (S/ 0.00)'}
+                                  >
+                                    <Gift className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 border border-slate-200">
+                                  <button type="button" onClick={() => alterarItemDelivery(idx, '-')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">-</button>
+                                  <span className="font-bold text-slate-900 w-5 text-center text-sm">{item.cant}</span>
+                                  <button type="button" onClick={() => alterarItemDelivery(idx, '+')} className="w-7 h-7 bg-white rounded-md shadow-sm font-black text-slate-600 text-lg leading-none">+</button>
+                                </div>
                               </div>
                             </div>
                             {/* Campo de especificaciones por ítem */}
@@ -3499,18 +4125,18 @@ export default function CajaPage({ currentUser }) {
                       <div>
                         <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase mb-1">Comprobante:</label>
                         <select 
-                          value={(deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía') ? 'Ticket' : deliveryTipoComprobante} 
+                          value={(deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía' || deliveryMetodoPago === 'Consumo') ? 'Ticket' : deliveryTipoComprobante} 
                           onChange={(e) => {
                             setDeliveryTipoComprobante(e.target.value);
                             setDeliveryNumDocumento('');
                             setDeliveryClienteNombre('');
                           }} 
-                          disabled={deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía'}
+                          disabled={deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía' || deliveryMetodoPago === 'Consumo'}
                           className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 font-bold text-slate-800 text-xs focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <option value="Ticket">{(deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía') ? 'Ticket Interno (forzado)' : 'Ticket Interno'}</option>
-                          {deliveryMetodoPago !== 'Crédito' && deliveryMetodoPago !== 'Cortesía' && <option value="Boleta">Boleta (DNI)</option>}
-                          {deliveryMetodoPago !== 'Crédito' && deliveryMetodoPago !== 'Cortesía' && <option value="Factura">Factura (RUC)</option>}
+                          <option value="Ticket">{(deliveryMetodoPago === 'Crédito' || deliveryMetodoPago === 'Cortesía' || deliveryMetodoPago === 'Consumo') ? 'Ticket Interno (forzado)' : 'Ticket Interno'}</option>
+                          {deliveryMetodoPago !== 'Crédito' && deliveryMetodoPago !== 'Cortesía' && deliveryMetodoPago !== 'Consumo' && <option value="Boleta">Boleta (DNI)</option>}
+                          {deliveryMetodoPago !== 'Crédito' && deliveryMetodoPago !== 'Cortesía' && deliveryMetodoPago !== 'Consumo' && <option value="Factura">Factura (RUC)</option>}
                         </select>
                       </div>
                       <div>
@@ -3519,7 +4145,7 @@ export default function CajaPage({ currentUser }) {
                           value={deliveryMetodoPago} 
                           onChange={(e) => {
                             setDeliveryMetodoPago(e.target.value);
-                            if (e.target.value === 'Crédito' || e.target.value === 'Cortesía') {
+                            if (e.target.value === 'Crédito' || e.target.value === 'Cortesía' || e.target.value === 'Consumo') {
                               setDeliveryTipoComprobante('Ticket');
                               setDeliveryNumDocumento('');
                             }
@@ -3530,11 +4156,41 @@ export default function CajaPage({ currentUser }) {
                           <option value="Tarjeta">Tarjeta (Visa/MC)</option>
                           <option value="Yape">Yape / Plin</option>
                           <option value="Crédito">💳 Crédito</option>
-                          <option value="Cortesía">🎁 Cortesía</option>
+                          <option value="Cortesía">🎁 Cortesía Total</option>
+                          <option value="Consumo">👤 Consumo Personal</option>
                           <option value="Mixto">➕ Mixto</option>
                         </select>
                       </div>
                     </div>
+
+                    {/* PIN DE AUTORIZACIÓN PARA CORTESÍA / CONSUMO EN LLEVAR/DELIVERY */}
+                    {(deliveryMetodoPago === 'Cortesía' || deliveryMetodoPago === 'Consumo' || cortesiaDeliveryIndices.length > 0) && (
+                      <div className="space-y-2 bg-amber-500/10 border-2 border-amber-500/30 p-3.5 rounded-2xl shadow-sm animate-fade-in">
+                        <label className="block text-slate-800 font-black text-[10px] tracking-wider uppercase flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-amber-600" />
+                          PIN DE AUTORIZACIÓN (ADMINISTRADOR / CAJERO):
+                        </label>
+                        <p className="text-[10px] text-slate-600 font-medium leading-tight">
+                          {deliveryMetodoPago === 'Cortesía' 
+                            ? '🎁 Has seleccionado Cortesía total (S/ 0.00). Ingresa el PIN para autorizar el pedido.' 
+                            : deliveryMetodoPago === 'Consumo'
+                              ? '👤 Has seleccionado Consumo de Personal. Ingresa el PIN para autorizar el pedido.'
+                              : `🎁 Se ha(n) marcado ${cortesiaDeliveryIndices.length} producto(s) como Cortesía (S/ 0.00). Ingresa el PIN para autorizar.`}
+                        </p>
+                        <div className="relative">
+                          <input
+                            type="password"
+                            value={pinAdminDelivery}
+                            onChange={(e) => setPinAdminDelivery(e.target.value)}
+                            placeholder="Ingresa PIN de autorización"
+                            maxLength={10}
+                            autoComplete="off"
+                            className="w-full bg-white border-2 border-amber-300 focus:border-amber-500 rounded-xl pl-9 pr-3 py-2 text-center text-sm font-black tracking-widest text-slate-900 focus:outline-none transition-all placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400 placeholder:text-xs"
+                          />
+                          <KeyRound className="w-4 h-4 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        </div>
+                      </div>
+                    )}
 
                     {deliveryMetodoPago === 'Crédito' && (
                       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 mt-2">
@@ -3834,6 +4490,24 @@ export default function CajaPage({ currentUser }) {
                         </div>
                       </div>
                     )}
+
+                    {deliveryMetodoPago === 'Tarjeta' && (
+                      <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex items-center justify-between text-xs animate-fade-in shadow-xs">
+                        <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                          <CreditCard className="w-4 h-4 text-blue-600" /> Cobro con Tarjeta (POS)
+                        </span>
+                        <span className="font-mono font-black text-blue-700">S/ {grandTotalDelivery.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    {deliveryMetodoPago === 'Yape' && (
+                      <div className="bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl flex items-center justify-between text-xs animate-fade-in shadow-xs">
+                        <span className="font-bold text-purple-900 flex items-center gap-1.5">
+                          <Wallet className="w-4 h-4 text-purple-600" /> Cobro con Yape / Plin
+                        </span>
+                        <span className="font-mono font-black text-purple-700">S/ {grandTotalDelivery.toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3862,6 +4536,15 @@ export default function CajaPage({ currentUser }) {
                       </span>
                     </div>
                   </div>
+
+                  {/* Banner de advertencia si falta PIN de autorización */}
+                  {(deliveryMetodoPago === 'Cortesía' || deliveryMetodoPago === 'Consumo' || cortesiaDeliveryIndices.length > 0) && !pinAdminDelivery.trim() && (
+                    <div className="mb-3 bg-amber-50 border border-amber-300 rounded-xl p-2.5 flex items-center gap-2 text-[10px] font-bold text-amber-900 animate-pulse">
+                      <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Debes ingresar el PIN de autorización para registrar la cortesía / consumo.</span>
+                    </div>
+                  )}
+
                   <button
                     onClick={enviarDeliveryACocina}
                     disabled={enviandoDelivery}
@@ -4163,7 +4846,8 @@ export default function CajaPage({ currentUser }) {
           if (v.metodoPago === 'Yape') return { efec: 0, tarj: 0, yape: total };
 
           // Restar la parte a crédito si es mixto
-          const totalFisico = total - parseFloat(v.montoCredito || 0);
+          const creditAmount = parseFloat(v.montoCredito || 0);
+          const totalFisico = Math.max(0, total - creditAmount);
           const suma = efec + tarj + yape;
           if (Math.abs(suma - totalFisico) > 0.01) {
             if (suma === 0) efec = totalFisico;
@@ -4199,15 +4883,24 @@ export default function CajaPage({ currentUser }) {
         let totalConsumoClientes = 0;
 
         ventasFiltradas.forEach(v => {
+          if (v.anulado || v.estadoPedido === 'Cancelado') return;
           if (v.metodoPago === 'Consumo') {
             totalConsumoPlanilla += (v.descuentoAplicado || v.total || 0);
-          } else if (v.clienteCreditoId !== null) {
-            const esTrab = clienteMap.get(v.clienteCreditoId) || false;
-            const montoCred = v.montoCredito || v.total || 0;
-            if (esTrab) {
-              totalConsumoPlanilla += montoCred;
-            } else {
-              totalConsumoClientes += montoCred;
+          } else {
+            const splits = v.creditoSplit || parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+            if (splits.length > 0) {
+              splits.forEach(s => {
+                const esTrab = clienteMap.get(s.clienteId) || false;
+                if (esTrab) {
+                  totalConsumoPlanilla += s.monto;
+                } else {
+                  totalConsumoClientes += s.monto;
+                }
+              });
+            } else if (v.metodoPago === 'Crédito') {
+              totalConsumoClientes += (v.total || 0);
+            } else if (parseFloat(v.montoCredito || 0) > 0) {
+              totalConsumoClientes += parseFloat(v.montoCredito);
             }
           }
         });
