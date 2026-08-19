@@ -24,6 +24,8 @@ export default function BarraPage() {
   const [pedidos, setPedidos] = useState([]);
   const [horaLocal, setHoraLocal] = useState('');
   const [cancelaciones, setCancelaciones] = useState([]);
+  const [confirmandoPedidoId, setConfirmandoPedidoId] = useState(null);
+  const [despachando, setDespachando] = useState(false);
 
   const fetchPedidos = useCallback(async () => {
     try {
@@ -57,12 +59,27 @@ export default function BarraPage() {
     return () => clearInterval(interval);
   }, [fetchPedidos, fetchCancelaciones]);
 
+  const handleClicListoPedido = (pedidoId) => {
+    if (confirmandoPedidoId === pedidoId) {
+      marcarListoBarra(pedidoId);
+      setConfirmandoPedidoId(null);
+    } else {
+      setConfirmandoPedidoId(pedidoId);
+      setTimeout(() => {
+        setConfirmandoPedidoId(prev => (prev === pedidoId ? null : prev));
+      }, 3500);
+    }
+  };
+
   const marcarListoBarra = async (pedidoId) => {
+    setDespachando(true);
     try {
       await api.prepararPedido(pedidoId, 'barra');
       await fetchPedidos();
     } catch (err) {
       alert('Error al despachar bebidas: ' + err.message);
+    } finally {
+      setDespachando(false);
     }
   };
 
@@ -254,15 +271,36 @@ export default function BarraPage() {
                     ))}
                   </div>
 
-                  {/* Botón despachar bebidas */}
+                  {/* Botón despachar bebidas con confirmación en 2 pasos */}
                   <div className="p-4 bg-slate-900 shrink-0 border-t border-indigo-950/40">
-                    <button
-                      onClick={() => marcarListoBarra(p.pedidoId)}
-                      className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2 text-xs"
-                    >
-                      <CheckCheck className="w-4 h-4" />
-                      Listo · Despachar
-                    </button>
+                    {confirmandoPedidoId === p.pedidoId ? (
+                      <div className="flex gap-2 animate-fade-in">
+                        <button
+                          onClick={() => marcarListoBarra(p.pedidoId)}
+                          disabled={despachando}
+                          className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black uppercase tracking-wider rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 text-xs cursor-pointer animate-pulse"
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                          ¡Confirmar Despacho!
+                        </button>
+                        <button
+                          onClick={() => setConfirmandoPedidoId(null)}
+                          className="px-3.5 py-3.5 bg-slate-700 hover:bg-slate-600 text-white font-black rounded-xl text-xs uppercase cursor-pointer"
+                          title="Cancelar confirmación"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleClicListoPedido(p.pedidoId)}
+                        disabled={despachando}
+                        className="w-full py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 active:scale-95 text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
+                      >
+                        <CheckCheck className="w-4 h-4" />
+                        Listo · Despachar
+                      </button>
+                    )}
                   </div>
                 </div>
               );
