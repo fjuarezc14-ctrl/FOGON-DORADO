@@ -15,37 +15,51 @@ async function apiRequest(endpoint, options = {}) {
     ...(options.body ? { 'Content-Type': 'application/json' } : {})
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers
-    }
-  });
+  const timeoutMs = options.timeoutMs || 10000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const contentType = response.headers.get('content-type') || '';
-  const isJson = contentType.includes('application/json');
-
-  if (!response.ok) {
-    if (isJson) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Error HTTP ${response.status}: ${response.statusText}`);
-    } else {
-      if (response.status === 502) {
-        throw new Error('502 Bad Gateway: El servidor backend no está respondiendo o se encuentra en reinicio.');
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: options.signal || controller.signal,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers
       }
-      if (response.status === 504) {
-        throw new Error('504 Gateway Timeout: El servidor tardó demasiado en responder.');
+    });
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+
+    if (!response.ok) {
+      if (isJson) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error HTTP ${response.status}: ${response.statusText}`);
+      } else {
+        if (response.status === 502) {
+          throw new Error('502 Bad Gateway: El servidor backend no está respondiendo o se encuentra en reinicio.');
+        }
+        if (response.status === 504) {
+          throw new Error('504 Gateway Timeout: El servidor tardó demasiado en responder.');
+        }
+        throw new Error(`Error ${response.status}: El servidor no devolvió una respuesta JSON válida.`);
       }
-      throw new Error(`Error ${response.status}: El servidor no devolvió una respuesta JSON válida.`);
     }
-  }
 
-  if (!isJson) {
-    return null;
-  }
+    if (!isJson) {
+      return null;
+    }
 
-  return response.json();
+    return response.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs / 1000}s). Verifica la conexión Wi-Fi con el servidor.`);
+    }
+    throw err;
+  }
 }
 
 export const api = {

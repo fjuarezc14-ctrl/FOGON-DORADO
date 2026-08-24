@@ -885,8 +885,20 @@ export default function SalonPage({ currentUser }) {
         adicional: esAdicional,
       });
 
+      const mesaNum = mesaActual.num;
       setModalOpen(false);
       await fetchMesas();
+
+      // Feedback visual inmediato para el mozo
+      const toastId = Date.now() + Math.random();
+      setToasts(prev => [...prev, {
+        id: toastId,
+        mesa: mesaNum,
+        mensaje: `✅ ¡Comanda de Mesa ${mesaNum} enviada a Cocina!`
+      }]);
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== toastId));
+      }, 4000);
     } catch (err) {
       alert('Error al enviar a cocina: ' + err.message);
     } finally {

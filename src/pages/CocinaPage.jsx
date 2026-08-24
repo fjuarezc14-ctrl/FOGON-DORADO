@@ -49,6 +49,8 @@ export default function CocinaPage() {
   useEffect(() => {
     fetchPedidos();
     fetchCancelaciones();
+
+    // 1. Refresco periódico cada 2 segundos (ultrarrápido)
     const tick = () => {
       fetchPedidos();
       fetchCancelaciones();
@@ -56,8 +58,51 @@ export default function CocinaPage() {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }));
     };
-    const interval = setInterval(tick, 3000);
-    return () => clearInterval(interval);
+    const interval = setInterval(tick, 2000);
+
+    // 2. Refresco instantáneo e inmediato al tocar la pantalla o reactivar la pestaña
+    let lastImmediateFetch = 0;
+    const triggerInstantRefresh = () => {
+      const now = Date.now();
+      if (now - lastImmediateFetch > 1000) {
+        lastImmediateFetch = now;
+        fetchPedidos();
+        fetchCancelaciones();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        triggerInstantRefresh();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', triggerInstantRefresh);
+    window.addEventListener('pointerdown', triggerInstantRefresh, { passive: true });
+
+    // 3. Screen Wake Lock API para evitar que la tablet o monitor se suspenda
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          // Navegador no soporta o rechazó wake lock (ignorar de forma segura)
+        }
+      }
+    };
+    requestWakeLock();
+    document.addEventListener('visibilitychange', requestWakeLock);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', requestWakeLock);
+      window.removeEventListener('focus', triggerInstantRefresh);
+      window.removeEventListener('pointerdown', triggerInstantRefresh);
+      if (wakeLock) wakeLock.release().catch(() => {});
+    };
   }, [fetchPedidos, fetchCancelaciones]);
 
   const handleClicListoPedido = (pedidoId) => {

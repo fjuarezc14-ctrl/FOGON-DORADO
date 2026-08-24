@@ -1168,11 +1168,26 @@ app.get('/api/pedidos/cocina', async (req, res) => {
     const pedidos = await prisma.pedido.findMany({
       where: { estado: 'Cocina' },
       orderBy: { createdAt: 'asc' },
-      include: {
+      select: {
+        id: true,
+        tipoEntrega: true,
+        codigoPedidosYa: true,
+        mesero: true,
+        adicional: true,
+        estadoEnsalada: true,
+        createdAt: true,
+        mesa: { select: { numero: true } },
         items: {
-          include: { producto: { select: { categoria: true } } },
+          select: {
+            id: true,
+            nombre: true,
+            cantidad: true,
+            precio: true,
+            historial: true,
+            notas: true,
+            producto: { select: { categoria: true } },
+          },
         },
-        mesa: true,
       },
     });
 
@@ -1212,11 +1227,24 @@ app.get('/api/pedidos/barra', async (req, res) => {
     const pedidos = await prisma.pedido.findMany({
       where: { estado: 'Cocina' },
       orderBy: { createdAt: 'asc' },
-      include: {
+      select: {
+        id: true,
+        tipoEntrega: true,
+        codigoPedidosYa: true,
+        mesero: true,
+        adicional: true,
+        createdAt: true,
+        mesa: { select: { numero: true } },
         items: {
-          include: { producto: { select: { categoria: true } } },
+          select: {
+            nombre: true,
+            cantidad: true,
+            precio: true,
+            historial: true,
+            notas: true,
+            producto: { select: { categoria: true } },
+          },
         },
-        mesa: true,
       },
     });
 
@@ -1567,10 +1595,16 @@ app.patch('/api/pedidos/:id/cancelar', async (req, res) => {
       });
 
       if (activos.length === 0) {
-        await prisma.mesa.update({
+        const mObj = await prisma.mesa.update({
           where: { id: pedido.mesaId },
           data: { estado: 'Libre' },
         });
+        if (mObj?.numero) {
+          await prisma.mesa.updateMany({
+            where: { estado: `Unida a Mesa ${mObj.numero}` },
+            data: { estado: 'Libre' },
+          });
+        }
         mesaLiberada = true;
       } else {
         // Si hay al menos un pedido activo en Cocina, la mesa debe quedarse en Cocina.
@@ -1826,18 +1860,15 @@ app.post('/api/pedidos/llevar', async (req, res) => {
     const isOwnDelivery = tipoDelivery === 'DeliveryPropio';
 
     const shippingFee = parseFloat(montoDelivery || 0);
-    const itemsTotal = parseFloat(total);
     const finalMetodoPago = metodoPago || (tipoDelivery === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
 
-    // Aplicar descuento porcentual al subtotal de items
+    // Calcular monto bruto de items y aplicar descuento porcentual una sola vez
+    const itemsBruto = (items || []).reduce((acc, item) => acc + (parseFloat(item.precio || 0) * parseInt(item.cant || item.cantidad || 1)), 0);
     const descPct = parseFloat(descuentoPorcentaje || 0);
-    const descuentoMonto = descPct > 0 ? parseFloat((itemsTotal * (descPct / 100)).toFixed(2)) : 0;
-    const totalConDescuento = Math.max(0, itemsTotal - descuentoMonto);
-    let grandTotal = totalConDescuento + shippingFee;
-    if (finalMetodoPago === 'Cortesía') {
-      grandTotal = 0.00;
-    }
-    const descuentoFinal = descPct > 0 ? descuentoMonto : 0;
+    const descuentoMonto = (descPct > 0 && itemsBruto > 0) ? parseFloat((itemsBruto * (descPct / 100)).toFixed(2)) : 0;
+    const totalConDescuento = Math.max(0, itemsBruto - descuentoMonto);
+    let grandTotal = finalMetodoPago === 'Cortesía' ? 0.00 : (totalConDescuento + shippingFee);
+    const descuentoFinal = finalMetodoPago === 'Cortesía' ? itemsBruto : descuentoMonto;
 
     const expandedItems = await expandPedidoItemsForDb(items);
     const finalEstadoEnsalada = await evaluarEstadoEnsalada(items);
@@ -2078,18 +2109,15 @@ app.put('/api/pedidos/llevar/:id', async (req, res) => {
     const isOwnDelivery = tipoDelivery === 'DeliveryPropio';
 
     const shippingFee = parseFloat(montoDelivery || 0);
-    const itemsTotal = parseFloat(total);
     const finalMetodoPago = metodoPago || (tipoDelivery === 'PedidosYa' ? 'PedidosYa' : 'Efectivo');
 
-    // Aplicar descuento porcentual al subtotal de items
+    // Calcular monto bruto de items y aplicar descuento porcentual una sola vez
+    const itemsBruto = (items || []).reduce((acc, item) => acc + (parseFloat(item.precio || 0) * parseInt(item.cant || item.cantidad || 1)), 0);
     const descPct = parseFloat(descuentoPorcentaje || 0);
-    const descuentoMonto = descPct > 0 ? parseFloat((itemsTotal * (descPct / 100)).toFixed(2)) : 0;
-    const totalConDescuento = Math.max(0, itemsTotal - descuentoMonto);
-    let grandTotal = totalConDescuento + shippingFee;
-    if (finalMetodoPago === 'Cortesía') {
-      grandTotal = 0.00;
-    }
-    const descuentoFinal = descPct > 0 ? descuentoMonto : 0;
+    const descuentoMonto = (descPct > 0 && itemsBruto > 0) ? parseFloat((itemsBruto * (descPct / 100)).toFixed(2)) : 0;
+    const totalConDescuento = Math.max(0, itemsBruto - descuentoMonto);
+    let grandTotal = finalMetodoPago === 'Cortesía' ? 0.00 : (totalConDescuento + shippingFee);
+    const descuentoFinal = finalMetodoPago === 'Cortesía' ? itemsBruto : descuentoMonto;
 
     const expandedItems = await expandPedidoItemsForDb(items);
     const finalEstadoEnsalada = await evaluarEstadoEnsalada(items);
@@ -2968,7 +2996,9 @@ app.patch('/api/ventas/:ventaId/anular', async (req, res) => {
           igv: 0.00,
           montoEfectivo: 0.00,
           montoTarjeta: 0.00,
-          montoYape: 0.00
+          montoYape: 0.00,
+          montoCredito: 0.00,
+          descuentoAplicado: 0.00
         }
       });
 

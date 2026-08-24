@@ -206,6 +206,8 @@ export default function ReportesPage() {
       subtotal: v.subtotal,
       igv: v.igv,
       total: v.total,
+      descuentoAplicado: v.descuentoAplicado || 0,
+      ofertaDescripcion: v.ofertaDescripcion || null,
       totalLetras,
       hashResumen: "gSbTDa" + Math.random().toString(36).substring(2, 8).toUpperCase() + "iIZDyirfA6TBPKJnEI=",
       metodoPago: v.metodoPago,
@@ -1469,6 +1471,18 @@ export default function ReportesPage() {
               <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
               
               <div className="space-y-1 text-right font-bold" style={{ fontSize: '11px' }}>
+                {activeComprobante.descuentoAplicado > 0 && (
+                  <>
+                    <div className="flex justify-between text-slate-700">
+                      <span>IMPORTE BRUTO</span> 
+                      <span>S/ {(activeComprobante.total + activeComprobante.descuentoAplicado).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-900">
+                      <span>{activeComprobante.ofertaDescripcion ? activeComprobante.ofertaDescripcion.toUpperCase() : 'DESCUENTO'}</span> 
+                      <span>- S/ {activeComprobante.descuentoAplicado.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between"><span>SUBTOTAL</span> <span>S/ {activeComprobante.subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>I.G.V (10.5%)</span> <span>S/ {activeComprobante.igv.toFixed(2)}</span></div>
                 <div className="flex justify-between" style={{ fontSize: '12px', fontWeight: '900' }}><span>TOTAL</span> <span>S/ {activeComprobante.total.toFixed(2)}</span></div>

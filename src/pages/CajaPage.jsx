@@ -804,6 +804,8 @@ export default function CajaPage({ currentUser }) {
       subtotal: v.subtotal,
       igv: v.igv,
       total: v.total,
+      descuentoAplicado: v.descuentoAplicado || 0,
+      ofertaDescripcion: v.ofertaDescripcion || null,
       totalLetras,
       hashResumen,
       metodoPago: v.metodoPago,
@@ -1051,6 +1053,10 @@ export default function CajaPage({ currentUser }) {
 
       // Desencadenar la visualización e impresión del comprobante (solo si no es Consumo Personal)
       if (mPago !== 'Consumo') {
+        const itemsCortesiaDescuento = (itemsParaImpresion || [])
+          .filter(item => payload.cortesiaItemIds?.includes(item.itemId))
+          .reduce((sum, item) => sum + (parseFloat(item.precio || 0) * parseInt(item.cant || 1)), 0);
+
         const itemsFormat = (itemsParaImpresion || []).map(item => {
           if (payload.cortesiaItemIds?.includes(item.itemId)) {
             return {
@@ -1070,7 +1076,10 @@ export default function CajaPage({ currentUser }) {
           nomCli || 'Consumidor Final',
           dirCli || '',
           itemsFormat,
-          mesaNum
+          mesaNum,
+          null,
+          itemsCortesiaDescuento,
+          itemsCortesiaDescuento > 0 ? 'Cortesía de ítems' : (mPago === 'Cortesía' ? 'Cortesía total' : null)
         );
       } else {
         alert(`✅ Consumo Personal registrado. Mesa liberada.`);
@@ -1922,7 +1931,7 @@ export default function CajaPage({ currentUser }) {
     }
   };
 
-  const abrirTicketImpresionDirecto = (total, response, tipoComprobante, numDocumento, clienteNombre, clienteDireccion, items, mesaNum = 'Delivery', deliveryInfo = null) => {
+  const abrirTicketImpresionDirecto = (total, response, tipoComprobante, numDocumento, clienteNombre, clienteDireccion, items, mesaNum = 'Delivery', deliveryInfo = null, descuentoAplicado = 0, ofertaDescripcion = null) => {
     if (!response) response = {};
     const fecha = new Date().toLocaleDateString('es-PE');
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
@@ -1973,6 +1982,8 @@ export default function CajaPage({ currentUser }) {
       subtotal,
       igv,
       total,
+      descuentoAplicado: descuentoAplicado || response.descuentoAplicado || 0,
+      ofertaDescripcion: ofertaDescripcion || response.ofertaDescripcion || null,
       totalLetras,
       hashResumen,
       metodoPago: response.metodoPago || metodoPago,
@@ -2210,7 +2221,9 @@ export default function CajaPage({ currentUser }) {
           tipoDelivery === 'DeliveryPropio' ? deliveryDireccion : '', 
           itemsImpresion, 
           tipoDelivery === 'DeliveryPropio' ? 'Delivery' : 'Llevar',
-          deliveryInfo
+          deliveryInfo,
+          descuentoFinal,
+          descuentoFinal > 0 ? `Descuento ${descPct}%` : null
         );
       } else {
         alert(`✅ Pedido ${codigoPY.toUpperCase()} enviado a Cocina. Venta registrada.`);
@@ -2607,6 +2620,21 @@ export default function CajaPage({ currentUser }) {
                                     </span>
                                   ) : (
                                     <>
+                                      {v.descuentoAplicado > 0 && (
+                                        <span className="bg-blue-50 text-blue-700 text-[9px] font-black px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-1 shrink-0">
+                                          🏷️ {v.ofertaDescripcion || `Desc: -S/ ${v.descuentoAplicado.toFixed(2)}`}
+                                        </span>
+                                      )}
+                                      {v.metodoPago === 'Cortesía' && (
+                                        <span className="bg-amber-100 text-amber-900 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-300 flex items-center gap-1 shrink-0 animate-pulse">
+                                          🎁 CORTESÍA TOTAL
+                                        </span>
+                                      )}
+                                      {v.itemsResumen?.includes('CORTESÍA') && v.metodoPago !== 'Cortesía' && (
+                                        <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 rounded border border-emerald-300 flex items-center gap-1 shrink-0">
+                                          🎁 CON CORTESÍA
+                                        </span>
+                                      )}
                                       {v.tipoComprobante === 'Ticket' && (
                                         <button
                                           title="Corregir datos de facturación (requiere PIN)"
@@ -2782,6 +2810,18 @@ export default function CajaPage({ currentUser }) {
                                 <span className="text-red-600 font-black">S/ 0.00</span>
                                 <span className="line-through text-slate-400 font-bold text-xs mt-1">
                                   S/ {(v.montoOriginal ?? v.total ?? 0).toFixed(2)}
+                                </span>
+                              </div>
+                            ) : v.descuentoAplicado > 0 ? (
+                              <div className="flex flex-col items-end leading-tight">
+                                <span className="text-slate-400 font-bold text-[10px] line-through font-mono">
+                                  S/ {(parseFloat(v.total || 0) + parseFloat(v.descuentoAplicado || 0)).toFixed(2)}
+                                </span>
+                                <span className="font-black text-slate-900 text-base font-mono">
+                                  S/ {(v.total ?? 0).toFixed(2)}
+                                </span>
+                                <span className="text-[9px] font-black text-blue-600 font-mono">
+                                  -S/ {parseFloat(v.descuentoAplicado).toFixed(2)}
                                 </span>
                               </div>
                             ) : (
@@ -5950,6 +5990,18 @@ export default function CajaPage({ currentUser }) {
               <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
               
               <div className="space-y-1 text-right font-bold" style={{ fontSize: '11px' }}>
+                {activeComprobante.descuentoAplicado > 0 && (
+                  <>
+                    <div className="flex justify-between text-slate-700">
+                      <span>IMPORTE BRUTO</span> 
+                      <span>S/ {(activeComprobante.total + activeComprobante.descuentoAplicado).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-900">
+                      <span>{activeComprobante.ofertaDescripcion ? activeComprobante.ofertaDescripcion.toUpperCase() : 'DESCUENTO'}</span> 
+                      <span>- S/ {activeComprobante.descuentoAplicado.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between"><span>SUBTOTAL</span> <span>S/ {activeComprobante.subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>I.G.V (10.5%)</span> <span>S/ {activeComprobante.igv.toFixed(2)}</span></div>
                 <div className="flex justify-between" style={{ fontSize: '12px', fontWeight: '900' }}><span>TOTAL</span> <span>S/ {activeComprobante.total.toFixed(2)}</span></div>
