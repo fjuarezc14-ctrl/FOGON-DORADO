@@ -1409,64 +1409,72 @@ export default function ReportesPage() {
                 <span>Mesa {activeComprobante.mesaNum}</span>
               </div>
               
-              <div className="space-y-1 mb-3">
-                <div><strong>Cliente:</strong> <span className="uppercase">{activeComprobante.clienteNombre}</span></div>
-                {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && (
-                  <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
-                )}
-                {activeComprobante.clienteDireccion && (
-                  <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
-                )}
-                <div><strong>Items:</strong> <span>{activeComprobante.items ? activeComprobante.items.length : 0}</span></div>
-              </div>
+              {(() => {
+                const itemsImprimibles = (activeComprobante.items || []).filter(item => item && (item.precio > 0 || (item.categoria && BARRA_CATEGORIAS.includes(item.categoria)) || (item.notas && item.notas.includes('CORTESÍA')) || (item.nombre && item.nombre.includes('CORTESÍA'))));
 
-              {/* Box de Datos de Despacho para Delivery */}
-              {activeComprobante.deliveryInfo && (
-                <div style={{ border: '1px dashed black', padding: '6px', margin: '8px 0', fontSize: '10px', lineHeight: '1.3' }} className="space-y-1 bg-slate-50 rounded-lg">
-                  <div className="text-center font-bold uppercase mb-1" style={{ fontSize: '11px' }}>🛵 DATOS DE DESPACHO / DELIVERY 🛵</div>
-                  <div><strong>DIRECCIÓN:</strong> <span className="uppercase font-bold">{activeComprobante.deliveryInfo.direccion}</span></div>
-                  <div className="flex justify-between">
-                    <div><strong>TELÉFONO:</strong> <span>{activeComprobante.deliveryInfo.telefono}</span></div>
-                    <div><strong>ENVÍO:</strong> <span>S/ {parseFloat(activeComprobante.deliveryInfo.montoDelivery || 0).toFixed(2)}</span></div>
-                  </div>
-                  {activeComprobante.deliveryInfo.conCuanto && parseFloat(activeComprobante.deliveryInfo.conCuanto) > 0 && (
-                    <div className="border-t border-slate-300 pt-1 mt-1 flex justify-between font-bold">
-                      <div><strong>PAGA CON:</strong> <span>S/ {parseFloat(activeComprobante.deliveryInfo.conCuanto).toFixed(2)}</span></div>
-                      <div><strong>VUELTO:</strong> <span className="text-emerald-700">S/ {parseFloat(activeComprobante.deliveryInfo.vuelto).toFixed(2)}</span></div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
-              
-              {/* Items Table Header */}
-              <div className="flex font-bold border-b border-dashed border-slate-350 pb-1 mb-1">
-                <span className="w-8 shrink-0">Cant</span>
-                <span className="flex-1 pl-1">DESCRIPCIÓN</span>
-                <span className="w-14 text-right shrink-0">P.Unit</span>
-                <span className="w-18 text-right shrink-0">TOTAL</span>
-              </div>
-              
-              {activeComprobante.items.map((item, idx) => {
-                const subTotalItem = item.cant * item.precio;
-                const cantStr = item.cant % 1 === 0 ? item.cant.toFixed(0) : item.cant.toFixed(2);
                 return (
-                  <div key={idx} className="flex flex-col mb-1.5">
-                    <div className="flex items-start">
-                      <span className="w-8 shrink-0 font-bold">{cantStr}x</span>
-                      <span className="flex-1 uppercase pl-1">{item.nombre}</span>
-                      <span className="w-14 text-right shrink-0">{item.precio.toFixed(2)}</span>
-                      <span className="w-18 text-right shrink-0">{subTotalItem.toFixed(2)}</span>
+                  <>
+                    <div className="space-y-1 mb-3">
+                      <div><strong>Cliente:</strong> <span className="uppercase">{activeComprobante.clienteNombre}</span></div>
+                      {activeComprobante.metodoPago !== 'Cortesía' && activeComprobante.metodoPago !== 'Consumo' && (
+                        <div><strong>{activeComprobante.tipo === 'Factura' ? 'RUC' : 'DNI'}:</strong> <span>{activeComprobante.clienteDoc}</span></div>
+                      )}
+                      {activeComprobante.clienteDireccion && (
+                        <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
+                      )}
+                      <div><strong>Items:</strong> <span>{itemsImprimibles.length}</span></div>
                     </div>
-                    {item.notas && (
-                      <div className="pl-8 text-[9px] text-slate-500 font-bold leading-tight uppercase text-left break-all">
-                        {item.notas}
+
+                    {/* Box de Datos de Despacho para Delivery */}
+                    {activeComprobante.deliveryInfo && (
+                      <div style={{ border: '1px dashed black', padding: '6px', margin: '8px 0', fontSize: '10px', lineHeight: '1.3' }} className="space-y-1 bg-slate-50 rounded-lg">
+                        <div className="text-center font-bold uppercase mb-1" style={{ fontSize: '11px' }}>🛵 DATOS DE DESPACHO / DELIVERY 🛵</div>
+                        <div><strong>DIRECCIÓN:</strong> <span className="uppercase font-bold">{activeComprobante.deliveryInfo.direccion}</span></div>
+                        <div className="flex justify-between">
+                          <div><strong>TELÉFONO:</strong> <span>{activeComprobante.deliveryInfo.telefono}</span></div>
+                          <div><strong>ENVÍO:</strong> <span>S/ {parseFloat(activeComprobante.deliveryInfo.montoDelivery || 0).toFixed(2)}</span></div>
+                        </div>
+                        {activeComprobante.deliveryInfo.conCuanto && parseFloat(activeComprobante.deliveryInfo.conCuanto) > 0 && (
+                          <div className="border-t border-slate-300 pt-1 mt-1 flex justify-between font-bold">
+                            <div><strong>PAGA CON:</strong> <span>S/ {parseFloat(activeComprobante.deliveryInfo.conCuanto).toFixed(2)}</span></div>
+                            <div><strong>VUELTO:</strong> <span className="text-emerald-700">S/ {parseFloat(activeComprobante.deliveryInfo.vuelto).toFixed(2)}</span></div>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
+                    
+                    <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
+                    
+                    {/* Items Table Header */}
+                    <div className="flex font-bold border-b border-dashed border-slate-350 pb-1 mb-1">
+                      <span className="w-8 shrink-0">Cant</span>
+                      <span className="flex-1 pl-1">DESCRIPCIÓN</span>
+                      <span className="w-14 text-right shrink-0">P.Unit</span>
+                      <span className="w-18 text-right shrink-0">TOTAL</span>
+                    </div>
+                    
+                    {itemsImprimibles.map((item, idx) => {
+                      const subTotalItem = item.cant * item.precio;
+                      const cantStr = item.cant % 1 === 0 ? item.cant.toFixed(0) : item.cant.toFixed(2);
+                      return (
+                        <div key={idx} className="flex flex-col mb-1.5">
+                          <div className="flex items-start">
+                            <span className="w-8 shrink-0 font-bold">{cantStr}x</span>
+                            <span className="flex-1 uppercase pl-1">{item.nombre}</span>
+                            <span className="w-14 text-right shrink-0">{item.precio.toFixed(2)}</span>
+                            <span className="w-18 text-right shrink-0">{subTotalItem.toFixed(2)}</span>
+                          </div>
+                          {item.notas && (
+                            <div className="pl-8 text-[9px] text-slate-500 font-bold leading-tight uppercase text-left break-all">
+                              {item.notas}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
                 );
-              })}
+              })()}
               
               <hr style={{ border: '0', borderTop: '1px dashed black', margin: '10px 0' }} />
               
