@@ -5934,7 +5934,7 @@ export default function CajaPage({ currentUser }) {
                 {activeComprobante.clienteDireccion && (
                   <div><strong>Dirección:</strong> <span className="uppercase text-[9px] leading-none block mt-0.5">{activeComprobante.clienteDireccion}</span></div>
                 )}
-                <div><strong>Items:</strong> <span>{activeComprobante.items.length}</span></div>
+                <div><strong>Items:</strong> <span>{activeComprobante.items ? activeComprobante.items.reduce((sum, i) => sum + (parseFloat(i.cant || i.cantidad) || 1), 0) : 0}</span></div>
               </div>
 
               {/* Box de Datos de Despacho para Delivery */}
@@ -6220,7 +6220,7 @@ export default function CajaPage({ currentUser }) {
         }
         @media print {
           /* Ocultar elementos de navegación y fondos */
-          aside, header, #sidebar-menu, #sidebar-backdrop, button, nav, .shrink-0 {
+          aside, header, #sidebar-menu, #sidebar-backdrop, button, nav, .no-print {
             display: none !important;
           }
           /* Ocultar el resto del contenido de la página excepto el modal a imprimir */
