@@ -9,6 +9,9 @@ export default defineConfig({
     react(),
   ],
   server: {
+    hmr: {
+      overlay: false
+    },
     allowedHosts: ['fogon.valetec.pe', 'localhost', '127.0.0.1'],
     host: true, // Listen on all local IPs (needed for Docker)
     port: 5173,
