@@ -301,19 +301,46 @@ export default function SalonPage({ currentUser }) {
       return;
     }
     setMesaActual(m);
+    const mesaNum = m.numero || m.num;
+    let initialItems = [];
     if (m.pedidoData?.items?.length > 0) {
-      let items = JSON.parse(JSON.stringify(m.pedidoData.items));
+      initialItems = JSON.parse(JSON.stringify(m.pedidoData.items));
       // Cualquier producto ya existente en la mesa se considera comanda histórica
       // para evitar que al agregar items nuevos se reenvíen los antiguos.
-      items.forEach(i => i.yaEnviado = true);
-      setTicketActual(items);
-    } else {
-      setTicketActual([]);
+      initialItems.forEach(i => i.yaEnviado = true);
     }
+    // Recuperar borrador guardado en caché si se interrumpió la conexión o recargó la vista
+    try {
+      const savedDraft = localStorage.getItem(`fogon_draft_mesa_${mesaNum}`);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          initialItems = [...initialItems, ...parsed];
+        }
+      }
+    } catch (err) {
+      console.error("Error al leer borrador local:", err);
+    }
+    setTicketActual(initialItems);
     setCategoriaActiva('Todos');
     setSearchQuery('');
     setModalOpen(true);
   };
+
+  // Auto-guardado en caché local del borrador de pedido en curso
+  useEffect(() => {
+    if (modalOpen && mesaActual) {
+      const mesaNum = mesaActual.numero || mesaActual.num;
+      if (mesaNum) {
+        const unsubmitted = ticketActual.filter(i => !i.yaEnviado);
+        if (unsubmitted.length > 0) {
+          localStorage.setItem(`fogon_draft_mesa_${mesaNum}`, JSON.stringify(unsubmitted));
+        } else {
+          localStorage.removeItem(`fogon_draft_mesa_${mesaNum}`);
+        }
+      }
+    }
+  }, [ticketActual, modalOpen, mesaActual]);
 
   const getProductSteps = (prod, currentSelections = {}) => {
     const steps = getProductStepsBase(prod, currentSelections);
@@ -878,14 +905,17 @@ export default function SalonPage({ currentUser }) {
       const totalNuevos = nuevosItems.reduce((acc, val) => acc + (val.cant * val.precio), 0);
       const esAdicional = mesaActual.pedidoData?.items?.length > 0;
 
-      await api.enviarACocina(mesaActual.num, {
+      const mesaNum = mesaActual.numero || mesaActual.num;
+      await api.enviarACocina(mesaNum, {
         mesero: meseroGlobal,
         items: nuevosItems, // Enviamos UNICAMENTE los nuevos items añadidos
         total: totalNuevos, // Enviamos el total del pedido adicional específico
         adicional: esAdicional,
       });
 
-      const mesaNum = mesaActual.num;
+      if (mesaNum) {
+        localStorage.removeItem(`fogon_draft_mesa_${mesaNum}`);
+      }
       setModalOpen(false);
       await fetchMesas();
 

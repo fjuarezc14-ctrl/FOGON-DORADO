@@ -354,6 +354,7 @@ export default function CajaPage({ currentUser }) {
   const [pedidosLlevar, setPedidosLlevar] = useState([]);
   const [stats, setStats] = useState({ atendidas: 0, ingresos: 0 });
   const [loading, setLoading] = useState(true);
+  const [forzarError, setForzarError] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [mesaSeleccionada, setMesaSeleccionada] = useState(null);
   const [tipoComprobante, setTipoComprobante] = useState('Boleta');
@@ -2246,6 +2247,10 @@ export default function CajaPage({ currentUser }) {
   const deliveryShippingFee = (tipoDelivery === 'DeliveryPropio' && deliveryMetodoPago !== 'Cortesía') ? parseFloat(deliveryMontoEnvio || 0) : 0;
   const grandTotalDelivery = deliveryMetodoPago === 'Cortesía' ? 0 : (deliveryTotalConDescuento + deliveryShippingFee);
 
+  if (forzarError) {
+    throw new Error("💥 ¡BUM! Este es un error simulado para probar el salvavidas.");
+  }
+
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-slate-50">
       <div className="text-center">
@@ -2259,7 +2264,17 @@ export default function CajaPage({ currentUser }) {
     <section className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-slate-50">
       <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">Caja y Facturación</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">Caja y Facturación</h1>
+            <button 
+              type="button"
+              onClick={() => setForzarError(true)}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2.5 rounded-xl text-[10px] uppercase tracking-wider shadow-sm transition-all active:scale-95 flex items-center gap-1"
+              title="Botón de prueba temporal para simular caída y probar Error Boundary"
+            >
+              💣 Probar Caída
+            </button>
+          </div>
           <p className="text-xs md:text-sm text-slate-500">Cierre de mesas, pedidos de delivery y control del turno.</p>
         </div>
         <button
