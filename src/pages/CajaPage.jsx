@@ -332,6 +332,7 @@ const agruparProductos = (items) => {
   
   if (tallarines.length > 0) {
     const ordenados = [...tallarines].sort((a, b) => a.precio - b.precio);
+    const totalVendidoTallarines = tallarines.reduce((acc, t) => acc + (t.totalVendido || 0), 0);
     list.push({
       id: 'group_tallarines_verdes',
       nombre: 'Tallarines Verdes',
@@ -340,13 +341,23 @@ const agruparProductos = (items) => {
       precioMax: ordenados[ordenados.length - 1].precio,
       esAgrupado: true,
       variantes: tallarines,
+      totalVendido: totalVendidoTallarines,
       tipoStock: 'ilimitado',
       stock: 0,
       activo: true
     });
   }
   
-  return [...list, ...otros];
+  const consolidado = [...list, ...otros];
+  // Ordenar automáticamente por popularidad (mayor totalVendido primero)
+  consolidado.sort((a, b) => {
+    const vA = a.totalVendido || 0;
+    const vB = b.totalVendido || 0;
+    if (vB !== vA) return vB - vA;
+    return (a.nombre || '').localeCompare(b.nombre || '');
+  });
+
+  return consolidado;
 };
 
 export default function CajaPage({ currentUser }) {
@@ -4124,6 +4135,7 @@ export default function CajaPage({ currentUser }) {
                     {(() => {
                       const ordenPrioridades = [
                         'Todos',
+                        '🔥 Más Pedidos',
                         'Menú',
                         'Pollos a la Brasa',
                         'Parrillas y Cortes',
@@ -4133,7 +4145,7 @@ export default function CajaPage({ currentUser }) {
                         'Ensaladas',
                         'Bebidas y Refrescos'
                       ];
-                      const cats = ['Todos', ...new Set(productosMenu.filter(p => p.activo && p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
+                      const cats = ['Todos', '🔥 Más Pedidos', ...new Set(productosMenu.filter(p => p.activo && p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
                       
                       return cats.sort((a, b) => {
                         const idxA = ordenPrioridades.indexOf(a);
@@ -4164,10 +4176,17 @@ export default function CajaPage({ currentUser }) {
                   {(() => {
                     const menuFiltradoPre = productosMenu.filter(p => {
                       if (!p.activo) return false;
+                      if (deliveryCategoriaActiva === '🔥 Más Pedidos') {
+                        return matchProductSemantic(p, deliverySearchQuery);
+                      }
                       if (deliveryCategoriaActiva !== 'Todos' && p.categoria !== deliveryCategoriaActiva) return false;
                       return matchProductSemantic(p, deliverySearchQuery);
                     });
-                    const menuFiltrado = agruparProductos(menuFiltradoPre);
+                    let menuFiltrado = agruparProductos(menuFiltradoPre);
+                    if (deliveryCategoriaActiva === '🔥 Más Pedidos') {
+                      const conVentas = menuFiltrado.filter(p => (p.totalVendido || 0) > 0);
+                      menuFiltrado = (conVentas.length >= 5 ? conVentas : menuFiltrado).slice(0, 15);
+                    }
                     
                     if (menuFiltrado.length === 0) {
                       return <div className="col-span-full text-center text-slate-400 font-medium py-12 text-sm">No se encontraron productos coincidentes.</div>;
@@ -4203,6 +4222,11 @@ export default function CajaPage({ currentUser }) {
                               {isGroup && (
                                 <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 bg-blue-100 text-blue-700">
                                   OPCIONES DE CARNE
+                                </span>
+                              )}
+                              {prod.totalVendido > 0 && !agotado && (
+                                <span className="inline-block text-[8px] font-black px-1.5 py-0.5 rounded mt-1.5 ml-1 bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                                  🔥 TOP {prod.totalVendido > 1 ? `(${prod.totalVendido})` : ''}
                                 </span>
                               )}
                               {prod.tipoStock === 'limitado' && !isGroup && (

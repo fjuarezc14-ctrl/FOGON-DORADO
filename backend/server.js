@@ -2277,6 +2277,22 @@ app.get('/api/productos', async (req, res) => {
       orderBy: [{ categoria: 'asc' }, { nombre: 'asc' }],
     });
 
+    // Conteo histórico de ventas reales por producto para ranking de popularidad
+    const ventasAgrupadas = await prisma.itemPedido.groupBy({
+      by: ['productoId'],
+      _sum: { cantidad: true },
+      where: {
+        pedido: { estado: { not: 'Cancelado' } }
+      }
+    }).catch(() => []);
+
+    const ventasMap = {};
+    ventasAgrupadas.forEach(v => {
+      if (v.productoId) {
+        ventasMap[v.productoId] = v._sum?.cantidad || 0;
+      }
+    });
+
     // Obtener todas las ofertas activas (y que estén en su rango de fecha si se especificó)
     const ahora = new Date();
     const ofertasActivas = await prisma.oferta.findMany({
@@ -2297,25 +2313,35 @@ app.get('/api/productos', async (req, res) => {
       }
     });
 
-    // Enriquecer cada producto con precioOferta si hay oferta activa para su categoría
+    // Enriquecer cada producto con precioOferta y totalVendido
     const productosEnriquecidos = productos.map(p => {
       const oferta = ofertasActivas.find(o => o.categorias.includes(p.categoria));
+      const totalVendido = ventasMap[p.id] || 0;
+      let precioOferta = null;
+      let ofertaNombre = null;
+      let ofertaTipo = null;
+      let ofertaValor = null;
+
       if (oferta) {
-        let precioOferta;
         if (oferta.tipoDescuento === 'porcentaje') {
           precioOferta = parseFloat((p.precio * (1 - oferta.valorDescuento / 100)).toFixed(2));
         } else {
           precioOferta = parseFloat((p.precio - oferta.valorDescuento).toFixed(2));
         }
-        return {
-          ...p,
-          precioOferta: Math.max(0, precioOferta),
-          ofertaNombre: oferta.nombre,
-          ofertaTipo: oferta.tipoDescuento,
-          ofertaValor: oferta.valorDescuento,
-        };
+        precioOferta = Math.max(0, precioOferta);
+        ofertaNombre = oferta.nombre;
+        ofertaTipo = oferta.tipoDescuento;
+        ofertaValor = oferta.valorDescuento;
       }
-      return { ...p, precioOferta: null, ofertaNombre: null };
+
+      return {
+        ...p,
+        totalVendido,
+        precioOferta,
+        ofertaNombre,
+        ofertaTipo,
+        ofertaValor,
+      };
     });
 
     res.json(productosEnriquecidos);

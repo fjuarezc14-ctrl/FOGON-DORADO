@@ -992,6 +992,9 @@ export default function SalonPage({ currentUser }) {
 
   const menuFiltradoPre = productos.filter(p => {
     if (p.categoria === 'PedidosYa / Ofertas') return false;
+    if (categoriaActiva === '🔥 Más Pedidos') {
+      return matchProductSemantic(p, searchQuery);
+    }
     if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
     return matchProductSemantic(p, searchQuery);
   });
@@ -1003,6 +1006,7 @@ export default function SalonPage({ currentUser }) {
     
     if (tallarines.length > 0) {
       const ordenados = [...tallarines].sort((a, b) => a.precio - b.precio);
+      const totalVendidoTallarines = tallarines.reduce((acc, t) => acc + (t.totalVendido || 0), 0);
       list.push({
         id: 'group_tallarines_verdes',
         nombre: 'Tallarines Verdes',
@@ -1011,16 +1015,30 @@ export default function SalonPage({ currentUser }) {
         precioMax: ordenados[ordenados.length - 1].precio,
         esAgrupado: true,
         variantes: tallarines,
+        totalVendido: totalVendidoTallarines,
         tipoStock: 'ilimitado',
         stock: 0,
         activo: true
       });
     }
     
-    return [...list, ...otros];
+    const consolidado = [...list, ...otros];
+    // Ordenar automáticamente por popularidad (mayor totalVendido primero)
+    consolidado.sort((a, b) => {
+      const vA = a.totalVendido || 0;
+      const vB = b.totalVendido || 0;
+      if (vB !== vA) return vB - vA;
+      return (a.nombre || '').localeCompare(b.nombre || '');
+    });
+
+    return consolidado;
   };
 
-  const menuFiltrado = agruparProductos(menuFiltradoPre);
+  let menuFiltrado = agruparProductos(menuFiltradoPre);
+  if (categoriaActiva === '🔥 Más Pedidos') {
+    const conVentas = menuFiltrado.filter(p => (p.totalVendido || 0) > 0);
+    menuFiltrado = (conVentas.length >= 5 ? conVentas : menuFiltrado).slice(0, 15);
+  }
   const totalTicket = ticketActual.reduce((acc, item) => acc + (item.cant * item.precio), 0);
   const badgeEstado = mesaActual?.estado === 'Servido' && ticketActual.length > 0
     ? 'text-blue-700 bg-blue-100' : (ticketActual.length > 0 ? 'text-amber-700 bg-amber-100' : 'text-emerald-700 bg-emerald-100');
@@ -1211,6 +1229,7 @@ export default function SalonPage({ currentUser }) {
                     {(() => {
                       const ordenPrioridades = [
                         'Todos',
+                        '🔥 Más Pedidos',
                         'Menú',
                         'Pollos a la Brasa',
                         'Parrillas y Cortes',
@@ -1220,7 +1239,7 @@ export default function SalonPage({ currentUser }) {
                         'Ensaladas',
                         'Bebidas y Refrescos'
                       ];
-                      const cats = ['Todos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
+                      const cats = ['Todos', '🔥 Más Pedidos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
                       
                       return cats.sort((a, b) => {
                         const idxA = ordenPrioridades.indexOf(a);
@@ -1266,6 +1285,11 @@ export default function SalonPage({ currentUser }) {
                             {isGroup && (
                               <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 bg-amber-100 text-amber-700">
                                 OPCIONES DE CARNE
+                              </span>
+                            )}
+                            {prod.totalVendido > 0 && !agotado && (
+                              <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 ml-1 bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
+                                🔥 TOP {prod.totalVendido > 1 ? `(${prod.totalVendido})` : ''}
                               </span>
                             )}
                             {prod.tipoStock === 'limitado' && !isGroup && (
