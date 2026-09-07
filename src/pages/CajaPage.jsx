@@ -488,6 +488,7 @@ export default function CajaPage({ currentUser }) {
   }, [currentUser]);
 
   const [deliverySearchQuery, setDeliverySearchQuery] = useState('');
+  const [deliveryCategoriaActiva, setDeliveryCategoriaActiva] = useState('Todos');
   const [optionsModalOpen, setOptionsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selections, setSelections] = useState({});
@@ -1437,6 +1438,7 @@ export default function CajaPage({ currentUser }) {
     setItemsDelivery([]);
     setCodigoPY('');
     setDeliverySearchQuery('');
+    setDeliveryCategoriaActiva('Todos');
     setDeliveryTelefono('');
     setDeliveryDireccion('');
     setDeliveryMontoEnvio('');
@@ -1459,6 +1461,7 @@ export default function CajaPage({ currentUser }) {
     setEditingPedidoId(p.pedidoId);
     setItemsDelivery(p.items || []);
     setDeliverySearchQuery('');
+    setDeliveryCategoriaActiva('Todos');
     
     // Identificar el tipo de delivery
     let calculatedTipo = 'PedidosYa';
@@ -4115,9 +4118,55 @@ export default function CajaPage({ currentUser }) {
                   </div>
                 </div>
 
+                {/* BARRA DE CATEGORÍAS */}
+                <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 overflow-x-auto custom-scrollbar flex-shrink-0">
+                  <div className="flex gap-1.5 md:gap-2">
+                    {(() => {
+                      const ordenPrioridades = [
+                        'Todos',
+                        'Menú',
+                        'Pollos a la Brasa',
+                        'Parrillas y Cortes',
+                        'Parrilladas Mixtas',
+                        'Platos Criollos',
+                        'Combos',
+                        'Ensaladas',
+                        'Bebidas y Refrescos'
+                      ];
+                      const cats = ['Todos', ...new Set(productosMenu.filter(p => p.activo && p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
+                      
+                      return cats.sort((a, b) => {
+                        const idxA = ordenPrioridades.indexOf(a);
+                        const idxB = ordenPrioridades.indexOf(b);
+                        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                        if (idxA !== -1) return -1;
+                        if (idxB !== -1) return 1;
+                        return a.localeCompare(b);
+                      }).map(cat => (
+                        <button 
+                          key={cat} 
+                          type="button"
+                          onClick={() => setDeliveryCategoriaActiva(cat)} 
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase whitespace-nowrap shadow-sm transition-colors ${
+                            deliveryCategoriaActiva === cat 
+                              ? 'bg-slate-900 text-white' 
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-amber-50'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 overflow-y-auto custom-scrollbar content-start flex-1">
                   {(() => {
-                    const menuFiltradoPre = productosMenu.filter(p => matchProductSemantic(p, deliverySearchQuery) && p.activo);
+                    const menuFiltradoPre = productosMenu.filter(p => {
+                      if (!p.activo) return false;
+                      if (deliveryCategoriaActiva !== 'Todos' && p.categoria !== deliveryCategoriaActiva) return false;
+                      return matchProductSemantic(p, deliverySearchQuery);
+                    });
                     const menuFiltrado = agruparProductos(menuFiltradoPre);
                     
                     if (menuFiltrado.length === 0) {
