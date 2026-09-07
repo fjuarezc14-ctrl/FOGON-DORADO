@@ -4135,6 +4135,7 @@ export default function CajaPage({ currentUser }) {
                     {(() => {
                       const ordenPrioridades = [
                         'Todos',
+                        '🔥 Más Pedidos',
                         'Menú',
                         'Pollos a la Brasa',
                         'Parrillas y Cortes',
@@ -4144,7 +4145,7 @@ export default function CajaPage({ currentUser }) {
                         'Ensaladas',
                         'Bebidas y Refrescos'
                       ];
-                      const cats = ['Todos', ...new Set(productosMenu.filter(p => p.activo && p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
+                      const cats = ['Todos', '🔥 Más Pedidos', ...new Set(productosMenu.filter(p => p.activo && p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
                       
                       return cats.sort((a, b) => {
                         const idxA = ordenPrioridades.indexOf(a);
@@ -4175,10 +4176,17 @@ export default function CajaPage({ currentUser }) {
                   {(() => {
                     const menuFiltradoPre = productosMenu.filter(p => {
                       if (!p.activo) return false;
+                      if (deliveryCategoriaActiva === '🔥 Más Pedidos') {
+                        return matchProductSemantic(p, deliverySearchQuery);
+                      }
                       if (deliveryCategoriaActiva !== 'Todos' && p.categoria !== deliveryCategoriaActiva) return false;
                       return matchProductSemantic(p, deliverySearchQuery);
                     });
-                    const menuFiltrado = agruparProductos(menuFiltradoPre);
+                    let menuFiltrado = agruparProductos(menuFiltradoPre);
+                    if (deliveryCategoriaActiva === '🔥 Más Pedidos') {
+                      const conVentas = menuFiltrado.filter(p => (p.totalVendido || 0) > 0);
+                      menuFiltrado = (conVentas.length >= 5 ? conVentas : menuFiltrado).slice(0, 15);
+                    }
                     
                     if (menuFiltrado.length === 0) {
                       return <div className="col-span-full text-center text-slate-400 font-medium py-12 text-sm">No se encontraron productos coincidentes.</div>;

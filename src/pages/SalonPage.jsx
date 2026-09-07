@@ -1012,6 +1012,9 @@ export default function SalonPage({ currentUser }) {
 
   const menuFiltradoPre = productos.filter(p => {
     if (p.categoria === 'PedidosYa / Ofertas') return false;
+    if (categoriaActiva === '🔥 Más Pedidos') {
+      return matchProductSemantic(p, searchQuery);
+    }
     if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
     return matchProductSemantic(p, searchQuery);
   });
@@ -1051,7 +1054,11 @@ export default function SalonPage({ currentUser }) {
     return consolidado;
   };
 
-  const menuFiltrado = agruparProductos(menuFiltradoPre);
+  let menuFiltrado = agruparProductos(menuFiltradoPre);
+  if (categoriaActiva === '🔥 Más Pedidos') {
+    const conVentas = menuFiltrado.filter(p => (p.totalVendido || 0) > 0);
+    menuFiltrado = (conVentas.length >= 5 ? conVentas : menuFiltrado).slice(0, 15);
+  }
   const totalTicket = ticketActual.reduce((acc, item) => acc + (item.cant * item.precio), 0);
   const badgeEstado = mesaActual?.estado === 'Servido' && ticketActual.length > 0
     ? 'text-blue-700 bg-blue-100' : (ticketActual.length > 0 ? 'text-amber-700 bg-amber-100' : 'text-emerald-700 bg-emerald-100');
@@ -1241,6 +1248,7 @@ export default function SalonPage({ currentUser }) {
                     {(() => {
                       const ordenPrioridades = [
                         'Todos',
+                        '🔥 Más Pedidos',
                         'Menú',
                         'Pollos a la Brasa',
                         'Parrillas y Cortes',
@@ -1250,7 +1258,7 @@ export default function SalonPage({ currentUser }) {
                         'Ensaladas',
                         'Bebidas y Refrescos'
                       ];
-                      const cats = ['Todos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
+                      const cats = ['Todos', '🔥 Más Pedidos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
                       
                       return cats.sort((a, b) => {
                         const idxA = ordenPrioridades.indexOf(a);
