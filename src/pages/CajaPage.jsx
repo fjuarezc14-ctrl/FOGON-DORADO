@@ -537,19 +537,19 @@ export default function CajaPage({ currentUser }) {
   const fetchCajaData = useCallback(async () => {
     try {
       const [mesasData, resumenData, llevarData, ventasData, prods, clientsList, abonosList] = await Promise.all([
-        api.getMesas(),
-        api.getResumenVentas(),
-        api.getPedidosLlevar(),
-        api.getHistorialVentas(),
-        api.getProductos(), // <-- Recargar productos dinámicamente para ofertas en vivo
+        api.getMesas().catch(() => []),
+        api.getResumenVentas().catch(() => ({ atendidas: 0, ingresos: 0 })),
+        api.getPedidosLlevar().catch(() => []),
+        api.getHistorialVentas().catch(() => []),
+        api.getProductos().catch(() => []),
         api.getClientes().catch(() => []),
         api.getAbonos().catch(() => []),
       ]);
-      setMesas(mesasData);
-      setPedidosLlevar(llevarData);
-      setStats({ atendidas: resumenData.atendidas || 0, ingresos: resumenData.ingresos || 0 });
+      setMesas(mesasData || []);
+      setPedidosLlevar(llevarData || []);
+      setStats({ atendidas: resumenData?.atendidas || 0, ingresos: resumenData?.ingresos || 0 });
       setVentas(ventasData || []);
-      setProductosMenu(prods); // <-- Actualizar el menú con precios de oferta en vivo
+      setProductosMenu(prods || []);
       setClientes(clientsList || []);
       setAbonos(abonosList || []);
     } catch (err) {

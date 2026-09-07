@@ -20,4 +20,4 @@ EXPOSE 3000
 # Al iniciar: aplicar TODAS las migraciones pendientes y luego arrancar el servidor.
 # NOTA: El seed.js ya NO se ejecuta aquí para evitar errores por datos duplicados en producción.
 # Si necesitas datos iniciales, corre manualmente: docker compose exec backend node prisma/seed.js
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+CMD ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && node server.js"]
