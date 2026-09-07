@@ -1501,11 +1501,10 @@ app.patch('/api/pedidos/:id/entregar-todo', async (req, res) => {
 
     if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
 
-    // Filtrar items que son de Cocina (no barra) y están listos (historial: true) pero no entregados
+    // Filtrar items listos (historial: true) pero no entregados (tanto de cocina como de barra)
     const itemsAActualizar = pedido.items.filter(i =>
       i.historial &&
-      !i.entregado &&
-      !BARRA_CATEGORIAS.includes(i.producto?.categoria)
+      !i.entregado
     );
 
     if (itemsAActualizar.length > 0) {

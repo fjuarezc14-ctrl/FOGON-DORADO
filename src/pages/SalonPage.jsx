@@ -732,23 +732,43 @@ export default function SalonPage({ currentUser }) {
       return;
     }
     if (prevMesasRef.current.length > 0) {
-      const listasNuevas = [];
       const activeMeseroName = currentUser?.nombre || meseroGlobal;
+      const esElevado = ['Administrador', 'Cajero'].includes(currentUser?.rol);
+      const alertasNuevas = [];
+
       mesas.forEach(m => {
+        const esMiMesa = m.pedidoData?.mesero === activeMeseroName || esElevado;
+        if (!esMiMesa || !m.pedidoData?.items) return;
+
         const ant = prevMesasRef.current.find(p => p.num === m.num);
+        const antItems = ant?.pedidoData?.items || [];
+
+        // Caso 1: La mesa pasó completa a Servido
         if (ant && ant.estado === 'Cocina' && m.estado === 'Servido') {
-          // Si corresponde a mi mesa, o si soy Administrador/Cajero, me alerta
-          const esMiMesa = m.pedidoData?.mesero === activeMeseroName || ['Administrador', 'Cajero'].includes(currentUser?.rol);
-          if (esMiMesa) {
-            listasNuevas.push(m.num);
-          }
+          alertasNuevas.push({ mesa: m.num, mensaje: `🛎️ ¡Mesa ${m.num} lista para servir!` });
+          return;
+        }
+
+        // Caso 2: Ítems específicos (de cocina o barra) acaban de quedar listos para recoger
+        const recienListos = m.pedidoData.items.filter(i => {
+          if (!i.historial || i.entregado) return false;
+          const antItem = antItems.find(ai => ai.itemId === i.itemId);
+          return !antItem || !antItem.historial;
+        });
+
+        if (recienListos.length > 0) {
+          const tieneBarra = recienListos.some(i => BARRA_CATEGORIAS.includes(i.categoria));
+          const tieneCocina = recienListos.some(i => !BARRA_CATEGORIAS.includes(i.categoria));
+          const origen = (tieneBarra && tieneCocina) ? 'Cocina y Barra' : (tieneBarra ? 'Barra' : 'Cocina');
+          alertasNuevas.push({ mesa: m.num, mensaje: `🛎️ ¡Mesa ${m.num}: pedido listo en ${origen}!` });
         }
       });
-      if (listasNuevas.length > 0) {
+
+      if (alertasNuevas.length > 0) {
         playChimeNotification();
-        listasNuevas.forEach(num => {
+        alertasNuevas.forEach(({ mesa, mensaje }) => {
           const toastId = Date.now() + Math.random();
-          setToasts(prev => [...prev, { id: toastId, mesa: num, mensaje: `🛎️ ¡Mesa ${num} lista para servir!` }]);
+          setToasts(prev => [...prev, { id: toastId, mesa, mensaje }]);
           setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== toastId));
           }, 6000);
@@ -992,9 +1012,6 @@ export default function SalonPage({ currentUser }) {
 
   const menuFiltradoPre = productos.filter(p => {
     if (p.categoria === 'PedidosYa / Ofertas') return false;
-    if (categoriaActiva === '🔥 Más Pedidos') {
-      return matchProductSemantic(p, searchQuery);
-    }
     if (categoriaActiva !== 'Todos' && p.categoria !== categoriaActiva) return false;
     return matchProductSemantic(p, searchQuery);
   });
@@ -1034,11 +1051,7 @@ export default function SalonPage({ currentUser }) {
     return consolidado;
   };
 
-  let menuFiltrado = agruparProductos(menuFiltradoPre);
-  if (categoriaActiva === '🔥 Más Pedidos') {
-    const conVentas = menuFiltrado.filter(p => (p.totalVendido || 0) > 0);
-    menuFiltrado = (conVentas.length >= 5 ? conVentas : menuFiltrado).slice(0, 15);
-  }
+  const menuFiltrado = agruparProductos(menuFiltradoPre);
   const totalTicket = ticketActual.reduce((acc, item) => acc + (item.cant * item.precio), 0);
   const badgeEstado = mesaActual?.estado === 'Servido' && ticketActual.length > 0
     ? 'text-blue-700 bg-blue-100' : (ticketActual.length > 0 ? 'text-amber-700 bg-amber-100' : 'text-emerald-700 bg-emerald-100');
@@ -1065,8 +1078,7 @@ export default function SalonPage({ currentUser }) {
 
     const itemsListos = m.pedidoData.items.filter(i => 
       i.historial && 
-      !i.entregado && 
-      !BARRA_CATEGORIAS.includes(i.categoria)
+      !i.entregado
     );
 
     return itemsListos.map(item => ({
@@ -1074,6 +1086,7 @@ export default function SalonPage({ currentUser }) {
       mesaNum: m.num,
       mesero: m.pedidoData.mesero,
       pedidoId: item.pedidoId,
+      esBarra: BARRA_CATEGORIAS.includes(item.categoria),
     }));
   });
 
@@ -1116,8 +1129,7 @@ export default function SalonPage({ currentUser }) {
           const esMiMesa = m.pedidoData?.mesero === activeMeseroName || isElevatedRole;
           const tieneListos = esMiMesa && (m.pedidoData?.items?.some(i => 
             i.historial && 
-            !i.entregado && 
-            !BARRA_CATEGORIAS.includes(i.categoria)
+            !i.entregado
           ) || false);
 
           let colorBg = 'bg-white hover:bg-emerald-50', colorText = 'text-emerald-500', colorBorder = 'border-slate-200', Icon = Receipt;
@@ -1224,12 +1236,11 @@ export default function SalonPage({ currentUser }) {
                       </button>
                     )}
                   </div>
-                  {/* Categorías */}
+                    {/* Categorías */}
                   <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-0.5 whitespace-nowrap">
                     {(() => {
                       const ordenPrioridades = [
                         'Todos',
-                        '🔥 Más Pedidos',
                         'Menú',
                         'Pollos a la Brasa',
                         'Parrillas y Cortes',
@@ -1239,7 +1250,7 @@ export default function SalonPage({ currentUser }) {
                         'Ensaladas',
                         'Bebidas y Refrescos'
                       ];
-                      const cats = ['Todos', '🔥 Más Pedidos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
+                      const cats = ['Todos', ...new Set(productos.filter(p => p.categoria !== 'PedidosYa / Ofertas').map(p => p.categoria))];
                       
                       return cats.sort((a, b) => {
                         const idxA = ordenPrioridades.indexOf(a);
@@ -1285,11 +1296,6 @@ export default function SalonPage({ currentUser }) {
                             {isGroup && (
                               <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 bg-amber-100 text-amber-700">
                                 OPCIONES DE CARNE
-                              </span>
-                            )}
-                            {prod.totalVendido > 0 && !agotado && (
-                              <span className="inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-1.5 ml-1 bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">
-                                🔥 TOP {prod.totalVendido > 1 ? `(${prod.totalVendido})` : ''}
                               </span>
                             )}
                             {prod.tipoStock === 'limitado' && !isGroup && (
@@ -2062,8 +2068,8 @@ export default function SalonPage({ currentUser }) {
                   <Bell className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="font-black text-sm md:text-base uppercase tracking-tight leading-none">Bandeja de Cocina</h2>
-                  <p className="text-[10px] text-indigo-200 mt-1 uppercase tracking-wider">Platos listos para servir</p>
+                  <h2 className="font-black text-sm md:text-base uppercase tracking-tight leading-none">Bandeja de Despacho</h2>
+                  <p className="text-[10px] text-indigo-200 mt-1 uppercase tracking-wider">Pedidos listos para servir (Cocina y Barra)</p>
                 </div>
               </div>
               <button onClick={() => setBandejaOpen(false)} className="bg-indigo-700 hover:bg-red-500 p-2 rounded-xl transition-colors text-white">
@@ -2076,7 +2082,7 @@ export default function SalonPage({ currentUser }) {
                 <div className="flex flex-col items-center justify-center h-full text-slate-400 py-10">
                   <CheckCircle className="w-16 h-16 text-slate-300 mb-3" />
                   <p className="font-black uppercase tracking-wider text-sm">Bandeja Vacía</p>
-                  <p className="text-xs text-slate-400 text-center mt-1">No hay platos listos pendientes de entregar en cocina.</p>
+                  <p className="text-xs text-slate-400 text-center mt-1">No hay pedidos listos pendientes de entregar.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -2113,10 +2119,18 @@ export default function SalonPage({ currentUser }) {
                         </div>
                         <ul className="space-y-2">
                           {items.map((item, idx) => (
-                            <li key={idx} className="flex items-center justify-between text-xs bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
-                              <span className="font-bold text-slate-800 uppercase flex-1 pr-2">
-                                <span className="font-black text-indigo-600 mr-2">{item.cant}x</span> {item.nombre}
-                              </span>
+                            <li key={idx} className="flex items-center justify-between text-xs bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 gap-2">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0 pr-2">
+                                <span className="font-black text-indigo-600 shrink-0">{item.cant}x</span>
+                                <span className="font-bold text-slate-800 uppercase truncate">{item.nombre}</span>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                                  item.esBarra 
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                }`}>
+                                  {item.esBarra ? '🍹 BARRA' : '🍳 COCINA'}
+                                </span>
+                              </div>
                               <button
                                 onClick={async () => {
                                   try {
@@ -2127,7 +2141,7 @@ export default function SalonPage({ currentUser }) {
                                     alert("Error al entregar: " + err.message);
                                   }
                                 }}
-                                className="p-1.5 bg-white hover:bg-emerald-500 hover:text-white border border-slate-200 rounded-lg text-slate-400 hover:border-emerald-500 transition-all active:scale-90"
+                                className="p-1.5 bg-white hover:bg-emerald-500 hover:text-white border border-slate-200 rounded-lg text-slate-400 hover:border-emerald-500 transition-all active:scale-90 shrink-0"
                                 title="Marcar como Servido"
                               >
                                 <CheckCircle className="w-4 h-4" />
