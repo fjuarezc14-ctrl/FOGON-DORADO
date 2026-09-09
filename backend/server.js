@@ -2748,6 +2748,17 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
       return res.status(400).json({ error: 'Debe seleccionar un cliente para registrar la venta a crédito.' });
     }
 
+    let nuevoNombreCliente = undefined;
+    if (finalMontoCredito > 0 && clienteCreditoId) {
+      const clienteObj = await prisma.cliente.findUnique({ where: { id: parseInt(clienteCreditoId) } });
+      if (clienteObj) {
+        // Si no tiene nombre definido o es genérico, actualizar al nombre del cliente de crédito
+        if (!venta.nombreCliente || venta.nombreCliente === 'Consumidor Final' || venta.nombreCliente === 'PÚBLICO GENERAL') {
+          nuevoNombreCliente = clienteObj.nombre;
+        }
+      }
+    }
+
     // Actualizar Venta
     const ventaActualizada = await prisma.venta.update({
       where: { id: parseInt(ventaId) },
@@ -2760,7 +2771,8 @@ app.patch('/api/ventas/:ventaId/metodo-pago', async (req, res) => {
         montoTarjeta: finalMontoTarjeta,
         montoYape: finalMontoYape,
         montoCredito: finalMontoCredito,
-        clienteCreditoId: clienteCreditoId ? parseInt(clienteCreditoId) : null
+        clienteCreditoId: finalMontoCredito > 0 && clienteCreditoId ? parseInt(clienteCreditoId) : null,
+        ...(nuevoNombreCliente ? { nombreCliente: nuevoNombreCliente } : {})
       },
     });
 

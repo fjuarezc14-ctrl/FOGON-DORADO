@@ -43,6 +43,7 @@ function SelectorClienteCreditoCombobox({
   clientes = [],
   clienteSeleccionado,
   onSelectCliente,
+  onCrearNuevo,
   label = "Cliente para Crédito:",
   placeholder = "Buscar por nombre, DNI o RUC..."
 }) {
@@ -141,10 +142,27 @@ function SelectorClienteCreditoCombobox({
                 className="fixed inset-0 z-[120]" 
                 onClick={() => setAbierto(false)} 
               />
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-[130] max-h-48 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-[130] max-h-52 overflow-y-auto custom-scrollbar p-1.5 space-y-1">
+                {onCrearNuevo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAbierto(false);
+                      onCrearNuevo(busqueda);
+                    }}
+                    className="w-full text-left px-2.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-black uppercase flex items-center justify-between gap-1 transition-all mb-1 shadow-xs"
+                  >
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Plus className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      <span>{busqueda ? `Registrar "${busqueda.toUpperCase()}"` : '➕ Registrar nuevo cliente'}</span>
+                    </span>
+                    <span className="text-[9px] bg-teal-600 text-white px-1.5 py-0.5 rounded font-bold shrink-0">NUEVO</span>
+                  </button>
+                )}
+
                 {filtrados.length === 0 ? (
                   <div className="p-3 text-center text-xs text-slate-400 font-bold">
-                    No se encontraron clientes
+                    No se encontraron clientes registrados con ese criterio.
                   </div>
                 ) : (
                   filtrados.map(c => {
@@ -452,6 +470,19 @@ export default function CajaPage({ currentUser }) {
   const [ventaACambiar, setVentaACambiar] = useState(null);
   const [cambioPin, setCambioPin] = useState('');
   const [cambioNuevoMetodo, setCambioNuevoMetodo] = useState('Efectivo');
+  const [cambioClienteCredito, setCambioClienteCredito] = useState(null);
+  const [modalNuevoClienteCreditoRapido, setModalNuevoClienteCreditoRapido] = useState(false);
+  const [formNuevoClienteRapido, setFormNuevoClienteRapido] = useState({
+    nombre: '',
+    tipoDoc: 'DNI',
+    numDoc: '',
+    telefono: '',
+    direccion: '',
+    esTrabajador: false
+  });
+  const [guardandoClienteRapido, setGuardandoClienteRapido] = useState(false);
+  const [consultandoDocRapido, setConsultandoDocRapido] = useState(false);
+  const [errorNuevoClienteRapido, setErrorNuevoClienteRapido] = useState('');
   const [cambiando, setCambiando] = useState(false);
   const [cambioError, setCambioError] = useState('');
 
@@ -1120,6 +1151,80 @@ export default function CajaPage({ currentUser }) {
   };
 
   // --- Cambiar método de pago de una venta existente ---
+  const abrirCambioMetodoModal = (v) => {
+    setVentaACambiar(v);
+    setCambioNuevoMetodo(v.metodoPago || 'Efectivo');
+    setCambioPin('');
+    setCambioError('');
+    // Intentar asociar cliente de crédito si ya existía o por documento / nombre
+    let cEncontrado = null;
+    if (v.clienteCreditoId) {
+      cEncontrado = clientes.find(c => c.id === v.clienteCreditoId);
+    } else if (v.numDocumento || (v.nombreCliente && v.nombreCliente !== 'Consumidor Final' && v.nombreCliente !== 'PÚBLICO GENERAL')) {
+      cEncontrado = clientes.find(c => 
+        (c.numDoc && v.numDocumento && String(c.numDoc).trim() === String(v.numDocumento).trim()) ||
+        (c.nombre && v.nombreCliente && c.nombre.trim().toLowerCase() === v.nombreCliente.trim().toLowerCase())
+      );
+    }
+    setCambioClienteCredito(cEncontrado || null);
+    setCambioMetodoModal(true);
+  };
+
+  const handleConsultarDocRapido = async () => {
+    const doc = formNuevoClienteRapido.numDoc?.trim();
+    if (!doc || (doc.length !== 8 && doc.length !== 11)) {
+      setErrorNuevoClienteRapido('Ingresa un DNI (8 dígitos) o RUC (11 dígitos) válido.');
+      return;
+    }
+    setConsultandoDocRapido(true);
+    setErrorNuevoClienteRapido('');
+    try {
+      const data = await api.consultarCliente(doc);
+      if (data) {
+        setFormNuevoClienteRapido(prev => ({
+          ...prev,
+          nombre: (data.razonSocial || data.nombre || prev.nombre || '').toUpperCase(),
+          direccion: data.direccion || prev.direccion || '',
+          tipoDoc: doc.length === 11 ? 'RUC' : 'DNI'
+        }));
+      }
+    } catch (err) {
+      setErrorNuevoClienteRapido('No se pudo autocompletar con RENIEC/SUNAT. Puedes escribir los datos manualmente.');
+    } finally {
+      setConsultandoDocRapido(false);
+    }
+  };
+
+  const handleGuardarClienteRapido = async (e) => {
+    if (e) e.preventDefault();
+    if (!formNuevoClienteRapido.nombre.trim()) {
+      setErrorNuevoClienteRapido('El nombre o razón social es obligatorio.');
+      return;
+    }
+    setGuardandoClienteRapido(true);
+    setErrorNuevoClienteRapido('');
+    try {
+      const nuevo = await api.crearCliente({
+        nombre: formNuevoClienteRapido.nombre.trim().toUpperCase(),
+        tipoDoc: formNuevoClienteRapido.tipoDoc,
+        numDoc: formNuevoClienteRapido.numDoc?.trim() || null,
+        telefono: formNuevoClienteRapido.telefono?.trim() || null,
+        direccion: formNuevoClienteRapido.direccion?.trim() || null,
+        esTrabajador: Boolean(formNuevoClienteRapido.esTrabajador)
+      });
+      const updatedClients = await api.getClientes();
+      setClientes(updatedClients || []);
+      const seleccionado = updatedClients?.find(c => c.id === nuevo.id) || nuevo;
+      setCambioClienteCredito(seleccionado);
+      setModalNuevoClienteCreditoRapido(false);
+      setFormNuevoClienteRapido({ nombre: '', tipoDoc: 'DNI', numDoc: '', telefono: '', direccion: '', esTrabajador: false });
+    } catch (err) {
+      setErrorNuevoClienteRapido(err.message || 'Error al registrar cliente.');
+    } finally {
+      setGuardandoClienteRapido(false);
+    }
+  };
+
   const handleCambiarMetodoPago = async () => {
     if (!cambioPin.trim()) { setCambioError('Ingresa el PIN de Administrador.'); return; }
     if (!cambioNuevoMetodo) { setCambioError('Selecciona el nuevo método de pago.'); return; }
@@ -1127,9 +1232,16 @@ export default function CajaPage({ currentUser }) {
     let finalMontoEfectivo = 0;
     let finalMontoTarjeta = 0;
     let finalMontoYape = 0;
+    let finalMontoCredito = 0;
     const total = ventaACambiar.total;
 
-    if (cambioNuevoMetodo === 'Mixto') {
+    if (cambioNuevoMetodo === 'Crédito') {
+      if (!cambioClienteCredito) {
+        setCambioError('Debes seleccionar o registrar un cliente para cargar la deuda de crédito.');
+        return;
+      }
+      finalMontoCredito = total;
+    } else if (cambioNuevoMetodo === 'Mixto') {
       const efecVal = parseFloat(cambioMixtoEfectivo || 0);
       const tarjVal = parseFloat(cambioMixtoTarjeta || 0);
       const yapeVal = parseFloat(cambioMixtoYape || 0);
@@ -1161,7 +1273,9 @@ export default function CajaPage({ currentUser }) {
       const res = await api.cambiarMetodoPago(ventaACambiar.id, cambioNuevoMetodo, cambioPin.trim(), {
         montoEfectivo: finalMontoEfectivo,
         montoTarjeta: finalMontoTarjeta,
-        montoYape: finalMontoYape
+        montoYape: finalMontoYape,
+        montoCredito: finalMontoCredito,
+        clienteCreditoId: cambioNuevoMetodo === 'Crédito' ? cambioClienteCredito.id : null
       });
       if (res.error) { setCambioError(res.error); return; }
       // Actualizar el estado local de ventas sin recargar
@@ -1170,12 +1284,16 @@ export default function CajaPage({ currentUser }) {
         metodoPago: cambioNuevoMetodo,
         montoEfectivo: finalMontoEfectivo,
         montoTarjeta: finalMontoTarjeta,
-        montoYape: finalMontoYape 
+        montoYape: finalMontoYape,
+        montoCredito: finalMontoCredito,
+        clienteCreditoId: cambioNuevoMetodo === 'Crédito' ? cambioClienteCredito.id : null,
+        nombreCliente: (cambioNuevoMetodo === 'Crédito' && (!v.nombreCliente || v.nombreCliente === 'Consumidor Final' || v.nombreCliente === 'PÚBLICO GENERAL')) ? cambioClienteCredito.nombre : v.nombreCliente
       } : v));
       setCambioMetodoModal(false);
       setVentaACambiar(null);
       setCambioPin('');
       setCambioNuevoMetodo('Efectivo');
+      setCambioClienteCredito(null);
       setCambioMixtoEfectivo('');
       setCambioMixtoTarjeta('');
       setCambioMixtoYape('');
@@ -2576,9 +2694,11 @@ export default function CajaPage({ currentUser }) {
                         <option value="Efectivo">💵 Efectivo</option>
                         <option value="Tarjeta">💳 Tarjeta</option>
                         <option value="Yape">📱 Yape / Plin</option>
+                        <option value="Crédito">💳 Crédito</option>
                         <option value="PedidosYa">🛵 PedidosYa</option>
                         <option value="Consumo">👤 Consumo Personal</option>
                         <option value="Cortesía">🎁 Cortesías</option>
+                        <option value="Mixto">➕ Mixto</option>
                       </select>
                     </div>
                     <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
@@ -2777,6 +2897,7 @@ export default function CajaPage({ currentUser }) {
                                       method === 'Efectivo' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
                                       method === 'Tarjeta' ? 'bg-blue-50 border-blue-200 text-blue-700' :
                                       method === 'Yape' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                                      method === 'Crédito' ? 'bg-teal-50 border-teal-300 text-teal-800 font-black' :
                                       method === 'Cortesía' ? 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' :
                                       method === 'Consumo' ? 'bg-violet-100 border-violet-300 text-violet-700' :
                                       method === 'Mixto' ? 'bg-amber-100 border-amber-250 text-amber-900 font-black' :
@@ -2785,19 +2906,19 @@ export default function CajaPage({ currentUser }) {
                                     {editable && (
                                       <button
                                         title="Corregir método de pago (requiere PIN Administrador)"
-                                        onClick={() => {
-                                          setVentaACambiar(v);
-                                          setCambioNuevoMetodo(v.metodoPago);
-                                          setCambioPin('');
-                                          setCambioError('');
-                                          setCambioMetodoModal(true);
-                                        }}
+                                        onClick={() => abrirCambioMetodoModal(v)}
                                         className="p-1 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-400 hover:text-amber-600 border border-slate-200 hover:border-amber-300 transition-all"
                                       >
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                                       </button>
                                     )}
                                   </div>
+                                  {method === 'Crédito' && (
+                                    <div className="text-[10px] font-black text-teal-800 bg-teal-50 border border-teal-200/70 px-2 py-0.5 rounded-md flex items-center gap-1 max-w-[170px] truncate shadow-2xs mt-0.5" title={v.clienteCreditoId ? (clientes.find(c => c.id === v.clienteCreditoId)?.nombre || v.nombreCliente) : v.nombreCliente}>
+                                      <span>👤</span>
+                                      <span className="truncate">{v.clienteCreditoId ? (clientes.find(c => c.id === v.clienteCreditoId)?.nombre || v.nombreCliente) : (v.nombreCliente || 'Cliente Crédito')}</span>
+                                    </div>
+                                  )}
                                   {method === 'Mixto' && (
                                     <div className="text-[9px] font-mono text-slate-500 bg-slate-50 p-1.5 rounded-lg border border-slate-150 space-y-0.5 mt-0.5 leading-none shadow-sm min-w-[100px]">
                                       {(v.montoEfectivo || 0) > 0 && <div className="flex justify-between gap-2"><span>💵 Efec:</span><span className="font-bold">S/ {v.montoEfectivo.toFixed(2)}</span></div>}
@@ -5307,7 +5428,7 @@ export default function CajaPage({ currentUser }) {
       {/* Modal: Corregir Método de Pago */}
       {cambioMetodoModal && ventaACambiar && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[260] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
             {/* Header */}
             <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-5 text-slate-950 flex justify-between items-center">
               <div>
@@ -5333,28 +5454,80 @@ export default function CajaPage({ currentUser }) {
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Nuevo Método de Pago</label>
                 <div className="grid grid-cols-4 gap-1.5">
-                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Consumo', 'Cortesía', 'Mixto'].map(mp => (
+                  {['Efectivo', 'Tarjeta', 'Yape', 'PedidosYa', 'Crédito', 'Consumo', 'Cortesía', 'Mixto'].map(mp => (
                     <button
                       key={mp}
                       type="button"
-                      onClick={() => setCambioNuevoMetodo(mp)}
+                      onClick={() => {
+                        setCambioNuevoMetodo(mp);
+                        setCambioError('');
+                      }}
                       className={`py-2 px-1 rounded-xl text-[9px] font-black uppercase border-2 transition-all ${
                         cambioNuevoMetodo === mp
-                          ? mp === 'Efectivo' ? 'bg-emerald-500 border-emerald-600 text-white' :
-                            mp === 'Tarjeta' ? 'bg-blue-500 border-blue-600 text-white' :
-                            mp === 'Yape' ? 'bg-purple-500 border-purple-600 text-white' :
-                            mp === 'Consumo' ? 'bg-slate-700 border-slate-800 text-white' :
-                            mp === 'Cortesía' ? 'bg-amber-500 border-amber-600 text-slate-950' :
-                            mp === 'Mixto' ? 'bg-orange-500 border-orange-600 text-white' :
-                            'bg-indigo-500 border-indigo-600 text-white'
+                          ? mp === 'Efectivo' ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' :
+                            mp === 'Tarjeta' ? 'bg-blue-500 border-blue-600 text-white shadow-sm' :
+                            mp === 'Yape' ? 'bg-purple-500 border-purple-600 text-white shadow-sm' :
+                            mp === 'Crédito' ? 'bg-teal-600 border-teal-700 text-white shadow-sm' :
+                            mp === 'Consumo' ? 'bg-slate-700 border-slate-800 text-white shadow-sm' :
+                            mp === 'Cortesía' ? 'bg-amber-500 border-amber-600 text-slate-950 shadow-sm' :
+                            mp === 'Mixto' ? 'bg-orange-500 border-orange-600 text-white shadow-sm' :
+                            'bg-indigo-500 border-indigo-600 text-white shadow-sm'
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}
                     >
-                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : mp === 'Consumo' ? '👤' : mp === 'Cortesía' ? '🎁' : mp === 'Mixto' ? '➕' : '🛵'} {mp === 'Consumo' ? 'Consumo' : mp === 'Cortesía' ? 'Corte.' : mp}
+                      {mp === 'Efectivo' ? '💵' : mp === 'Tarjeta' ? '💳' : mp === 'Yape' ? '📱' : mp === 'Crédito' ? '💳' : mp === 'Consumo' ? '👤' : mp === 'Cortesía' ? '🎁' : mp === 'Mixto' ? '➕' : '🛵'} {mp === 'Consumo' ? 'Consumo' : mp === 'Cortesía' ? 'Corte.' : mp}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Selector de Cliente de Crédito */}
+              {cambioNuevoMetodo === 'Crédito' && (
+                <div className="bg-teal-500/10 border border-teal-500/25 p-3.5 rounded-2xl shadow-sm space-y-2.5">
+                  <SelectorClienteCreditoCombobox
+                    clientes={clientes}
+                    clienteSeleccionado={cambioClienteCredito}
+                    onSelectCliente={(c) => {
+                      setCambioClienteCredito(c);
+                      setCambioError('');
+                    }}
+                    onCrearNuevo={(busqueda) => {
+                      const esNumero = busqueda && /^\d+$/.test(busqueda.trim());
+                      setFormNuevoClienteRapido({
+                        nombre: !esNumero && busqueda ? busqueda.toUpperCase() : (ventaACambiar?.nombreCliente && ventaACambiar.nombreCliente !== 'Consumidor Final' && ventaACambiar.nombreCliente !== 'PÚBLICO GENERAL' ? ventaACambiar.nombreCliente : ''),
+                        tipoDoc: esNumero && busqueda.trim().length === 11 ? 'RUC' : (ventaACambiar?.tipoComprobante === 'Factura' ? 'RUC' : 'DNI'),
+                        numDoc: esNumero ? busqueda.trim() : (ventaACambiar?.numDocumento && ventaACambiar.numDocumento !== '-' ? ventaACambiar.numDocumento : ''),
+                        telefono: '',
+                        direccion: (ventaACambiar?.clienteDireccion && ventaACambiar.clienteDireccion !== '-') ? ventaACambiar.clienteDireccion : '',
+                        esTrabajador: false
+                      });
+                      setErrorNuevoClienteRapido('');
+                      setModalNuevoClienteCreditoRapido(true);
+                    }}
+                    label="Cliente para Crédito (Obligatorio):"
+                    placeholder="Buscar por nombre, DNI o RUC..."
+                  />
+
+                  {cambioClienteCredito ? (
+                    <div className="text-[11px] bg-white p-2.5 rounded-xl border border-teal-200 text-teal-950 flex justify-between items-center shadow-2xs">
+                      <div className="flex items-center gap-1.5 truncate pr-2">
+                        <span className="w-2 h-2 rounded-full bg-teal-500 shrink-0"></span>
+                        <span className="font-black truncate">{cambioClienteCredito.nombre}</span>
+                      </div>
+                      <span className={`font-mono font-black shrink-0 px-2 py-0.5 rounded ${
+                        (cambioClienteCredito.saldo || 0) > 0 ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      }`}>
+                        {(cambioClienteCredito.saldo || 0) > 0 ? `Debe S/ ${(cambioClienteCredito.saldo).toFixed(2)}` : 'S/ 0.00'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-amber-700 bg-amber-50/90 border border-amber-200 p-2 rounded-xl flex items-center gap-1.5 font-bold">
+                      <span>⚠️</span>
+                      <span>Busca y selecciona a quién se cargará este monto de S/ {ventaACambiar.total.toFixed(2)}.</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Pago Mixto para Corrección */}
               {cambioNuevoMetodo === 'Mixto' && (() => {
@@ -5478,6 +5651,167 @@ export default function CajaPage({ currentUser }) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Registrar Nuevo Cliente para Crédito Rápido */}
+      {modalNuevoClienteCreditoRapido && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[270] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up border border-teal-500/30">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-4 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Registrar Cliente para Crédito
+                </h3>
+                <p className="text-[11px] font-bold text-teal-100 mt-0.5">Se creará en el módulo de créditos y se asignará automáticamente</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNuevoClienteCreditoRapido(false)}
+                className="bg-black/20 hover:bg-black/30 p-2 rounded-xl transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarClienteRapido} className="p-5 space-y-3.5">
+              {/* Tipo y Num Doc */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Tipo Doc.</label>
+                  <select
+                    value={formNuevoClienteRapido.tipoDoc}
+                    onChange={e => setFormNuevoClienteRapido({ ...formNuevoClienteRapido, tipoDoc: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="DNI">DNI</option>
+                    <option value="RUC">RUC</option>
+                    <option value="CE">C.E.</option>
+                    <option value="OTRO">OTRO</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1 flex justify-between items-center">
+                    <span>N° Documento</span>
+                    {(formNuevoClienteRapido.numDoc?.length === 8 || formNuevoClienteRapido.numDoc?.length === 11) && (
+                      <button
+                        type="button"
+                        onClick={handleConsultarDocRapido}
+                        disabled={consultandoDocRapido}
+                        className="text-[9px] text-teal-600 hover:text-teal-800 underline font-black"
+                      >
+                        {consultandoDocRapido ? 'Consultando...' : '🔍 Buscar SUNAT/RENIEC'}
+                      </button>
+                    )}
+                  </label>
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={formNuevoClienteRapido.numDoc}
+                      onChange={e => setFormNuevoClienteRapido({ ...formNuevoClienteRapido, numDoc: e.target.value })}
+                      placeholder="DNI (8) o RUC (11)"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-teal-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleConsultarDocRapido}
+                      disabled={consultandoDocRapido || !formNuevoClienteRapido.numDoc?.trim()}
+                      className="px-2.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-[10px] font-black uppercase transition-all shrink-0 disabled:opacity-40"
+                      title="Consultar RENIEC / SUNAT"
+                    >
+                      {consultandoDocRapido ? '...' : '🔍'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nombre / Razón Social */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">
+                  Nombre Completo o Razón Social <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formNuevoClienteRapido.nombre}
+                  onChange={e => setFormNuevoClienteRapido({ ...formNuevoClienteRapido, nombre: e.target.value.toUpperCase() })}
+                  placeholder="Ej. JUAN PÉREZ / EMPRESA SAC"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-teal-500 uppercase"
+                />
+              </div>
+
+              {/* Teléfono / Celular */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">
+                  Teléfono / Celular <span className="text-slate-400 font-normal">(para cobranza)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formNuevoClienteRapido.telefono}
+                  onChange={e => setFormNuevoClienteRapido({ ...formNuevoClienteRapido, telefono: e.target.value })}
+                  placeholder="Ej. 987654321"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-teal-500 font-mono"
+                />
+              </div>
+
+              {/* Dirección */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">
+                  Dirección <span className="text-slate-400 font-normal">(referencia o domicilio)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formNuevoClienteRapido.direccion}
+                  onChange={e => setFormNuevoClienteRapido({ ...formNuevoClienteRapido, direccion: e.target.value })}
+                  placeholder="Ej. Av. Principal 123"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              {/* Checkbox es personal / trabajador */}
+              <label className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={formNuevoClienteRapido.esTrabajador}
+                  onChange={e => setFormNuevoClienteRapido({ ...formNuevoClienteRapido, esTrabajador: e.target.checked })}
+                  className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
+                />
+                <div className="text-[11px] leading-tight">
+                  <span className="font-black text-slate-700 block">¿Es personal / trabajador del local?</span>
+                  <span className="text-[9px] text-slate-500">Se clasificará como STAFF en el módulo de créditos</span>
+                </div>
+              </label>
+
+              {/* Error */}
+              {errorNuevoClienteRapido && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{errorNuevoClienteRapido}</span>
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalNuevoClienteCreditoRapido(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardandoClienteRapido || !formNuevoClienteRapido.nombre.trim()}
+                  className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-black text-xs uppercase rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5"
+                >
+                  {guardandoClienteRapido ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  {guardandoClienteRapido ? 'Guardando...' : 'Guardar y Asignar'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
