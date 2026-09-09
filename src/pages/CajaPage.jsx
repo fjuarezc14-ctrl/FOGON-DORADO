@@ -64,10 +64,10 @@ function SelectorClienteCreditoCombobox({
         <div className="flex justify-between items-center mb-1">
           <label className="block text-slate-500 font-bold text-[9px] tracking-widest uppercase">{label}</label>
           {clienteSeleccionado && (
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
-              (clienteSeleccionado.saldo || 0) > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
+              (clienteSeleccionado.saldo || 0) > 0 ? 'bg-slate-100 border-slate-200 text-slate-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
             }`}>
-              {(clienteSeleccionado.saldo || 0) > 0 ? `Debe S/ ${(clienteSeleccionado.saldo || 0).toFixed(2)}` : 'Al día'}
+              {(clienteSeleccionado.saldo || 0) > 0 ? `Deuda anterior: S/ ${(clienteSeleccionado.saldo || 0).toFixed(2)}` : 'Sin deuda previa'}
             </span>
           )}
         </div>
@@ -5509,21 +5509,35 @@ export default function CajaPage({ currentUser }) {
                   />
 
                   {cambioClienteCredito ? (
-                    <div className="text-[11px] bg-white p-2.5 rounded-xl border border-teal-200 text-teal-950 flex justify-between items-center shadow-2xs">
-                      <div className="flex items-center gap-1.5 truncate pr-2">
-                        <span className="w-2 h-2 rounded-full bg-teal-500 shrink-0"></span>
-                        <span className="font-black truncate">{cambioClienteCredito.nombre}</span>
+                    <div className="bg-white p-3 rounded-2xl border border-teal-200/90 shadow-sm space-y-2.5">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-150">
+                        <span className="text-slate-600 font-bold uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                          <span>💳</span> Monto de esta venta a cargar:
+                        </span>
+                        <span className="font-mono font-black text-teal-800 text-sm bg-teal-50 px-2.5 py-0.5 rounded-lg border border-teal-200">
+                          + S/ {ventaACambiar.total.toFixed(2)}
+                        </span>
                       </div>
-                      <span className={`font-mono font-black shrink-0 px-2 py-0.5 rounded ${
-                        (cambioClienteCredito.saldo || 0) > 0 ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      }`}>
-                        {(cambioClienteCredito.saldo || 0) > 0 ? `Debe S/ ${(cambioClienteCredito.saldo).toFixed(2)}` : 'S/ 0.00'}
-                      </span>
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                          <span className="text-slate-400 font-bold block text-[9px] uppercase tracking-wider">Deuda anterior</span>
+                          <span className="font-mono font-bold text-slate-700 text-xs">
+                            S/ {(cambioClienteCredito.saldo || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="bg-amber-50/80 p-2.5 rounded-xl border border-amber-200">
+                          <span className="text-amber-800 font-bold block text-[9px] uppercase tracking-wider">Nueva deuda total</span>
+                          <span className="font-mono font-black text-amber-900 text-xs">
+                            S/ {((cambioClienteCredito.saldo || 0) + ventaACambiar.total).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-[10px] text-amber-700 bg-amber-50/90 border border-amber-200 p-2 rounded-xl flex items-center gap-1.5 font-bold">
-                      <span>⚠️</span>
-                      <span>Busca y selecciona a quién se cargará este monto de S/ {ventaACambiar.total.toFixed(2)}.</span>
+                    <div className="text-[11px] text-amber-800 bg-amber-50/90 border border-amber-200 p-2.5 rounded-xl flex items-center gap-2 font-bold">
+                      <span className="text-base shrink-0">⚠️</span>
+                      <span>Busca o registra el cliente al que se le cargarán los <strong>S/ {ventaACambiar.total.toFixed(2)}</strong> de esta venta.</span>
                     </div>
                   )}
                 </div>
