@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, TrendingUp, TrendingDown, DollarSign, XCircle, Users, Truck, Calendar, Search, Receipt, Printer, X, Wallet, Briefcase } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, DollarSign, XCircle, Users, Truck, Calendar, Search, Receipt, Printer, X, Wallet, Briefcase, FileSpreadsheet } from 'lucide-react';
+import ExcelJS from 'exceljs';
 
 import { api } from '../api';
 
@@ -79,6 +80,7 @@ export default function ReportesPage() {
   const [mozos, setMozos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtrando, setFiltrando] = useState(false);
+  const [exportandoExcel, setExportandoExcel] = useState(false);
   const [ventas, setVentas] = useState([]);
   const [activeComprobante, setActiveComprobante] = useState(null);
   const [sunatModalOpen, setSunatModalOpen] = useState(false);
@@ -289,80 +291,525 @@ export default function ReportesPage() {
     fetchReportes(fechaDesde, fechaHasta);
   };
 
-  const exportarLibroContableRCE = async () => {
+  const exportarLibroContableExcel = async () => {
     try {
-      setFiltrando(true);
-      // Obtener el historial real detallado de ventas y compras del periodo seleccionado
-      const [ventasData, comprasData] = await Promise.all([
+      setExportandoExcel(true);
+      // Obtener datos detallados de ventas, compras y balance contable del periodo
+      const [ventasData, comprasData, contableData] = await Promise.all([
         api.getHistorialVentas(fechaDesde, fechaHasta),
-        api.getCompras(fechaDesde, fechaHasta)
+        api.getCompras(fechaDesde, fechaHasta),
+        api.getReporteContable(fechaDesde, fechaHasta).catch(() => null)
       ]);
 
-      const rows = [
-        ['REGISTRO TRIBUTARIO (RCE / RVE) - EL FOGÓN DORADO'],
-        [`PERIODO: DESDE ${fechaDesde} HASTA ${fechaHasta}`],
-        [],
-        ['TIPO', 'FECHA EMISION', 'COMPROBANTE', 'NUM DOCUMENTO', 'CLIENTE / PROVEEDOR', 'METODO PAGO', 'BASE IMPONIBLE (S/)', 'IGV (S/)', 'TOTAL (S/)', 'EFECTIVO (S/)', 'TARJETA (S/)', 'YAPE (S/)']
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'El Fogón Dorado ERP';
+      workbook.lastModifiedBy = 'Administración';
+      workbook.created = new Date();
+      workbook.modified = new Date();
+
+      // Definición de Estilos Reutilizables
+      const fontHeader = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      const fontRegular = { name: 'Calibri', size: 10, color: { argb: 'FF1E293B' } };
+      const fontBold = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+      const fontAnulado = { name: 'Calibri', size: 10, strike: true, color: { argb: 'FF94A3B8' } };
+
+      const fillNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      const fillBlueHeader = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      const fillGreenHeader = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+      const fillZebra = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      const fillTotal = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      const fillHighlight = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+
+      const borderThin = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+
+      const borderTotal = {
+        top: { style: 'thin', color: { argb: 'FF0F172A' } },
+        bottom: { style: 'double', color: { argb: 'FF0F172A' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+
+      const fmtMoneda = '"S/" #,##0.00';
+      const fmtPorcentaje = '0.00%';
+
+      // ==========================================
+      // HOJA 1: RESUMEN TRIBUTARIO Y LIQUIDACIÓN
+      // ==========================================
+      const wsResumen = workbook.addWorksheet('Resumen Tributario', {
+        views: [{ showGridLines: true }]
+      });
+
+      // Título principal
+      wsResumen.mergeCells('B2:F2');
+      const titleCell = wsResumen.getCell('B2');
+      titleCell.value = 'POLLERÍA EL FOGÓN DORADO - LIBRO CONTABLE TRIBUTARIO';
+      titleCell.font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleCell.fill = fillNavy;
+      titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsResumen.getRow(2).height = 28;
+
+      wsResumen.mergeCells('B3:F3');
+      const subCell = wsResumen.getCell('B3');
+      subCell.value = `PERIODO: DESDE ${fechaDesde} HASTA ${fechaHasta}  |  GENERADO EL ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`;
+      subCell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF475569' } };
+      subCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsResumen.getRow(3).height = 20;
+
+      // Sección 1: Liquidación IGV
+      wsResumen.getCell('B5').value = '1. LIQUIDACIÓN ESTIMADA DE IGV (DÉBITO VS CRÉDITO FISCAL)';
+      wsResumen.getCell('B5').font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF0F172A' } };
+
+      const liqHeaders = ['CONCEPTO', 'BASE IMPONIBLE', 'IGV FISCAL', 'TOTAL IMPORTE', 'OBSERVACIÓN'];
+      const r6 = wsResumen.getRow(6);
+      liqHeaders.forEach((h, idx) => {
+        const cell = r6.getCell(idx + 2);
+        cell.value = h;
+        cell.font = fontHeader;
+        cell.fill = fillNavy;
+        cell.alignment = { vertical: 'middle', horizontal: idx === 0 ? 'left' : 'right' };
+      });
+      r6.height = 24;
+
+      const vBase = contableData?.ventasBase || resumen?.ventasBase || 0;
+      const vIGV = contableData?.ventasIGV || resumen?.ventasIGV || 0;
+      const vTot = contableData?.ventasTotal || resumen?.ventasTotal || 0;
+
+      const cBase = contableData?.comprasBase || resumen?.comprasBase || 0;
+      const cIGV = contableData?.comprasIGV || resumen?.comprasIGV || 0;
+      const cTot = contableData?.comprasTotal || resumen?.comprasTotal || 0;
+
+      const liqRows = [
+        { concepto: 'VENTAS DECLARADAS (DÉBITO FISCAL)', base: vBase, igv: vIGV, total: vTot, obs: 'Comprobantes emitidos en el periodo' },
+        { concepto: 'COMPRAS Y GASTOS (CRÉDITO FISCAL)', base: cBase, igv: cIGV, total: cTot, obs: 'Facturas de compras con derecho a crédito fiscal' },
       ];
 
-      // Insertar Ventas
-      ventasData.forEach(v => {
-        const date = v.createdAt ? v.createdAt.split('T')[0] : '';
-        let efec = v.montoEfectivo || (v.metodoPago === 'Efectivo' ? v.total : 0);
-        let tarj = v.montoTarjeta || (v.metodoPago === 'Tarjeta' ? v.total : 0);
-        let yape = v.montoYape || (v.metodoPago === 'Yape' ? v.total : 0);
-        
-        if (v.metodoPago === 'Mixto' && (efec + tarj + yape) < v.total) {
-          efec += (v.total - (efec + tarj + yape));
+      liqRows.forEach((item, i) => {
+        const row = wsResumen.getRow(7 + i);
+        row.getCell(2).value = item.concepto;
+        row.getCell(2).font = fontBold;
+        row.getCell(2).border = borderThin;
+
+        row.getCell(3).value = item.base;
+        row.getCell(3).numFmt = fmtMoneda;
+        row.getCell(3).font = fontRegular;
+        row.getCell(3).border = borderThin;
+
+        row.getCell(4).value = item.igv;
+        row.getCell(4).numFmt = fmtMoneda;
+        row.getCell(4).font = fontRegular;
+        row.getCell(4).border = borderThin;
+
+        row.getCell(5).value = item.total;
+        row.getCell(5).numFmt = fmtMoneda;
+        row.getCell(5).font = fontBold;
+        row.getCell(5).border = borderThin;
+
+        row.getCell(6).value = item.obs;
+        row.getCell(6).font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
+        row.getCell(6).border = borderThin;
+        row.height = 22;
+      });
+
+      // Fila Diferencia / Saldo neto
+      const rLiqTotal = wsResumen.getRow(9);
+      rLiqTotal.getCell(2).value = 'SALDO ESTIMADO DE IGV';
+      rLiqTotal.getCell(2).font = fontBold;
+      rLiqTotal.getCell(2).border = borderTotal;
+      rLiqTotal.getCell(2).fill = fillHighlight;
+
+      rLiqTotal.getCell(3).value = { formula: 'C7-C8', result: vBase - cBase };
+      rLiqTotal.getCell(3).numFmt = fmtMoneda;
+      rLiqTotal.getCell(3).font = fontBold;
+      rLiqTotal.getCell(3).border = borderTotal;
+      rLiqTotal.getCell(3).fill = fillHighlight;
+
+      const igvAPagar = vIGV - cIGV;
+      rLiqTotal.getCell(4).value = { formula: 'D7-D8', result: igvAPagar };
+      rLiqTotal.getCell(4).numFmt = fmtMoneda;
+      rLiqTotal.getCell(4).font = { name: 'Calibri', size: 10, bold: true, color: { argb: igvAPagar >= 0 ? 'FFB91C1C' : 'FF047857' } };
+      rLiqTotal.getCell(4).border = borderTotal;
+      rLiqTotal.getCell(4).fill = fillHighlight;
+
+      rLiqTotal.getCell(5).value = { formula: 'E7-E8', result: vTot - cTot };
+      rLiqTotal.getCell(5).numFmt = fmtMoneda;
+      rLiqTotal.getCell(5).font = fontBold;
+      rLiqTotal.getCell(5).border = borderTotal;
+      rLiqTotal.getCell(5).fill = fillHighlight;
+
+      rLiqTotal.getCell(6).value = igvAPagar >= 0 ? 'IMPUESTO A PAGAR ESTIMADO' : 'SALDO A FAVOR DEL CONTRIBUYENTE';
+      rLiqTotal.getCell(6).font = { name: 'Calibri', size: 9, bold: true, color: { argb: igvAPagar >= 0 ? 'FFB91C1C' : 'FF047857' } };
+      rLiqTotal.getCell(6).border = borderTotal;
+      rLiqTotal.getCell(6).fill = fillHighlight;
+      rLiqTotal.height = 24;
+
+      // Sección 2: Desglose por Medio de Pago
+      wsResumen.getCell('B12').value = '2. RECAUDACIÓN POR MEDIO DE PAGO';
+      wsResumen.getCell('B12').font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF0F172A' } };
+
+      const r13 = wsResumen.getRow(13);
+      ['MEDIO DE PAGO', 'TOTAL RECAUDADO', 'PARTICIPACIÓN (%)'].forEach((h, idx) => {
+        const cell = r13.getCell(idx + 2);
+        cell.value = h;
+        cell.font = fontHeader;
+        cell.fill = fillNavy;
+        cell.alignment = { vertical: 'middle', horizontal: idx === 0 ? 'left' : 'right' };
+      });
+      r13.height = 24;
+
+      const desglose = contableData?.desgloseCaja || {};
+      const mediosList = [
+        { nombre: 'Efectivo en Caja', monto: desglose.efectivo || 0 },
+        { nombre: 'Tarjeta (POS Visa / Mastercard)', monto: desglose.tarjeta || 0 },
+        { nombre: 'Billeteras Digitales (Yape / Plin)', monto: desglose.yape || 0 },
+        { nombre: 'Créditos a Clientes (Cuentas por Cobrar)', monto: desglose.credito || 0 },
+        { nombre: 'PedidosYa (Plataforma)', monto: desglose.pedidosYa || 0 },
+        { nombre: 'Consumo Personal (Staff / Planilla)', monto: desglose.consumoPlanilla || 0 },
+        { nombre: 'Cortesías / Promociones', monto: desglose.cortesias || 0 },
+      ];
+
+      const sumMedios = mediosList.reduce((acc, m) => acc + m.monto, 0);
+
+      mediosList.forEach((m, idx) => {
+        const row = wsResumen.getRow(14 + idx);
+        row.getCell(2).value = m.nombre;
+        row.getCell(2).font = fontRegular;
+        row.getCell(2).border = borderThin;
+
+        row.getCell(3).value = m.monto;
+        row.getCell(3).numFmt = fmtMoneda;
+        row.getCell(3).font = fontRegular;
+        row.getCell(3).border = borderThin;
+
+        row.getCell(4).value = sumMedios > 0 ? (m.monto / sumMedios) : 0;
+        row.getCell(4).numFmt = fmtPorcentaje;
+        row.getCell(4).font = fontRegular;
+        row.getCell(4).border = borderThin;
+        row.height = 20;
+      });
+
+      // Total Medios
+      const lastMedioRow = 14 + mediosList.length;
+      const rMediosTotal = wsResumen.getRow(lastMedioRow);
+      rMediosTotal.getCell(2).value = 'TOTAL RECAUDACIÓN';
+      rMediosTotal.getCell(2).font = fontBold;
+      rMediosTotal.getCell(2).border = borderTotal;
+      rMediosTotal.getCell(2).fill = fillTotal;
+
+      rMediosTotal.getCell(3).value = { formula: `SUM(C14:C${lastMedioRow - 1})`, result: sumMedios };
+      rMediosTotal.getCell(3).numFmt = fmtMoneda;
+      rMediosTotal.getCell(3).font = fontBold;
+      rMediosTotal.getCell(3).border = borderTotal;
+      rMediosTotal.getCell(3).fill = fillTotal;
+
+      rMediosTotal.getCell(4).value = sumMedios > 0 ? 1 : 0;
+      rMediosTotal.getCell(4).numFmt = fmtPorcentaje;
+      rMediosTotal.getCell(4).font = fontBold;
+      rMediosTotal.getCell(4).border = borderTotal;
+      rMediosTotal.getCell(4).fill = fillTotal;
+      rMediosTotal.height = 24;
+
+      // ==========================================
+      // HOJA 2: REGISTRO DE VENTAS (RVE)
+      // ==========================================
+      const wsVentas = workbook.addWorksheet('Registro de Ventas (RVE)', {
+        views: [{ showGridLines: true }]
+      });
+
+      // Título
+      wsVentas.mergeCells('A1:Q1');
+      const titleVentas = wsVentas.getCell('A1');
+      titleVentas.value = 'REGISTRO DE VENTAS E INGRESOS (RVE) - EL FOGÓN DORADO';
+      titleVentas.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleVentas.fill = fillBlueHeader;
+      titleVentas.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsVentas.getRow(1).height = 26;
+
+      wsVentas.mergeCells('A2:Q2');
+      const subVentas = wsVentas.getCell('A2');
+      subVentas.value = `Periodo: ${fechaDesde} al ${fechaHasta}  |  Total Comprobantes Emitidos: ${ventasData.length}`;
+      subVentas.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF475569' } };
+      subVentas.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsVentas.getRow(2).height = 18;
+
+      const headersVentas = [
+        'N° OP',
+        'FECHA',
+        'HORA',
+        'COMPROBANTE',
+        'SERIE - NÚMERO',
+        'TIPO DOC',
+        'N° DOCUMENTO',
+        'CLIENTE / RAZÓN SOCIAL',
+        'MÉTODO PAGO',
+        'BASE IMPONIBLE (S/)',
+        'IGV 10.5% (S/)',
+        'TOTAL (S/)',
+        'EFECTIVO (S/)',
+        'TARJETA (S/)',
+        'YAPE/PLIN (S/)',
+        'CRÉDITO (S/)',
+        'ESTADO'
+      ];
+
+      const rVentasHead = wsVentas.getRow(4);
+      headersVentas.forEach((h, idx) => {
+        const cell = rVentasHead.getCell(idx + 1);
+        cell.value = h;
+        cell.font = fontHeader;
+        cell.fill = fillNavy;
+        cell.alignment = { vertical: 'middle', horizontal: idx >= 9 && idx <= 15 ? 'right' : 'center' };
+      });
+      rVentasHead.height = 24;
+
+      // Llenar ventas
+      let vRowIndex = 5;
+      ventasData.forEach((v, idx) => {
+        const row = wsVentas.getRow(vRowIndex);
+        const isAnulado = Boolean(v.anulado);
+
+        const fechaStr = v.createdAt ? v.createdAt.split('T')[0] : '';
+        const horaStr = v.hora || (v.createdAt ? new Date(v.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '');
+
+        // Extraer serie y correlativo formal
+        let serieCorrelativo = '';
+        if (v.estadoNubefact && v.estadoNubefact.includes(':')) {
+          serieCorrelativo = v.estadoNubefact.split(':')[1]?.trim() || '';
+        }
+        if (!serieCorrelativo) {
+          const pref = v.tipoComprobante === 'Factura' ? 'F001' : (v.tipoComprobante === 'Boleta' ? 'B001' : 'NV01');
+          serieCorrelativo = `${pref}-${String(v.id % 100000).padStart(5, '0')}`;
         }
 
-        rows.push([
-          'VENTA',
-          date,
-          v.tipoComprobante,
-          v.numDocumento || 'S/D',
-          v.nombreCliente || 'PÚBLICO GENERAL',
-          v.metodoPago,
-          v.subtotal.toFixed(2),
-          v.igv.toFixed(2),
-          v.total.toFixed(2),
-          efec.toFixed(2),
-          tarj.toFixed(2),
-          yape.toFixed(2)
-        ]);
+        const tipoDoc = v.numDocumento?.length === 11 ? 'RUC' : (v.numDocumento?.length === 8 ? 'DNI' : (v.numDocumento ? 'DOC' : 'S/D'));
+
+        // Desglose de pagos
+        let efec = 0, tarj = 0, yape = 0, cred = 0;
+        if (!isAnulado) {
+          if (v.metodoPago === 'Efectivo') efec = v.total;
+          else if (v.metodoPago === 'Tarjeta') tarj = v.total;
+          else if (v.metodoPago === 'Yape') yape = v.total;
+          else if (v.metodoPago === 'Crédito') cred = v.total;
+          else if (v.metodoPago === 'Mixto') {
+            efec = Number(v.montoEfectivo || 0);
+            tarj = Number(v.montoTarjeta || 0);
+            yape = Number(v.montoYape || 0);
+            cred = Number(v.montoCredito || 0);
+            const sumP = efec + tarj + yape + cred;
+            if (sumP < v.total) efec += (v.total - sumP);
+          }
+        }
+
+        const baseVal = isAnulado ? 0 : Number(v.subtotal || 0);
+        const igvVal = isAnulado ? 0 : Number(v.igv || 0);
+        const totalVal = isAnulado ? 0 : Number(v.total || 0);
+
+        row.getCell(1).value = v.id;
+        row.getCell(2).value = fechaStr;
+        row.getCell(3).value = horaStr;
+        row.getCell(4).value = v.tipoComprobante || 'Boleta';
+        row.getCell(5).value = serieCorrelativo;
+        row.getCell(6).value = tipoDoc;
+        row.getCell(7).value = v.numDocumento || 'S/D';
+        row.getCell(8).value = (v.nombreCliente || 'CONSUMIDOR FINAL').toUpperCase();
+        row.getCell(9).value = v.metodoPago || 'Efectivo';
+        row.getCell(10).value = baseVal;
+        row.getCell(11).value = igvVal;
+        row.getCell(12).value = totalVal;
+        row.getCell(13).value = efec;
+        row.getCell(14).value = tarj;
+        row.getCell(15).value = yape;
+        row.getCell(16).value = cred;
+        row.getCell(17).value = isAnulado ? 'ANULADO' : 'EMITIDO';
+
+        // Formatos de celda
+        const rowFont = isAnulado ? fontAnulado : fontRegular;
+        const rowFill = isAnulado ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } } : (idx % 2 === 1 ? fillZebra : null);
+
+        for (let col = 1; col <= 17; col++) {
+          const cell = row.getCell(col);
+          cell.font = rowFont;
+          cell.border = borderThin;
+          if (rowFill) cell.fill = rowFill;
+          if (col >= 10 && col <= 16) {
+            cell.numFmt = fmtMoneda;
+          }
+          if (col === 1 || col === 2 || col === 3 || col === 5 || col === 6 || col === 7 || col === 17) {
+            cell.alignment = { horizontal: 'center' };
+          }
+        }
+        row.height = 20;
+        vRowIndex++;
       });
 
-      // Insertar Compras
-      comprasData.forEach(c => {
-        const date = c.creadoEn ? c.creadoEn.split('T')[0] : '';
-        rows.push([
-          'COMPRA',
-          date,
-          c.tipoDocumento || 'Factura',
-          c.ruc || 'S/D',
-          c.proveedor,
-          'Efectivo/Transferencia',
-          c.baseImponible.toFixed(2),
-          c.igv.toFixed(2),
-          c.total.toFixed(2),
-          '0.00',
-          '0.00',
-          '0.00'
-        ]);
+      // Fila de Totales de Ventas
+      const rVentasTotal = wsVentas.getRow(vRowIndex);
+      rVentasTotal.getCell(1).value = 'TOTALES';
+      wsVentas.mergeCells(`A${vRowIndex}:I${vRowIndex}`);
+      rVentasTotal.getCell(1).font = fontBold;
+      rVentasTotal.getCell(1).alignment = { horizontal: 'right' };
+      rVentasTotal.getCell(1).fill = fillTotal;
+      rVentasTotal.getCell(1).border = borderTotal;
+
+      const colsVentasSum = ['J', 'K', 'L', 'M', 'N', 'O', 'P'];
+      colsVentasSum.forEach((colLtr, cIdx) => {
+        const cell = rVentasTotal.getCell(10 + cIdx);
+        cell.value = { formula: `SUM(${colLtr}5:${colLtr}${vRowIndex - 1})` };
+        cell.numFmt = fmtMoneda;
+        cell.font = fontBold;
+        cell.fill = fillTotal;
+        cell.border = borderTotal;
+      });
+      rVentasTotal.getCell(17).fill = fillTotal;
+      rVentasTotal.getCell(17).border = borderTotal;
+      rVentasTotal.height = 24;
+
+      // Auto-filtro en ventas
+      wsVentas.autoFilter = `A4:Q${vRowIndex - 1}`;
+
+      // ==========================================
+      // HOJA 3: REGISTRO DE COMPRAS (RCE)
+      // ==========================================
+      const wsCompras = workbook.addWorksheet('Registro de Compras (RCE)', {
+        views: [{ showGridLines: true }]
       });
 
-      // Convertir a CSV compatible con Excel en español (con codificación UTF-8 BOM)
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map(r => r.join(',')).join('\n');
+      // Título
+      wsCompras.mergeCells('A1:K1');
+      const titleCompras = wsCompras.getCell('A1');
+      titleCompras.value = 'REGISTRO DE COMPRAS Y GASTOS (RCE) - EL FOGÓN DORADO';
+      titleCompras.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleCompras.fill = fillGreenHeader;
+      titleCompras.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsCompras.getRow(1).height = 26;
+
+      wsCompras.mergeCells('A2:K2');
+      const subCompras = wsCompras.getCell('A2');
+      subCompras.value = `Periodo: ${fechaDesde} al ${fechaHasta}  |  Total Facturas y Gastos: ${comprasData.length}`;
+      subCompras.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF475569' } };
+      subCompras.alignment = { vertical: 'middle', horizontal: 'center' };
+      wsCompras.getRow(2).height = 18;
+
+      const headersCompras = [
+        'ITEM',
+        'FECHA',
+        'TIPO COMPROBANTE',
+        'SERIE - NÚMERO',
+        'RUC PROVEEDOR',
+        'RAZÓN SOCIAL PROVEEDOR',
+        'CATEGORÍA',
+        'MEDIO PAGO',
+        'BASE IMPONIBLE (S/)',
+        'IGV CRÉDITO (S/)',
+        'TOTAL COMPRA (S/)'
+      ];
+
+      const rComprasHead = wsCompras.getRow(4);
+      headersCompras.forEach((h, idx) => {
+        const cell = rComprasHead.getCell(idx + 1);
+        cell.value = h;
+        cell.font = fontHeader;
+        cell.fill = fillNavy;
+        cell.alignment = { vertical: 'middle', horizontal: idx >= 8 ? 'right' : 'center' };
+      });
+      rComprasHead.height = 24;
+
+      let cRowIndex = 5;
+      comprasData.forEach((c, idx) => {
+        const row = wsCompras.getRow(cRowIndex);
+        const fechaStr = c.creadoEn ? c.creadoEn.split('T')[0] : '';
+        const baseVal = Number(c.baseImponible || 0);
+        const igvVal = Number(c.igv || 0);
+        const totalVal = Number(c.total || 0);
+
+        row.getCell(1).value = idx + 1;
+        row.getCell(2).value = fechaStr;
+        row.getCell(3).value = c.tipoDocumento || 'Factura';
+        row.getCell(4).value = c.numero || 'S/N';
+        row.getCell(5).value = c.ruc || 'S/D';
+        row.getCell(6).value = (c.proveedor || 'PROVEEDOR GENERAL').toUpperCase();
+        row.getCell(7).value = (c.categoria || 'INSUMOS').toUpperCase();
+        row.getCell(8).value = c.metodoPago || 'Transferencia/Efectivo';
+        row.getCell(9).value = baseVal;
+        row.getCell(10).value = igvVal;
+        row.getCell(11).value = totalVal;
+
+        const rowFill = idx % 2 === 1 ? fillZebra : null;
+        for (let col = 1; col <= 11; col++) {
+          const cell = row.getCell(col);
+          cell.font = fontRegular;
+          cell.border = borderThin;
+          if (rowFill) cell.fill = rowFill;
+          if (col >= 9 && col <= 11) {
+            cell.numFmt = fmtMoneda;
+          }
+          if (col === 1 || col === 2 || col === 4 || col === 5) {
+            cell.alignment = { horizontal: 'center' };
+          }
+        }
+        row.height = 20;
+        cRowIndex++;
+      });
+
+      // Fila Totales Compras
+      const rComprasTotal = wsCompras.getRow(cRowIndex);
+      rComprasTotal.getCell(1).value = 'TOTALES';
+      wsCompras.mergeCells(`A${cRowIndex}:H${cRowIndex}`);
+      rComprasTotal.getCell(1).font = fontBold;
+      rComprasTotal.getCell(1).alignment = { horizontal: 'right' };
+      rComprasTotal.getCell(1).fill = fillTotal;
+      rComprasTotal.getCell(1).border = borderTotal;
+
+      ['I', 'J', 'K'].forEach((colLtr, cIdx) => {
+        const cell = rComprasTotal.getCell(9 + cIdx);
+        cell.value = { formula: `SUM(${colLtr}5:${colLtr}${cRowIndex - 1})` };
+        cell.numFmt = fmtMoneda;
+        cell.font = fontBold;
+        cell.fill = fillTotal;
+        cell.border = borderTotal;
+      });
+      rComprasTotal.height = 24;
+
+      // Auto-filtro en compras
+      wsCompras.autoFilter = `A4:K${cRowIndex - 1}`;
+
+      // ==========================================
+      // AJUSTE DINÁMICO DE ANCHO DE COLUMNAS
+      // ==========================================
+      [wsResumen, wsVentas, wsCompras].forEach(ws => {
+        ws.columns.forEach(column => {
+          let maxLen = 0;
+          column.eachCell({ includeEmpty: false }, (cell) => {
+            const v = cell.value;
+            if (v !== null && v !== undefined) {
+              const str = typeof v === 'object' && v.result ? String(v.result) : (typeof v === 'object' && v.formula ? '' : String(v));
+              if (str.length > maxLen) maxLen = str.length;
+            }
+          });
+          column.width = Math.min(Math.max(maxLen + 4, 13), 45);
+        });
+      });
+
+      // Generar Buffer y Descargar
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', encodeURI(csvContent));
-      link.setAttribute('download', `RCE_RVE_FOGON_${fechaDesde}_AL_${fechaHasta}.csv`);
+      link.href = url;
+      link.download = `Libro_Contable_FogonDorado_${fechaDesde}_al_${fechaHasta}.xlsx`;
       document.body.appendChild(link);
       link.click();
+      window.URL.revokeObjectURL(url);
       document.body.removeChild(link);
     } catch (err) {
-      alert('Error al generar libro contable: ' + err.message);
+      console.error('Error al exportar Excel:', err);
+      alert('Error al generar libro contable en Excel: ' + err.message);
     } finally {
-      setFiltrando(false);
+      setExportandoExcel(false);
     }
   };
 
@@ -475,11 +922,21 @@ export default function ReportesPage() {
             Filtrar
           </button>
           <button 
-            onClick={exportarLibroContableRCE} 
-            disabled={filtrando}
-            className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-5 py-2.5 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 transition-all active:scale-95 disabled:opacity-50 h-[38px]"
+            onClick={exportarLibroContableExcel} 
+            disabled={filtrando || exportandoExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 transition-all active:scale-95 disabled:opacity-50 h-[38px]"
+            title="Descargar libro contable en formato Excel (.xlsx) estructurado para contabilidad"
           >
-            <Download className="w-4 h-4" /> Exportar RCE / Ventas
+            {exportandoExcel ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                Generando Excel...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="w-4 h-4" /> Exportar a Excel (.xlsx)
+              </>
+            )}
           </button>
           <button 
             onClick={() => setGerencialModalOpen(true)}
