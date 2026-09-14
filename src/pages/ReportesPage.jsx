@@ -611,12 +611,23 @@ export default function ReportesPage() {
 
           // Extraer serie y correlativo formal
           let serieCorrelativo = '';
-          if (v.estadoNubefact && v.estadoNubefact.includes(':')) {
-            serieCorrelativo = v.estadoNubefact.split(':')[1]?.trim() || '';
+          if (v.serie && v.numero) {
+            serieCorrelativo = `${v.serie}-${String(v.numero).padStart(v.serie.startsWith('B') || v.serie.startsWith('F') ? 8 : 4, '0')}`;
+          } else if (v.estadoNubefact && v.estadoNubefact.startsWith('ACEPTADO:')) {
+            try {
+              const parsedNube = JSON.parse(v.estadoNubefact.substring(9));
+              if (parsedNube.serie && parsedNube.numero) {
+                serieCorrelativo = `${parsedNube.serie}-${String(parsedNube.numero).padStart(8, '0')}`;
+              }
+            } catch (e) {
+              console.error("Error al parsear estadoNubefact:", e);
+            }
           }
+
           if (!serieCorrelativo) {
             const pref = v.tipoComprobante === 'Factura' ? 'F001' : (v.tipoComprobante === 'Boleta' ? 'B001' : 'NV01');
-            serieCorrelativo = `${pref}-${String(v.id % 100000).padStart(5, '0')}`;
+            const correlativoVal = v.numero ? String(v.numero).padStart(pref.startsWith('N') ? 5 : 8, '0') : String(v.id % 100000).padStart(5, '0');
+            serieCorrelativo = `${v.serie || pref}-${correlativoVal}`;
           }
 
           const tipoDoc = v.numDocumento?.length === 11 ? 'RUC' : (v.numDocumento?.length === 8 ? 'DNI' : (v.numDocumento ? 'DOC' : 'S/D'));
