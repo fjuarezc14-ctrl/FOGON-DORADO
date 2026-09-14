@@ -568,108 +568,165 @@ export default function ReportesPage() {
 
       // Llenar ventas
       let vRowIndex = 5;
-      ventasData.forEach((v, idx) => {
-        const row = wsVentas.getRow(vRowIndex);
-        const isAnulado = Boolean(v.anulado);
+      if (ventasData.length === 0) {
+        const rowEmpty = wsVentas.getRow(5);
+        wsVentas.mergeCells('A5:Q5');
+        rowEmpty.getCell(1).value = '(No se registraron comprobantes de venta en el periodo seleccionado)';
+        rowEmpty.getCell(1).font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
+        rowEmpty.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        rowEmpty.getCell(1).border = borderThin;
+        rowEmpty.height = 24;
+        vRowIndex = 6;
 
-        const fechaStr = v.createdAt ? v.createdAt.split('T')[0] : '';
-        const horaStr = v.hora || (v.createdAt ? new Date(v.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '');
+        // Fila de Totales de Ventas con 0
+        const rVentasTotal = wsVentas.getRow(vRowIndex);
+        rVentasTotal.getCell(1).value = 'TOTALES';
+        wsVentas.mergeCells(`A${vRowIndex}:I${vRowIndex}`);
+        rVentasTotal.getCell(1).font = fontBold;
+        rVentasTotal.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+        rVentasTotal.getCell(1).fill = fillTotal;
+        rVentasTotal.getCell(1).border = borderTotal;
 
-        // Extraer serie y correlativo formal
-        let serieCorrelativo = '';
-        if (v.estadoNubefact && v.estadoNubefact.includes(':')) {
-          serieCorrelativo = v.estadoNubefact.split(':')[1]?.trim() || '';
+        for (let col = 10; col <= 16; col++) {
+          const cell = rVentasTotal.getCell(col);
+          cell.value = 0;
+          cell.numFmt = fmtMoneda;
+          cell.font = fontBold;
+          cell.fill = fillTotal;
+          cell.border = borderTotal;
         }
-        if (!serieCorrelativo) {
-          const pref = v.tipoComprobante === 'Factura' ? 'F001' : (v.tipoComprobante === 'Boleta' ? 'B001' : 'NV01');
-          serieCorrelativo = `${pref}-${String(v.id % 100000).padStart(5, '0')}`;
-        }
+        rVentasTotal.getCell(17).fill = fillTotal;
+        rVentasTotal.getCell(17).border = borderTotal;
+        rVentasTotal.height = 24;
+      } else {
+        let sumBase = 0, sumIGV = 0, sumTotal = 0;
+        let sumEfec = 0, sumTarj = 0, sumYape = 0, sumCred = 0;
 
-        const tipoDoc = v.numDocumento?.length === 11 ? 'RUC' : (v.numDocumento?.length === 8 ? 'DNI' : (v.numDocumento ? 'DOC' : 'S/D'));
+        ventasData.forEach((v, idx) => {
+          const row = wsVentas.getRow(vRowIndex);
+          const isAnulado = Boolean(v.anulado);
 
-        // Desglose de pagos
-        let efec = 0, tarj = 0, yape = 0, cred = 0;
-        if (!isAnulado) {
-          if (v.metodoPago === 'Efectivo') efec = v.total;
-          else if (v.metodoPago === 'Tarjeta') tarj = v.total;
-          else if (v.metodoPago === 'Yape') yape = v.total;
-          else if (v.metodoPago === 'Crédito') cred = v.total;
-          else if (v.metodoPago === 'Mixto') {
-            efec = Number(v.montoEfectivo || 0);
-            tarj = Number(v.montoTarjeta || 0);
-            yape = Number(v.montoYape || 0);
-            cred = Number(v.montoCredito || 0);
-            const sumP = efec + tarj + yape + cred;
-            if (sumP < v.total) efec += (v.total - sumP);
+          const fechaStr = v.createdAt ? v.createdAt.split('T')[0] : '';
+          const horaStr = v.hora || (v.createdAt ? new Date(v.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '');
+
+          // Extraer serie y correlativo formal
+          let serieCorrelativo = '';
+          if (v.estadoNubefact && v.estadoNubefact.includes(':')) {
+            serieCorrelativo = v.estadoNubefact.split(':')[1]?.trim() || '';
           }
-        }
-
-        const baseVal = isAnulado ? 0 : Number(v.subtotal || 0);
-        const igvVal = isAnulado ? 0 : Number(v.igv || 0);
-        const totalVal = isAnulado ? 0 : Number(v.total || 0);
-
-        row.getCell(1).value = v.id;
-        row.getCell(2).value = fechaStr;
-        row.getCell(3).value = horaStr;
-        row.getCell(4).value = v.tipoComprobante || 'Boleta';
-        row.getCell(5).value = serieCorrelativo;
-        row.getCell(6).value = tipoDoc;
-        row.getCell(7).value = v.numDocumento || 'S/D';
-        row.getCell(8).value = (v.nombreCliente || 'CONSUMIDOR FINAL').toUpperCase();
-        row.getCell(9).value = v.metodoPago || 'Efectivo';
-        row.getCell(10).value = baseVal;
-        row.getCell(11).value = igvVal;
-        row.getCell(12).value = totalVal;
-        row.getCell(13).value = efec;
-        row.getCell(14).value = tarj;
-        row.getCell(15).value = yape;
-        row.getCell(16).value = cred;
-        row.getCell(17).value = isAnulado ? 'ANULADO' : 'EMITIDO';
-
-        // Formatos de celda
-        const rowFont = isAnulado ? fontAnulado : fontRegular;
-        const rowFill = isAnulado ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } } : (idx % 2 === 1 ? fillZebra : null);
-
-        for (let col = 1; col <= 17; col++) {
-          const cell = row.getCell(col);
-          cell.font = rowFont;
-          cell.border = borderThin;
-          if (rowFill) cell.fill = rowFill;
-          if (col >= 10 && col <= 16) {
-            cell.numFmt = fmtMoneda;
+          if (!serieCorrelativo) {
+            const pref = v.tipoComprobante === 'Factura' ? 'F001' : (v.tipoComprobante === 'Boleta' ? 'B001' : 'NV01');
+            serieCorrelativo = `${pref}-${String(v.id % 100000).padStart(5, '0')}`;
           }
-          if (col === 1 || col === 2 || col === 3 || col === 5 || col === 6 || col === 7 || col === 17) {
-            cell.alignment = { horizontal: 'center' };
+
+          const tipoDoc = v.numDocumento?.length === 11 ? 'RUC' : (v.numDocumento?.length === 8 ? 'DNI' : (v.numDocumento ? 'DOC' : 'S/D'));
+
+          // Desglose de pagos
+          let efec = 0, tarj = 0, yape = 0, cred = 0;
+          if (!isAnulado) {
+            if (v.metodoPago === 'Efectivo') efec = v.total;
+            else if (v.metodoPago === 'Tarjeta') tarj = v.total;
+            else if (v.metodoPago === 'Yape') yape = v.total;
+            else if (v.metodoPago === 'Crédito') cred = v.total;
+            else if (v.metodoPago === 'Mixto') {
+              efec = Number(v.montoEfectivo || 0);
+              tarj = Number(v.montoTarjeta || 0);
+              yape = Number(v.montoYape || 0);
+              cred = Number(v.montoCredito || 0);
+              const sumP = efec + tarj + yape + cred;
+              if (sumP < v.total) efec += (v.total - sumP);
+            }
           }
-        }
-        row.height = 20;
-        vRowIndex++;
-      });
 
-      // Fila de Totales de Ventas
-      const rVentasTotal = wsVentas.getRow(vRowIndex);
-      rVentasTotal.getCell(1).value = 'TOTALES';
-      wsVentas.mergeCells(`A${vRowIndex}:I${vRowIndex}`);
-      rVentasTotal.getCell(1).font = fontBold;
-      rVentasTotal.getCell(1).alignment = { horizontal: 'right' };
-      rVentasTotal.getCell(1).fill = fillTotal;
-      rVentasTotal.getCell(1).border = borderTotal;
+          const baseVal = isAnulado ? 0 : Number(v.subtotal || 0);
+          const igvVal = isAnulado ? 0 : Number(v.igv || 0);
+          const totalVal = isAnulado ? 0 : Number(v.total || 0);
 
-      const colsVentasSum = ['J', 'K', 'L', 'M', 'N', 'O', 'P'];
-      colsVentasSum.forEach((colLtr, cIdx) => {
-        const cell = rVentasTotal.getCell(10 + cIdx);
-        cell.value = { formula: `SUM(${colLtr}5:${colLtr}${vRowIndex - 1})` };
-        cell.numFmt = fmtMoneda;
-        cell.font = fontBold;
-        cell.fill = fillTotal;
-        cell.border = borderTotal;
-      });
-      rVentasTotal.getCell(17).fill = fillTotal;
-      rVentasTotal.getCell(17).border = borderTotal;
-      rVentasTotal.height = 24;
+          if (!isAnulado) {
+            sumBase += baseVal;
+            sumIGV += igvVal;
+            sumTotal += totalVal;
+            sumEfec += efec;
+            sumTarj += tarj;
+            sumYape += yape;
+            sumCred += cred;
+          }
 
-      // Auto-filtro en ventas
-      wsVentas.autoFilter = `A4:Q${vRowIndex - 1}`;
+          row.getCell(1).value = v.id;
+          row.getCell(2).value = fechaStr;
+          row.getCell(3).value = horaStr;
+          row.getCell(4).value = v.tipoComprobante || 'Boleta';
+          row.getCell(5).value = serieCorrelativo;
+          row.getCell(6).value = tipoDoc;
+          row.getCell(7).value = v.numDocumento || 'S/D';
+          row.getCell(8).value = (v.nombreCliente || 'CONSUMIDOR FINAL').toUpperCase();
+          row.getCell(9).value = v.metodoPago || 'Efectivo';
+          row.getCell(10).value = baseVal;
+          row.getCell(11).value = igvVal;
+          row.getCell(12).value = totalVal;
+          row.getCell(13).value = efec;
+          row.getCell(14).value = tarj;
+          row.getCell(15).value = yape;
+          row.getCell(16).value = cred;
+          row.getCell(17).value = isAnulado ? 'ANULADO' : 'EMITIDO';
+
+          // Formatos de celda
+          const rowFont = isAnulado ? fontAnulado : fontRegular;
+          const rowFill = isAnulado ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } } : (idx % 2 === 1 ? fillZebra : null);
+
+          for (let col = 1; col <= 17; col++) {
+            const cell = row.getCell(col);
+            cell.font = rowFont;
+            cell.border = borderThin;
+            if (rowFill) cell.fill = rowFill;
+            if (col >= 10 && col <= 16) {
+              cell.numFmt = fmtMoneda;
+            }
+            if (col === 1 || col === 2 || col === 3 || col === 5 || col === 6 || col === 7 || col === 17) {
+              cell.alignment = { horizontal: 'center' };
+            }
+          }
+          row.height = 20;
+          vRowIndex++;
+        });
+
+        // Fila de Totales de Ventas con fórmulas SUM y resultado
+        const rVentasTotal = wsVentas.getRow(vRowIndex);
+        rVentasTotal.getCell(1).value = 'TOTALES';
+        wsVentas.mergeCells(`A${vRowIndex}:I${vRowIndex}`);
+        rVentasTotal.getCell(1).font = fontBold;
+        rVentasTotal.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+        rVentasTotal.getCell(1).fill = fillTotal;
+        rVentasTotal.getCell(1).border = borderTotal;
+
+        const sumMap = {
+          J: sumBase,
+          K: sumIGV,
+          L: sumTotal,
+          M: sumEfec,
+          N: sumTarj,
+          O: sumYape,
+          P: sumCred
+        };
+
+        const colsVentasSum = ['J', 'K', 'L', 'M', 'N', 'O', 'P'];
+        colsVentasSum.forEach((colLtr, cIdx) => {
+          const cell = rVentasTotal.getCell(10 + cIdx);
+          cell.value = {
+            formula: `SUM(${colLtr}5:${colLtr}${vRowIndex - 1})`,
+            result: Number(sumMap[colLtr].toFixed(2))
+          };
+          cell.numFmt = fmtMoneda;
+          cell.font = fontBold;
+          cell.fill = fillTotal;
+          cell.border = borderTotal;
+        });
+        rVentasTotal.getCell(17).fill = fillTotal;
+        rVentasTotal.getCell(17).border = borderTotal;
+        rVentasTotal.height = 24;
+
+        wsVentas.autoFilter = `A4:Q${vRowIndex - 1}`;
+      }
 
       // ==========================================
       // HOJA 3: REGISTRO DE COMPRAS (RCE)
@@ -719,63 +776,102 @@ export default function ReportesPage() {
       rComprasHead.height = 24;
 
       let cRowIndex = 5;
-      comprasData.forEach((c, idx) => {
-        const row = wsCompras.getRow(cRowIndex);
-        const fechaStr = c.creadoEn ? c.creadoEn.split('T')[0] : '';
-        const baseVal = Number(c.baseImponible || 0);
-        const igvVal = Number(c.igv || 0);
-        const totalVal = Number(c.total || 0);
+      if (comprasData.length === 0) {
+        const rowEmpty = wsCompras.getRow(5);
+        wsCompras.mergeCells('A5:K5');
+        rowEmpty.getCell(1).value = '(No se registraron facturas o compras en el periodo seleccionado)';
+        rowEmpty.getCell(1).font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF94A3B8' } };
+        rowEmpty.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        rowEmpty.getCell(1).border = borderThin;
+        rowEmpty.height = 24;
+        cRowIndex = 6;
 
-        row.getCell(1).value = idx + 1;
-        row.getCell(2).value = fechaStr;
-        row.getCell(3).value = c.tipoDocumento || 'Factura';
-        row.getCell(4).value = c.numero || 'S/N';
-        row.getCell(5).value = c.ruc || 'S/D';
-        row.getCell(6).value = (c.proveedor || 'PROVEEDOR GENERAL').toUpperCase();
-        row.getCell(7).value = (c.categoria || 'INSUMOS').toUpperCase();
-        row.getCell(8).value = c.metodoPago || 'Transferencia/Efectivo';
-        row.getCell(9).value = baseVal;
-        row.getCell(10).value = igvVal;
-        row.getCell(11).value = totalVal;
+        // Fila Totales Compras con 0
+        const rComprasTotal = wsCompras.getRow(cRowIndex);
+        rComprasTotal.getCell(1).value = 'TOTALES';
+        wsCompras.mergeCells(`A${cRowIndex}:H${cRowIndex}`);
+        rComprasTotal.getCell(1).font = fontBold;
+        rComprasTotal.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+        rComprasTotal.getCell(1).fill = fillTotal;
+        rComprasTotal.getCell(1).border = borderTotal;
 
-        const rowFill = idx % 2 === 1 ? fillZebra : null;
-        for (let col = 1; col <= 11; col++) {
-          const cell = row.getCell(col);
-          cell.font = fontRegular;
-          cell.border = borderThin;
-          if (rowFill) cell.fill = rowFill;
-          if (col >= 9 && col <= 11) {
-            cell.numFmt = fmtMoneda;
-          }
-          if (col === 1 || col === 2 || col === 4 || col === 5) {
-            cell.alignment = { horizontal: 'center' };
-          }
+        for (let col = 9; col <= 11; col++) {
+          const cell = rComprasTotal.getCell(col);
+          cell.value = 0;
+          cell.numFmt = fmtMoneda;
+          cell.font = fontBold;
+          cell.fill = fillTotal;
+          cell.border = borderTotal;
         }
-        row.height = 20;
-        cRowIndex++;
-      });
+        rComprasTotal.height = 24;
+      } else {
+        let sumCBase = 0, sumCIGV = 0, sumCTot = 0;
 
-      // Fila Totales Compras
-      const rComprasTotal = wsCompras.getRow(cRowIndex);
-      rComprasTotal.getCell(1).value = 'TOTALES';
-      wsCompras.mergeCells(`A${cRowIndex}:H${cRowIndex}`);
-      rComprasTotal.getCell(1).font = fontBold;
-      rComprasTotal.getCell(1).alignment = { horizontal: 'right' };
-      rComprasTotal.getCell(1).fill = fillTotal;
-      rComprasTotal.getCell(1).border = borderTotal;
+        comprasData.forEach((c, idx) => {
+          const row = wsCompras.getRow(cRowIndex);
+          const fechaStr = c.creadoEn ? c.creadoEn.split('T')[0] : '';
+          const baseVal = Number(c.baseImponible || 0);
+          const igvVal = Number(c.igv || 0);
+          const totalVal = Number(c.total || 0);
 
-      ['I', 'J', 'K'].forEach((colLtr, cIdx) => {
-        const cell = rComprasTotal.getCell(9 + cIdx);
-        cell.value = { formula: `SUM(${colLtr}5:${colLtr}${cRowIndex - 1})` };
-        cell.numFmt = fmtMoneda;
-        cell.font = fontBold;
-        cell.fill = fillTotal;
-        cell.border = borderTotal;
-      });
-      rComprasTotal.height = 24;
+          sumCBase += baseVal;
+          sumCIGV += igvVal;
+          sumCTot += totalVal;
 
-      // Auto-filtro en compras
-      wsCompras.autoFilter = `A4:K${cRowIndex - 1}`;
+          row.getCell(1).value = idx + 1;
+          row.getCell(2).value = fechaStr;
+          row.getCell(3).value = c.tipoDocumento || 'Factura';
+          row.getCell(4).value = c.numero || 'S/N';
+          row.getCell(5).value = c.ruc || 'S/D';
+          row.getCell(6).value = (c.proveedor || 'PROVEEDOR GENERAL').toUpperCase();
+          row.getCell(7).value = (c.categoria || 'INSUMOS').toUpperCase();
+          row.getCell(8).value = c.metodoPago || 'Transferencia/Efectivo';
+          row.getCell(9).value = baseVal;
+          row.getCell(10).value = igvVal;
+          row.getCell(11).value = totalVal;
+
+          const rowFill = idx % 2 === 1 ? fillZebra : null;
+          for (let col = 1; col <= 11; col++) {
+            const cell = row.getCell(col);
+            cell.font = fontRegular;
+            cell.border = borderThin;
+            if (rowFill) cell.fill = rowFill;
+            if (col >= 9 && col <= 11) {
+              cell.numFmt = fmtMoneda;
+            }
+            if (col === 1 || col === 2 || col === 4 || col === 5) {
+              cell.alignment = { horizontal: 'center' };
+            }
+          }
+          row.height = 20;
+          cRowIndex++;
+        });
+
+        // Fila Totales Compras con fórmula SUM y resultado
+        const rComprasTotal = wsCompras.getRow(cRowIndex);
+        rComprasTotal.getCell(1).value = 'TOTALES';
+        wsCompras.mergeCells(`A${cRowIndex}:H${cRowIndex}`);
+        rComprasTotal.getCell(1).font = fontBold;
+        rComprasTotal.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+        rComprasTotal.getCell(1).fill = fillTotal;
+        rComprasTotal.getCell(1).border = borderTotal;
+
+        const cSumMap = { I: sumCBase, J: sumCIGV, K: sumCTot };
+        ['I', 'J', 'K'].forEach((colLtr, cIdx) => {
+          const cell = rComprasTotal.getCell(9 + cIdx);
+          cell.value = {
+            formula: `SUM(${colLtr}5:${colLtr}${cRowIndex - 1})`,
+            result: Number(cSumMap[colLtr].toFixed(2))
+          };
+          cell.numFmt = fmtMoneda;
+          cell.font = fontBold;
+          cell.fill = fillTotal;
+          cell.border = borderTotal;
+        });
+        rComprasTotal.height = 24;
+
+        wsCompras.autoFilter = `A4:K${cRowIndex - 1}`;
+      }
 
       // ==========================================
       // AJUSTE DINÁMICO DE ANCHO DE COLUMNAS
