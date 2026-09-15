@@ -176,6 +176,16 @@ export default function SalonPage({ currentUser }) {
   const [supervisorAprobador, setSupervisorAprobador] = useState(null);
   const [precuentaMesa, setPrecuentaMesa] = useState(null);
 
+  // Modal táctil para Anulación Individual de Plato
+  const [cancelItemModal, setCancelItemModal] = useState({
+    open: false,
+    item: null,
+    cantidad: 1,
+    motivo: '',
+    supervisor: null,
+    loading: false
+  });
+
   // Estados de Notificación en Tiempo Real
   const prevMesasRef = useRef([]);
   const [toasts, setToasts] = useState([]);
@@ -822,31 +832,48 @@ export default function SalonPage({ currentUser }) {
     }
   };
 
-  const handleCancelarItem = async (item, supervisor) => {
-    const motivo = prompt(`Escribe el motivo de cancelación para ${item.nombre}:`);
-    if (motivo === null) return;
-    if (!motivo.trim()) { alert("El motivo de cancelación es obligatorio."); return; }
-    
-    const cantStr = prompt(`Cantidad a cancelar (Máximo ${item.cant}):`, item.cant.toString());
-    if (cantStr === null) return;
-    const cant = parseInt(cantStr);
-    if (isNaN(cant) || cant <= 0 || cant > item.cant) { alert("Cantidad no válida."); return; }
+  const abrirModalCancelarItem = (item, supervisor = null) => {
+    setCancelItemModal({
+      open: true,
+      item,
+      cantidad: 1,
+      motivo: 'Comensal cambió de opinión',
+      supervisor,
+      loading: false
+    });
+  };
+
+  const ejecutarCancelacionItem = async () => {
+    const { item, cantidad, motivo, supervisor } = cancelItemModal;
+    if (!item) return;
+    if (!motivo || !motivo.trim()) {
+      alert("Por favor ingresa o selecciona un motivo de cancelación.");
+      return;
+    }
+    const cant = parseInt(cantidad);
+    if (isNaN(cant) || cant <= 0 || cant > item.cant) {
+      alert("Cantidad a cancelar no válida.");
+      return;
+    }
 
     const isForce = mesaActual.estado === 'Servido' || item.historial;
 
+    setCancelItemModal(prev => ({ ...prev, loading: true }));
     try {
       const res = await api.cancelarItemPedido(item.pedidoId, {
         productoId: item.id,
+        itemId: item.itemId,
         cantidadACancelar: cant,
         motivo: motivo.trim(),
         canceladoPor: supervisor ? `${supervisor.nombre} (${supervisor.rol})` : meseroGlobal,
         force: isForce,
       });
       if (res.error) throw new Error(res.error);
-      
+
+      setCancelItemModal({ open: false, item: null, cantidad: 1, motivo: '', supervisor: null, loading: false });
       await fetchMesas();
       setModalOpen(false);
-      
+
       if (res.pedidoVacio) {
         if (res.mesaLiberada) {
           alert(`✅ Comanda anulada por completo. Mesa ${mesaActual.num} ahora está LIBRE.`);
@@ -854,10 +881,11 @@ export default function SalonPage({ currentUser }) {
           alert(`✅ Comanda anulada por completo. La mesa ${mesaActual.num} sigue activa con consumos previos.`);
         }
       } else {
-        alert(`✅ Se cancelaron ${cant} unidades de "${item.nombre}" correctamente.`);
+        alert(`✅ Se anularon ${cant} unidades de "${item.nombre}" correctamente.`);
       }
     } catch (err) {
-      alert("Error al cancelar ítem: " + err.message);
+      alert("Error al anular ítem: " + err.message);
+      setCancelItemModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -1378,21 +1406,19 @@ export default function SalonPage({ currentUser }) {
                                     <div className="font-black text-slate-400 text-sm px-3">
                                       {item.cant} <span className="text-[10px]">{item.historial ? '✔ Ready' : '⏳ Pendiente'}</span>
                                     </div>
-                                    {esCancelable && (
-                                      <button 
-                                        onClick={() => {
-                                          if (mesaActual.estado === 'Servido' || item.historial) {
-                                            requestSupervisorAuth(`Anular "${item.nombre}"`, (supervisor) => handleCancelarItem(item, supervisor));
-                                          } else {
-                                            handleCancelarItem(item, null);
-                                          }
-                                        }} 
-                                        title="Anular o reducir cantidad de este producto"
-                                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg hover:text-red-700 transition-colors pointer-events-auto shrink-0"
-                                      >
-                                        <Trash className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
+                                    <button 
+                                      onClick={() => {
+                                        if (mesaActual.estado === 'Servido' || item.historial) {
+                                          requestSupervisorAuth(`Anular "${item.nombre}"`, (supervisor) => abrirModalCancelarItem(item, supervisor));
+                                        } else {
+                                          abrirModalCancelarItem(item, null);
+                                        }
+                                      }} 
+                                      title="Anular o reducir cantidad de este producto"
+                                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg hover:text-red-700 transition-colors pointer-events-auto shrink-0"
+                                    >
+                                      <Trash className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                 </div>
                                 <div className="mt-1.5 flex items-center gap-2">
@@ -1475,7 +1501,7 @@ export default function SalonPage({ currentUser }) {
                       {mesaActual.estado === 'Cocina' ? (
                         <button
                           onClick={() => {
-                            const algunItemPreparado = ticketActual.some(i => i.yaEnviado && i.historial && i.pedidoId === mesaActual.pedidoData?.pedidoId);
+                            const algunItemPreparado = ticketActual.some(i => i.yaEnviado && i.historial && Number(i.precio || 0) > 0 && i.pedidoId === mesaActual.pedidoData?.pedidoId);
                             if (algunItemPreparado) {
                               alert("⚠️ No puedes realizar una cancelación normal porque algunos platos ya han sido preparados.\n\nPara cancelar platos servidos, usa el botón de 'Anulación Especial (Reclamo)'.");
                               return;
@@ -1595,6 +1621,109 @@ export default function SalonPage({ currentUser }) {
                 {cancelandoPedido
                   ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                   : <><AlertTriangle className="w-4 h-4" /> Confirmar</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL TÁCTIL PARA ANULACIÓN INDIVIDUAL DE PLATO */}
+      {cancelItemModal.open && cancelItemModal.item && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[210] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-slide-up">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center shrink-0">
+                <Trash className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-none">Anular Producto</h3>
+                <p className="text-xs text-slate-500 mt-1">Mesa {mesaActual?.num} · <span className="font-bold text-slate-800">{cancelItemModal.item.nombre}</span></p>
+              </div>
+            </div>
+
+            {/* Cantidad a anular */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Cantidad a anular</span>
+                  <span className="text-[11px] text-slate-400">Total en comanda: {cancelItemModal.item.cant} un.</span>
+                </div>
+                <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setCancelItemModal(prev => ({ ...prev, cantidad: Math.max(1, prev.cantidad - 1) }))}
+                    disabled={cancelItemModal.cantidad <= 1}
+                    className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center font-black text-slate-700 text-lg transition-colors"
+                  >
+                    -
+                  </button>
+                  <span className="font-black text-lg text-slate-900 min-w-[24px] text-center">
+                    {cancelItemModal.cantidad}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCancelItemModal(prev => ({ ...prev, cantidad: Math.min(prev.item.cant, prev.cantidad + 1) }))}
+                    disabled={cancelItemModal.cantidad >= cancelItemModal.item.cant}
+                    className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center font-black text-slate-700 text-lg transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Motivos rápidos */}
+            <div className="mb-5">
+              <label className="block text-slate-500 font-bold mb-2 text-[10px] tracking-widest uppercase">Motivo de anulación:</label>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                {[
+                  'Comensal cambió de opinión',
+                  'Error de comanda / digitación',
+                  'Demora en preparación',
+                  'Plato agotado'
+                ].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setCancelItemModal(prev => ({ ...prev, motivo: m }))}
+                    className={`px-3 py-2 text-xs font-bold rounded-xl border text-left transition-all ${
+                      cancelItemModal.motivo === m
+                        ? 'bg-red-50 border-red-400 text-red-700 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={cancelItemModal.motivo}
+                onChange={(e) => setCancelItemModal(prev => ({ ...prev, motivo: e.target.value }))}
+                placeholder="O escribe otro motivo específico..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-800 focus:outline-none focus:border-red-400"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelItemModal({ open: false, item: null, cantidad: 1, motivo: '', supervisor: null, loading: false })}
+                disabled={cancelItemModal.loading}
+                className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm uppercase tracking-wide transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarCancelacionItem}
+                disabled={cancelItemModal.loading || !cancelItemModal.motivo.trim()}
+                className="py-3 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-sm uppercase tracking-wide transition-colors flex justify-center items-center gap-2 disabled:opacity-50 shadow-lg shadow-red-500/20"
+              >
+                {cancelItemModal.loading ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                ) : (
+                  <>Confirmar Anulación</>
+                )}
               </button>
             </div>
           </div>

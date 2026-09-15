@@ -228,17 +228,35 @@ const MIX_PRODUCTS_DECOMPOSITION = {
 function parseSelectionsFromNotes(notas) {
   const selections = {};
   if (!notas) return selections;
-  const matches = notas.match(/\[([^\]:]+):\s*([^\]]+)\]/g);
-  if (matches) {
-    matches.forEach(m => {
+
+  // 1. Parsear formato con corchetes [Clave: Valor]
+  const bracketMatches = notas.match(/\[([^\]:]+):\s*([^\]]+)\]/g);
+  if (bracketMatches) {
+    bracketMatches.forEach(m => {
       const parts = m.slice(1, -1).split(':');
       if (parts.length >= 2) {
         const key = parts[0].trim();
-        const val = parts[1].trim();
+        const val = parts.slice(1).join(':').trim();
         selections[key] = val;
       }
     });
   }
+
+  // 2. Parsear formato sin corchetes separado por "·" o saltos de línea (ej: "Guarnición: Papas Fritas · Bebida: Sangría")
+  const segments = notas.split(/[·\n]/);
+  segments.forEach(seg => {
+    const trimmed = seg.trim();
+    if (!trimmed || trimmed.startsWith('[') || trimmed.startsWith('(')) return;
+    const colonIdx = trimmed.indexOf(':');
+    if (colonIdx > 0) {
+      const key = trimmed.substring(0, colonIdx).trim();
+      const val = trimmed.substring(colonIdx + 1).trim();
+      if (key && val && !selections[key]) {
+        selections[key] = val;
+      }
+    }
+  });
+
   return selections;
 }
 
@@ -250,7 +268,7 @@ async function expandPedidoItemsForDb(itemsList) {
 
     if (decomp) {
       const parsedNotes = parseSelectionsFromNotes(i.notas);
-      const acompanamiento = parsedNotes["Acompañamiento"] || parsedNotes["Elige el Acompañamiento"] || parsedNotes["Elige la Guarnición"] || parsedNotes["guarnicion"] || "Sin Acompañamiento";
+      const acompanamiento = parsedNotes["Acompañamiento"] || parsedNotes["Guarnición"] || parsedNotes["Guarnicion"] || parsedNotes["Elige el Acompañamiento"] || parsedNotes["Elige la Guarnición"] || parsedNotes["guarnicion"] || "Sin Acompañamiento";
 
       const detailedGrillNotesArray = [
         `🥔 ACOMPAÑAMIENTO: ${acompanamiento}`
@@ -380,7 +398,7 @@ async function expandPedidoItemsForDb(itemsList) {
             cantidad: Math.ceil(rep.cantidadMultiplier * parseInt(i.cant || i.cantidad)),
             historial: rep.toBar ? false : true,
             entregado: rep.toBar ? false : true, // Mark as delivered if only for reporting
-            notas: null,
+            notas: rep.reportOnly ? '[REPORT_ONLY]' : null,
           });
         }
       }
@@ -899,20 +917,29 @@ app.get('/api/mesas', async (req, res) => {
         return { num: m.numero, estado: m.estado, pedidoData: null };
       }
 
-      // Consolidar items de TODOS los pedidos activos (fix bug adicional)
+      // Consolidar items de TODOS los pedidos activos (excluyendo items internos de reporte y desgloses de carne a S/ 0)
       const todosLosItems = pedidosActivos.flatMap(p =>
-        p.items.map(i => ({
-          id: String(i.productoId),
-          itemId: i.id,
-          nombre: i.nombre,
-          precio: i.precio,
-          cant: i.cantidad,
-          historial: i.historial,
-          entregado: i.entregado,
-          categoria: i.producto?.categoria || '',
-          pedidoId: p.id,
-          notas: i.notas || null,
-        }))
+        p.items
+          .filter(i => {
+            const esReportOnly = i.notas && i.notas.includes('[REPORT_ONLY]');
+            if (esReportOnly) return false;
+            const esBarra = i.producto?.categoria && BARRA_CATEGORIAS.includes(i.producto.categoria);
+            const esBebidaCombo = i.notas && (i.notas.includes('Bebida Incluida') || i.notas.toLowerCase().includes('bebida'));
+            const esCortesia = (i.notas && i.notas.includes('CORTESÍA')) || (i.nombre && i.nombre.includes('CORTESÍA'));
+            return i.precio > 0 || esBarra || esBebidaCombo || esCortesia;
+          })
+          .map(i => ({
+            id: String(i.productoId),
+            itemId: i.id,
+            nombre: i.nombre,
+            precio: i.precio,
+            cant: i.cantidad,
+            historial: i.historial,
+            entregado: i.entregado,
+            categoria: i.producto?.categoria || '',
+            pedidoId: p.id,
+            notas: i.notas || null,
+          }))
       );
 
       const totalConsolidado = pedidosActivos.reduce((sum, p) => sum + p.total, 0);
@@ -1310,7 +1337,9 @@ app.get('/api/pedidos/ensaladas', async (req, res) => {
         .filter(i => {
           const esBarra = BARRA_CATEGORIAS.includes(i.producto?.categoria);
           const llevaGuarnicion = i.producto?.requiereGuarnicion || (i.producto?.categoria && categoriasGuarnicion.includes(i.producto.categoria));
-          return llevaGuarnicion && !esBarra;
+          // Excluir desgloses internos de carne (precio 0 sin notas de ensalada) para no saturar el monitor de ensaladas
+          const esSubComponenteCarne = parseFloat(i.precio || 0) === 0 && (!i.notas || !i.notas.toLowerCase().includes('ensalada'));
+          return llevaGuarnicion && !esBarra && !esSubComponenteCarne;
         })
         .map(i => ({
           nombre: i.nombre,
@@ -1692,7 +1721,7 @@ app.delete('/api/barra/cancelaciones/:id', (req, res) => {
 
 app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
   const id = parseInt(req.params.id);
-  const { productoId, cantidadACancelar, motivo, canceladoPor, force } = req.body;
+  const { productoId, itemId, cantidadACancelar, motivo, canceladoPor, force } = req.body;
 
   try {
     const pedido = await prisma.pedido.findUnique({
@@ -1714,9 +1743,15 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
       }
     }
 
-    const item = force
-      ? pedido.items.find(i => String(i.productoId) === String(productoId))
-      : pedido.items.find(i => String(i.productoId) === String(productoId) && !i.historial);
+    let item = null;
+    if (itemId) {
+      item = pedido.items.find(i => String(i.id) === String(itemId));
+    }
+    if (!item) {
+      item = force
+        ? pedido.items.find(i => String(i.productoId) === String(productoId))
+        : pedido.items.find(i => String(i.productoId) === String(productoId) && !i.historial);
+    }
 
     if (!item) return res.status(404).json({ error: 'El ítem seleccionado no se encuentra en la comanda activa.' });
 
@@ -1819,6 +1854,38 @@ app.patch('/api/pedidos/:id/cancelar-item', async (req, res) => {
           data: { estado: nuevoEstadoMesa },
         });
       }
+    }
+
+    // 🔔 Registrar alerta de cancelación individual para cocina o barra (store en memoria)
+    const esDeBarra = BARRA_CATEGORIAS.includes(item.producto?.categoria || '');
+    const cancelItemObj = {
+      nombre: item.nombre,
+      cantidad: cantidadACancelar,
+      precio: item.precio,
+      notas: item.notas || null,
+    };
+    const mesaInfo = pedido.mesaId ? `Mesa ${pedido.mesa?.numero || pedido.mesaId}` : (pedido.codigoPedidosYa ? `🛵 ${pedido.codigoPedidosYa}` : 'Para Llevar/Delivery');
+    
+    if (esDeBarra) {
+      cancelacionesBarra.push({
+        id: `cancel-item-${Date.now()}-${item.id}`,
+        pedidoId: pedido.id,
+        items: [cancelItemObj],
+        mesaInfo,
+        codigoPedidosYa: pedido.codigoPedidosYa || null,
+        canceladoPor: canceladoPor || 'Mozo / Caja',
+        canceladoEn: new Date().toISOString(),
+      });
+    } else {
+      cancelacionesCocina.push({
+        id: `cancel-item-${Date.now()}-${item.id}`,
+        pedidoId: pedido.id,
+        items: [cancelItemObj],
+        mesaInfo,
+        codigoPedidosYa: pedido.codigoPedidosYa || null,
+        canceladoPor: canceladoPor || 'Mozo / Caja',
+        canceladoEn: new Date().toISOString(),
+      });
     }
 
     res.json({ ok: true, mesaLiberada, nuevoEstadoMesa, pedidoVacio: itemsRestantes.length === 0 });
