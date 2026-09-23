@@ -1421,9 +1421,6 @@ app.patch('/api/pedidos/:id/preparar', async (req, res) => {
 
     // Filtrar los items que corresponden a la sección
     const itemsAActualizar = pedido.items.filter(i => {
-      // Si es delivery/llevar, marcamos todos los items como listos para que no dependa de barra
-      if (pedido.tipoEntrega === 'llevar' || pedido.tipoEntrega === 'delivery') return true;
-
       const esItemBarra = BARRA_CATEGORIAS.includes(i.producto?.categoria);
       if (seccion === 'barra') return esItemBarra;
       if (seccion === 'cocina') return !esItemBarra;
