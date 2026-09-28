@@ -35,12 +35,21 @@ const BARRA_CATEGORIAS = [
 ];
 
 // Helper para parsear la distribución de crédito en ventas con múltiples clientes
-function parsearCreditoSplit(ofertaDescripcion, defaultClienteId, defaultMonto) {
+function parsearCreditoSplit(ofertaDescripcion, defaultClienteId, defaultMonto, ventaId) {
   if (ofertaDescripcion && typeof ofertaDescripcion === 'string') {
     const match = ofertaDescripcion.match(/\[CREDITO_SPLIT:(.*?)\]/);
     if (match && match[1]) {
       try {
-        const parsed = JSON.parse(match[1]);
+        // Sanitizar cadena antes de parsear: intentar reparar JSON mal formado
+        let raw = match[1].trim();
+        // Eliminar comas o caracteres colgantes al final antes del cierre de array
+        raw = raw.replace(/,\s*\]/g, ']').replace(/,\s*\}/g, '}');
+        // Si no cierra el array, cerrarlo
+        if (raw.startsWith('[') && !raw.endsWith(']')) raw = raw + ']';
+        // Si no cierra el objeto, cerrarlo
+        if (raw.startsWith('{') && !raw.endsWith('}')) raw = raw + '}';
+
+        const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map(item => ({
             clienteId: parseInt(item.clienteId || item.id),
@@ -49,7 +58,9 @@ function parsearCreditoSplit(ofertaDescripcion, defaultClienteId, defaultMonto) 
           })).filter(item => !isNaN(item.clienteId) && item.monto > 0);
         }
       } catch (e) {
-        console.error('Error parseando CREDITO_SPLIT:', e);
+        // Usar warn en lugar de error para no contaminar logs de producción con stack traces
+        const idInfo = ventaId ? ` Venta ID: ${ventaId}` : '';
+        console.warn(`[CREDITO_SPLIT Invalid JSON]${idInfo} — ${e.message}`);
       }
     }
   }
@@ -546,7 +557,7 @@ app.get('/api/clientes', async (req, res) => {
 
     const consumoPorCliente = {};
     ventasCredito.forEach(v => {
-      const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+      const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)), v.id);
       if (splits.length > 0) {
         splits.forEach(s => {
           consumoPorCliente[s.clienteId] = (consumoPorCliente[s.clienteId] || 0) + s.monto;
@@ -665,7 +676,7 @@ app.get('/api/clientes/:id', async (req, res) => {
 
     const ventasCredito = [];
     ventasPosibles.forEach(v => {
-      const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+      const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)), v.id);
       const miSplit = splits.find(s => s.clienteId === id);
       if (miSplit) {
         ventasCredito.push({
@@ -843,37 +854,31 @@ app.get('/api/clientes/consulta/:doc', async (req, res) => {
   try {
     const isRUC = cleaned.length === 11;
     const apiURL = isRUC
-      ? `https://api.decolecta.com/v1/sunat/ruc?numero=${cleaned}`
-      : `https://api.decolecta.com/v1/reniec/dni?numero=${cleaned}`;
+      ? `https://dniruc.apisperu.com/api/v1/ruc/${cleaned}?token=${token}`
+      : `https://dniruc.apisperu.com/api/v1/dni/${cleaned}?token=${token}`;
 
-    const response = await fetch(apiURL, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Referer': 'https://apis.net.pe/',
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await fetch(apiURL);
 
     if (response.ok) {
       const data = await response.json();
 
-      // Mapear al formato consistente que espera el frontend
       if (isRUC) {
         return res.json({
-          razonSocial: data.razon_social || '',
+          razonSocial: data.razonSocial || data.razon_social || '',
           direccion: data.direccion || '',
           tipo: 'Factura'
         });
       } else {
+        const nombreCompleto = data.nombre || `${data.nombres || ''} ${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim();
         return res.json({
-          nombre: data.full_name || `${data.first_name || ''} ${data.first_last_name || ''} ${data.second_last_name || ''}`.trim() || '',
-          direccion: '', // DNI de RENIEC no devuelve dirección de forma pública
+          nombre: nombreCompleto,
+          direccion: data.direccion || '',
           tipo: 'Boleta'
         });
       }
     } else {
       const errorText = await response.text();
-      console.warn(`[Proxy Decolecta] Error de respuesta de API (${response.status}): ${errorText}`);
+      console.warn(`[Proxy apisperu] Error de respuesta de API (${response.status}): ${errorText}`);
       throw new Error(`API responded with status ${response.status}`);
     }
   } catch (err) {
@@ -3508,7 +3513,7 @@ app.get('/api/ventas', async (req, res) => {
       clienteCreditoId: v.clienteCreditoId || null,
       ofertaDescripcion: v.ofertaDescripcion || null,
       descuentoAplicado: v.descuentoAplicado || 0,
-      creditoSplit: parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, v.montoCredito || (v.metodoPago === 'Crédito' ? v.total : 0)),
+      creditoSplit: parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, v.montoCredito || (v.metodoPago === 'Crédito' ? v.total : 0), v.id),
       anulado: v.anulado || v.pedido?.estado === 'Cancelado',
       motivoAnulacion: v.motivoAnulacion || v.pedido?.motivoCancela || null,
       anuladoPor: v.anuladoPor || v.pedido?.canceladoPor || null,
@@ -3613,7 +3618,7 @@ app.get('/api/ventas/resumen', async (req, res) => {
       if (v.metodoPago === 'Consumo') {
         consumoPlanilla += (v.descuentoAplicado || v.total);
       } else {
-        const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+        const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)), v.id);
         if (splits.length > 0) {
           splits.forEach(s => {
             const esTrab = clienteMap.get(s.clienteId) || false;
@@ -4152,7 +4157,7 @@ app.get('/api/reportes/contable', async (req, res) => {
       if (v.metodoPago === 'Consumo') {
         consumoPlanilla += (v.descuentoAplicado || v.total);
       } else {
-        const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)));
+        const splits = parsearCreditoSplit(v.ofertaDescripcion, v.clienteCreditoId, (v.montoCredito > 0 ? v.montoCredito : (v.metodoPago === 'Crédito' ? v.total : 0)), v.id);
         if (splits.length > 0) {
           splits.forEach(s => {
             const esTrab = clienteMap.get(s.clienteId) || false;
