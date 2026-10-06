@@ -5,6 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    # Vite escucha en el 5173 dentro del contenedor (en producción nginx usa el 80)
+    ports: !override
+      - "5173:5173"
     volumes:
       - .:/app
       - /app/node_modules
