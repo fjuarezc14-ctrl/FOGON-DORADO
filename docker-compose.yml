@@ -1,20 +1,17 @@
 version: '3.8'
 
 services:
-  # --- Frontend: React/Vite ---
+  # --- Frontend: React compilado y servido con nginx ---
+  # Para desarrollo con Vite: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
   web:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     ports:
       - "5173:5173"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
     depends_on:
-      - db
+      - backend
+    restart: unless-stopped
 
   # --- Backend: Node.js/Express ---
   backend:
@@ -31,10 +28,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://fogon_user:fogon_password@db:5432/fogon_dorado
       - PORT=3000
+      - NODE_ENV=production
     depends_on:
       db:
         condition: service_healthy
-    restart: on-failure
+    restart: unless-stopped
 
   # --- Base de Datos: PostgreSQL ---
   db:
@@ -48,6 +46,7 @@ services:
       - POSTGRES_DB=fogon_dorado
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fogon_user -d fogon_dorado"]
       interval: 5s

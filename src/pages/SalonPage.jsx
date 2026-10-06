@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChefHat, CheckCircle, PlusCircle, Receipt, X, Edit3, ShoppingBag, User, AlertTriangle, Clock, Trash, Lock, Tag, Percent, Link2, Bell, Settings, Plus, Utensils, Save, Trash2, Search, Check } from 'lucide-react';
 import { api } from '../api';
+import { pestanaOculta } from '../utils/visibilidad';
 
 const LIMITE_CANCELACION_MS = 5 * 60 * 1000;
 
@@ -249,18 +250,24 @@ export default function SalonPage({ currentUser }) {
     fetchMesas();
     fetchProductos();
     fetchUsuarios();
-    // Sincronización en tiempo real cada 3 segundos (sincroniza mesas y productos para ofertas en vivo)
-    const interval = setInterval(() => {
-      fetchProductos(); // <-- Traer productos para actualizar ofertas en tiempo real
-      if (!modalOpen) {
-        fetchMesas();
-        fetchUsuarios();
-      } else {
-        // Si el modal está abierto, seguimos actualizando las mesas en segundo plano
-        fetchMesas();
+    // Mesas cada 4 segundos; productos (ofertas y stock) y mozos cada 60 segundos.
+    // Como el efecto depende de modalOpen, todo se recarga también al abrir o cerrar el modal de pedido.
+    let ultimaCargaLenta = Date.now();
+    const tick = () => {
+      if (pestanaOculta()) return;
+      fetchMesas();
+      if (Date.now() - ultimaCargaLenta >= 60000) {
+        ultimaCargaLenta = Date.now();
+        fetchProductos();
+        if (!modalOpen) fetchUsuarios();
       }
-    }, 3000);
-    return () => clearInterval(interval);
+    };
+    const interval = setInterval(tick, 4000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, [fetchMesas, fetchProductos, fetchUsuarios, modalOpen]);
 
   const handleUnirMesa = async (numToJoin) => {

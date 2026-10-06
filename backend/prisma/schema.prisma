@@ -55,6 +55,9 @@ model AbonoCredito {
   registradoPor String
   nota        String?
   creadoEn    DateTime @default(now())
+
+  @@index([clienteId])
+  @@index([creadoEn])
 }
 
 // ============================================================
@@ -107,6 +110,10 @@ model Pedido {
 
   items  ItemPedido[]
   Venta  Venta?
+
+  @@index([mesaId, estado])
+  @@index([estado])
+  @@index([createdAt])
 }
 
 model ItemPedido {
@@ -121,6 +128,9 @@ model ItemPedido {
   historial  Boolean  @default(false)
   entregado  Boolean  @default(false)
   notas      String?
+
+  @@index([pedidoId])
+  @@index([productoId])
 }
 
 // ============================================================
@@ -159,6 +169,10 @@ model Venta {
   anuladoEn          DateTime?
   montoOriginal      Float?    // Guarda el monto cobrado originalmente antes de ser devuelto
   createdAt          DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([clienteCreditoId])
+  @@index([estadoSunat])
 }
 
 // ============================================================
@@ -182,6 +196,8 @@ model Compra {
   urlXml         String?   // URL de descarga del XML desde apisunat.pe
   metodoPago     String    @default("Efectivo") // "Efectivo", "Tarjeta", "Yape", "Crédito", "Mixto"
   creadoEn       DateTime  @default(now())
+
+  @@index([creadoEn])
 }
 
 // ============================================================

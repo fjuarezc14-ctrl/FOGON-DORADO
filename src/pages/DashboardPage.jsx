@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Flame, CheckCircle, Banknote, LayoutGrid, ChefHat, Calculator } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import { pestanaOculta } from '../utils/visibilidad';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ ocupadas: 0, totalMesas: 15, enCocina: 0, atendidas: 0, ingresos: 0 });
@@ -32,8 +33,15 @@ export default function DashboardPage() {
     };
 
     updateStats();
-    const interval = setInterval(updateStats, 3000);
-    return () => clearInterval(interval);
+    const tick = () => {
+      if (!pestanaOculta()) updateStats();
+    };
+    const interval = setInterval(tick, 10000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, []);
 
 
