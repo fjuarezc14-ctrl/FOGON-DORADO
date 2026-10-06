@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, CheckCheck, CheckCircle2, User, Truck, GlassWater, XCircle, AlertTriangle } from 'lucide-react';
 import { api } from '../api';
+import { pestanaOculta } from '../utils/visibilidad';
 
 const parseDeliveryInfo = (code) => {
   if (!code || !code.startsWith('DELIVERY -')) return null;
@@ -49,15 +50,16 @@ export default function BarraPage() {
     fetchPedidos();
     fetchCancelaciones();
 
-    // 1. Refresco periódico cada 2 segundos (ultrarrápido)
+    // 1. Refresco periódico cada 3 segundos (se pausa con la pestaña en segundo plano)
     const tick = () => {
+      if (pestanaOculta()) return;
       fetchPedidos();
       fetchCancelaciones();
       setHoraLocal(new Date().toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }));
     };
-    const interval = setInterval(tick, 2000);
+    const interval = setInterval(tick, 3000);
 
     // 2. Refresco instantáneo e inmediato al tocar la pantalla o reactivar la pestaña
     let lastImmediateFetch = 0;

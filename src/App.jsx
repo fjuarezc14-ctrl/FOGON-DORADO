@@ -14,6 +14,7 @@ import CartaPage from './pages/CartaPage';
 import UsuariosPage from './pages/UsuariosPage';
 import EnsaladasPage from './pages/EnsaladasPage';
 import CreditosPage from './pages/CreditosPage';
+import { pestanaOculta } from './utils/visibilidad';
 
 // === PROTECTED ROUTE NAVIGATION GUARD ===
 const ProtectedRoute = ({ children, permission, currentUser }) => {
@@ -340,6 +341,7 @@ function App() {
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     const interval = setInterval(async () => {
+      if (pestanaOculta()) return;
       try {
         const res = await api.checkUserStatus(currentUser.id);
         if (!res || !res.exists || !res.activo) {
@@ -363,7 +365,7 @@ function App() {
       } catch (err) {
         console.error('Error validando sesión periódica:', err);
       }
-    }, 8000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [currentUser]);
 

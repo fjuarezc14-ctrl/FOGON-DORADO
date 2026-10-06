@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, CheckCheck, CheckCircle2, User, Truck, Salad, AlertTriangle } from 'lucide-react';
 import { api } from '../api';
+import { pestanaOculta } from '../utils/visibilidad';
 
 const parseDeliveryInfo = (code) => {
   if (!code || !code.startsWith('DELIVERY -')) return null;
@@ -38,13 +39,19 @@ export default function EnsaladasPage() {
   useEffect(() => {
     fetchPedidos();
     const tick = () => {
+      if (pestanaOculta()) return;
       fetchPedidos();
       setHoraLocal(new Date().toLocaleTimeString('es-PE', {
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       }));
     };
     const interval = setInterval(tick, 3000);
-    return () => clearInterval(interval);
+    // Al volver a la pestaña se refresca de inmediato
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, [fetchPedidos]);
 
   const marcarListoEnsalada = async (pedidoId) => {

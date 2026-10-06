@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Receipt, X, Banknote, Search, CheckCircle, Clock, Sparkles, CreditCard, Wallet, Truck, PackageCheck, Plus, Calculator, Printer, Gift, Tag, Percent, Check, Users, Layers, Ban, AlertTriangle, Trash2, Lock, KeyRound } from 'lucide-react';
 
 import { api } from '../api';
+import { pestanaOculta } from '../utils/visibilidad';
 
 // Helper para parsear la distribución de crédito en ventas con múltiples clientes
 const parsearCreditoSplit = (ofertaDescripcion, defaultClienteId, defaultMonto) => {
@@ -586,24 +587,36 @@ export default function CajaPage({ currentUser }) {
     }
   };
 
-  const fetchCajaData = useCallback(async () => {
+  // completo: además de mesas, ventas y pedidos para llevar, recarga productos, clientes y abonos (más pesados).
+  // Sin argumentos hace la carga completa, que es lo que necesitan las acciones (cobrar, abonar, anular...).
+  const fetchCajaData = useCallback(async ({ completo = true } = {}) => {
     try {
-      const [mesasData, resumenData, llevarData, ventasData, prods, clientsList, abonosList] = await Promise.all([
+      const ligeras = Promise.all([
         api.getMesas().catch(() => []),
         api.getResumenVentas().catch(() => ({ atendidas: 0, ingresos: 0 })),
         api.getPedidosLlevar().catch(() => []),
         api.getHistorialVentas().catch(() => []),
-        api.getProductos().catch(() => []),
-        api.getClientes().catch(() => []),
-        api.getAbonos().catch(() => []),
       ]);
+      const pesadas = completo
+        ? Promise.all([
+            api.getProductos().catch(() => []),
+            api.getClientes().catch(() => []),
+            api.getAbonos().catch(() => []),
+          ])
+        : null;
+
+      const [mesasData, resumenData, llevarData, ventasData] = await ligeras;
       setMesas(mesasData || []);
       setPedidosLlevar(llevarData || []);
       setStats({ atendidas: resumenData?.atendidas || 0, ingresos: resumenData?.ingresos || 0 });
       setVentas(ventasData || []);
-      setProductosMenu(prods || []);
-      setClientes(clientsList || []);
-      setAbonos(abonosList || []);
+
+      if (pesadas) {
+        const [prods, clientsList, abonosList] = await pesadas;
+        setProductosMenu(prods || []);
+        setClientes(clientsList || []);
+        setAbonos(abonosList || []);
+      }
     } catch (err) {
       console.error('Error cargando datos de caja:', err);
     } finally {
@@ -613,10 +626,20 @@ export default function CajaPage({ currentUser }) {
 
   useEffect(() => {
     fetchCajaData();
-    const interval = setInterval(() => {
-      if (!modalOpen && !deliveryModal && !cierreModalOpen) fetchCajaData();
-    }, 4000);
-    return () => clearInterval(interval);
+    // Carga ligera cada 5 segundos y completa cada 60; también completa al abrir o cerrar un modal (cambian las dependencias)
+    let ultimaCargaCompleta = Date.now();
+    const tick = () => {
+      if (pestanaOculta() || modalOpen || deliveryModal || cierreModalOpen) return;
+      const completo = Date.now() - ultimaCargaCompleta >= 60000;
+      if (completo) ultimaCargaCompleta = Date.now();
+      fetchCajaData({ completo });
+    };
+    const interval = setInterval(tick, 5000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, [fetchCajaData, modalOpen, deliveryModal, cierreModalOpen]);
 
   // Alerta sonora y visual en tiempo real al estar listos
