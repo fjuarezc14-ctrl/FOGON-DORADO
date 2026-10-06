@@ -2338,6 +2338,37 @@ app.patch('/api/pedidos/:id/entregar', async (req, res) => {
 // PRODUCTOS (CARTA)
 // ============================================================
 
+// Ranking de ventas por producto: recorre todo el historial, así que se guarda en memoria unos minutos
+const RANKING_VENTAS_TTL_MS = 5 * 60 * 1000;
+let rankingVentasCache = { mapa: null, expira: 0 };
+
+async function obtenerRankingVentas() {
+  if (rankingVentasCache.mapa && Date.now() < rankingVentasCache.expira) {
+    return rankingVentasCache.mapa;
+  }
+
+  const ventasAgrupadas = await prisma.itemPedido.groupBy({
+    by: ['productoId'],
+    _sum: { cantidad: true },
+    where: {
+      pedido: { estado: { not: 'Cancelado' } }
+    }
+  }).catch(() => null);
+
+  // Si la consulta falla, se usa el último ranking conocido (o uno vacío) sin guardarlo en caché
+  if (!ventasAgrupadas) return rankingVentasCache.mapa || {};
+
+  const ventasMap = {};
+  ventasAgrupadas.forEach(v => {
+    if (v.productoId) {
+      ventasMap[v.productoId] = v._sum?.cantidad || 0;
+    }
+  });
+
+  rankingVentasCache = { mapa: ventasMap, expira: Date.now() + RANKING_VENTAS_TTL_MS };
+  return ventasMap;
+}
+
 app.get('/api/productos', async (req, res) => {
   try {
     const productos = await prisma.producto.findMany({
@@ -2346,20 +2377,7 @@ app.get('/api/productos', async (req, res) => {
     });
 
     // Conteo histórico de ventas reales por producto para ranking de popularidad
-    const ventasAgrupadas = await prisma.itemPedido.groupBy({
-      by: ['productoId'],
-      _sum: { cantidad: true },
-      where: {
-        pedido: { estado: { not: 'Cancelado' } }
-      }
-    }).catch(() => []);
-
-    const ventasMap = {};
-    ventasAgrupadas.forEach(v => {
-      if (v.productoId) {
-        ventasMap[v.productoId] = v._sum?.cantidad || 0;
-      }
-    });
+    const ventasMap = await obtenerRankingVentas();
 
     // Obtener todas las ofertas activas (y que estén en su rango de fecha si se especificó)
     const ahora = new Date();
